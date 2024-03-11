@@ -16,9 +16,12 @@ import { InvestorTransactionRatioResponse } from '../stock/responses/InvestorTra
 import { StockService } from '../stock/stock.service';
 import { UtilCommonTemplate } from '../utils/utils.common';
 import { INews } from './dto/save-news.dto';
+import { ISaveStockRecommendWeek } from './dto/saveStockRecommendWeek.dto';
+import { SetFlexiblePageDto } from './dto/setFlexiblePage.dto';
 import { AfternoonReport1, IStockContribute } from './response/afternoonReport1.response';
 import { EventResponse } from './response/event.response';
 import { ExchangeRateResponse } from './response/exchangeRate.response';
+import { ExchangeRateUSDEURResponse } from './response/exchangeRateUSDEUR.response';
 import { ReportIndexResponse } from './response/index.response';
 import { LiquidityMarketResponse } from './response/liquidityMarket.response';
 import { MerchandiseResponse } from './response/merchandise.response';
@@ -29,6 +32,12 @@ import { NewsInternationalResponse } from './response/newsInternational.response
 import { AfterNoonReport2Response, StockMarketResponse } from './response/stockMarket.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
+import { InterestRateResponse } from '../macro/responses/interest-rate.response'
+import { BuyingAndSellingStatisticsResponse } from './response/buyingAndSellingStatistics.response';
+import * as calTech from 'technicalindicators';
+import { GetStockRecommendWeekResponse } from './response/getStockRecommendWeek.response';
+import { Time } from 'mssql';
+import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
 
 @Injectable()
 export class ReportService {
@@ -121,23 +130,35 @@ export class ReportService {
     return
   }
 
-  async newsInternational(quantity: number) {
+  async newsInternational(quantity: number, type: number) {
     try {
-      const data = await this.mssqlService.query<NewsInternationalResponse[]>(`
-      select distinct top ${quantity || 7} Title as title, Href as href, Date from macroEconomic.dbo.TinTucQuocTe order by Date desc
-      `)
+      let data = []
+      if (!type) {
+        data = await this.mssqlService.query<NewsInternationalResponse[]>(`
+        select distinct top ${quantity || 7} Title as title, Href as href, Date, SubTitle as sub_title from macroEconomic.dbo.TinTucQuocTe order by Date desc
+        `)
+      } else {
+        data = await this.redis.get(RedisKeys.weekNewsInternationalNotFilter) || []
+      }
+
       const dataMapped = NewsInternationalResponse.mapToList(data)
       return dataMapped
+
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async newsDomestic(quantity: number) {
+  async newsDomestic(quantity: number, type: number) {
     try {
-      const data = await this.mssqlService.query<NewsInternationalResponse[]>(`
-      select distinct top ${quantity || 6} Title as title, Href as href, Date from macroEconomic.dbo.TinTucViMo order by Date desc
-      `)
+      let data = []
+      if (!type) {
+        data = await this.mssqlService.query<NewsInternationalResponse[]>(`
+        select distinct top ${quantity || 6} Title as title, Href as href, Date, SubTitle as sub_title from macroEconomic.dbo.TinTucViMo order by Date desc
+        `)
+      } else {
+        data = await this.redis.get(RedisKeys.weekNewsDomesticNotFilter) || []
+      }
       const dataMapped = NewsInternationalResponse.mapToList(data)
       return dataMapped
     } catch (e) {
@@ -159,7 +180,10 @@ export class ReportService {
 
   async event() {
     try {
-      const data = await this.mssqlService.query<EventResponse[]>(`select distinct top 15 ticker, NoiDungSuKien as title, NgayGDKHQ as date from PHANTICH.dbo.LichSukien order by NgayGDKHQ desc`)
+      const data = await this.mssqlService.query<EventResponse[]>(`
+      select distinct top 15 ticker, i.floor, NoiDungSuKien as title, NgayGDKHQ as date, NgayDKCC, NgayThucHien from PHANTICH.dbo.LichSukien l 
+      inner join marketInfor.dbo.info i on i.code = l.ticker
+       order by NgayGDKHQ desc`)
       const dataMapped = EventResponse.mapToList(data)
       return dataMapped
     } catch (e) {
@@ -171,9 +195,13 @@ export class ReportService {
     try {
       const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.exchangeRateVCB order by date desc`))[0].date).format('YYYY-MM-DD')
       const prev = moment(now).subtract(1, 'day').format('YYYY-MM-DD')
+      const week = moment(now).subtract(1, 'week').format('YYYY-MM-DD')
       const month = moment(now).subtract(1, 'month').format('YYYY-MM-DD')
       const year = moment(now).subtract(1, 'year').endOf('year').format('YYYY-MM-DD')
-      
+
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, year, week])
+      const pivot = same_day.map(item => `[${item}]`).join(',')
+
       const code = `
       'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD'
       `
@@ -188,14 +216,15 @@ export class ReportService {
         ${sort}
       FROM macroEconomic.dbo.exchangeRateVCB
       WHERE code IN (${code})
-      AND date IN ('${now}', '${prev}', '${year}', '${month}'))
+      AND date IN ('${now}', '${prev}', '${week}', '${year}', '${month}'))
       SELECT
         code,
         [${now}] AS price,
         ([${now}] - [${prev}]) / [${prev}] * 100 AS day,
+        ([${now}] - [${week}]) / [${week}] * 100 AS week,
         ([${now}] - [${month}]) / [${month}] * 100 AS month,
         ([${now}] - [${year}]) / [${year}] * 100 AS year
-      FROM temp AS source PIVOT (SUM(bySell) FOR date IN ([${now}], [${prev}], [${year}], [${month}])) AS chuyen
+      FROM temp AS source PIVOT (SUM(bySell) FOR date IN (${pivot})) AS chuyen
       `
 
       const data = await this.mssqlService.query<ExchangeRateResponse[]>(query)
@@ -209,33 +238,58 @@ export class ReportService {
   async merchandise() {
     try {
       const name = `N'Dầu Brent', N'Dầu Thô', N'Vàng', N'Cao su', N'Đường', N'Khí Gas', N'Thép', N'Xăng'`
-      const sort = `case ${name.split(',').map((item, index) => `when h.name = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const sort = `case ${name.split(',').map((item, index) => `when t2.name = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
 
       const query = `
-      WITH temp
-      AS (SELECT
-        MAX(lastUpdated) AS date,
+      with temp as (select name, price,
+              date,
+              unit,
+              DATEADD(MONTH, -1, date) as month,
+              DATEADD(WEEK, -1, date) as week,
+              DATEADD(YEAR, -1, date) as year,
+              DATEFROMPARTS(YEAR(date) - 1, 12, 31) AS ytd
+      from macroEconomic.dbo.HangHoa
+      where name in (${name}) and id is not null
+      ),
+      temp_2 as (SELECT
+          name,
+        price,
+        unit,
+        date,
+        lead(price) over (partition by name order by date desc) as day,
+        lead(date) over (partition by name order by date desc) as day_d,
+        (select top 1 price from macroEconomic.dbo.HangHoa where date = (select max(date) from macroEconomic.dbo.HangHoa where date <= week and name = temp.name) and name = temp.name) as week,
+        (select max(date) from macroEconomic.dbo.HangHoa where date <= week and name = temp.name) as week_d,
+        (select top 1 price from macroEconomic.dbo.HangHoa where date = (select max(date) from macroEconomic.dbo.HangHoa where date <= month and name = temp.name) and name = temp.name) as month,
+        (select max(date) from macroEconomic.dbo.HangHoa where date <= month and name = temp.name) as month_d,
+        (select top 1 price from macroEconomic.dbo.HangHoa where date = (select max(date) from macroEconomic.dbo.HangHoa where date <= year and name = temp.name) and name = temp.name) as year,
+        (select max(date) from macroEconomic.dbo.HangHoa where date <= year and name = temp.name) as year_d,
+        (select top 1 price from macroEconomic.dbo.HangHoa where date = (select max(date) from macroEconomic.dbo.HangHoa where date <= ytd and name = temp.name) and name = temp.name) as ytd,
+        (select max(date) from macroEconomic.dbo.HangHoa where date <= ytd and name = temp.name) as year_to_date_d
+      FROM
+        temp),
+      temp_3 as (
+        SELECT
+        MAX(date) AS date,
         name
       FROM macroEconomic.dbo.HangHoa
       WHERE unit != ''
-      GROUP BY name)
-      SELECT
-        h.name + ' (' + h.unit + ')' AS name,
-        price,
-        change1D AS day,
-        change1M AS month,
-        change1Y AS year,
-        changeYTD AS ytd,
-        ${sort}
-      FROM macroEconomic.dbo.HangHoa h
-      INNER JOIN temp t
-        ON t.name = h.name
-        AND t.date = h.lastUpdated
-      WHERE h.id IS NOT NULL
-      AND h.name IN (${name})
-      ORDER BY row_num ASC, h.name ASC
+      GROUP BY name
+      )
+      select
+          t2.name + ' (' + t2.unit + ')' AS name,
+          t2.date,
+          price,
+              (price - day) / day * 100 as day,
+              (price - week) / week * 100 as week,
+              (price - month) / month * 100 as month,
+              (price - year) / year * 100 as year,
+              (price - ytd) / ytd * 100 as ytd,
+              ${sort}
+              from temp_2 t2
+              inner join temp_3 t3 on t3.name = t2.name and t3.date = t2.date
+      order by row_num
       `
-      
       const data = await this.mssqlService.query<MerchandiseResponse[]>(query)
       const dataMapped = MerchandiseResponse.mapToList(data)
       return dataMapped
@@ -253,16 +307,22 @@ export class ReportService {
         `with date_ranges as (
           select
               max(case when date <= '${moment(now).subtract(1, 'day').format('YYYY-MM-DD')}' then date else null end) as prev,
+              max(case when date <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week,
               max(case when date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then date else null end) as month,
               max(case when date <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then date else null end) as ytd
           from macroEconomic.dbo.EconomicVN_byTriVo
       )
-      select prev, month, ytd
+      select prev, week, month, ytd
       from date_ranges;`
       )
+
       const prev = moment(date[0].prev).format('YYYY-MM-DD')
       const month = moment(date[0].month).format('YYYY-MM-DD')
+      const week = moment(date[0].week).format('YYYY-MM-DD')
       const ytd = moment(date[0].ytd).format('YYYY-MM-DD')
+
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week])
+      const pivot = same_day.map(item => `[${item}]`).join(',')
 
       const query = `
       WITH temp
@@ -272,16 +332,18 @@ export class ReportService {
         value,
         ${sort}
       FROM macroEconomic.dbo.EconomicVN_byTriVo
-      WHERE date IN ('${now}', '${prev}', '${month}', '${ytd}')
+      WHERE date IN ('${now}', '${prev}', '${week}', '${month}', '${ytd}')
       AND code IN (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng'))
       SELECT
         code,
         [${now}] AS price,
         ([${now}] - [${prev}]) / [${prev}] * 100 AS day,
+        ([${now}] - [${week}]) / [${week}] * 100 AS week,
         ([${now}] - [${month}]) / [${month}] * 100 AS month,
         ([${now}] - [${ytd}]) / [${ytd}] * 100 AS year
-      FROM temp PIVOT (SUM(value) FOR date IN ([${now}], [${prev}], [${month}], [${ytd}])) AS chuyen
+      FROM temp PIVOT (SUM(value) FOR date IN (${pivot})) AS chuyen
       `
+
       const data = await this.mssqlService.query<ExchangeRateResponse[]>(query)
       const dataMapped = ExchangeRateResponse.mapToList(data)
       return dataMapped
@@ -290,116 +352,102 @@ export class ReportService {
     }
   }
 
-  async stockMarket() {
+  async stockMarket(type: number) { //0 - sáng, 1 - tuần
     try {
-      const name = `
-      'Dow Jones', 'Nikkei 225', 'Shanghai', 'FTSE 100'
-      `
-      const index = `
-      'VNINDEX', 'VN30', 'HNX', 'UPCOM'
-      `
-      const sort = `case ${name.split(',').map((item, index) => `when t.name = ${item.replace(/\n/g, "").trim()} then ${index + 4}`).join(' ')} end as row_num`
-      const sort_1 = `case ${index.split(',').map((item, index) => `when t.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      let index = ''
+      switch (+type) {
+        case 0: //sáng
+          index = `
+          'VNINDEX', 'VN30', 'HNX', 'UPCOM', 'Dow Jones', 'Nikkei 225', 'Shanghai', 'FTSE 100'
+          `
+          break;
+        case 1: //tuần
+          index = `
+        'VNINDEX', 'Dow Jones', 'Nikkei 225', 'Shanghai', 'FTSE 100', 'DAX', 'STI', 'KLCI', 'IDX', 'SET', 'PSEI', 'Dollar Index', 'Dollar Index', 'U.S.10Y'      
+        `
+          break
+        case 2: //tuần trang 3
+          index = `'VNINDEX', 'VN30', 'VNMID'`
+          break
+        default:
+          break;
+      }
 
+      const sort = `case ${index.split(',').map((item, index) => `when t2.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
       const query = `
-      WITH temp
-      AS (SELECT
-        name,
+      with temp as (select name as code, closePrice,
+        date,
+        DATEADD(MONTH, -1, date) as month,
+        DATEADD(WEEK, -1, date) as week,
+        DATEADD(YEAR, -1, date) as year,
+        DATEFROMPARTS(YEAR(date) - 1, 12, 31) AS ytd,
+        1 as id
+      from macroEconomic.dbo.WorldIndices
+      union all
+      select code, closePrice,
+              date,
+              DATEADD(MONTH, -1, date) as month,
+              DATEADD(WEEK, -1, date) as week,
+              DATEADD(YEAR, -1, date) as year,
+              DATEFROMPARTS(YEAR(date) - 1, 12, 31) AS ytd,
+              0 as id
+      from marketTrade.dbo.indexTradeVND
+      ),
+      temp_2 as (SELECT
+          code,
         closePrice,
         date,
-        (closePrice - LEAD(closePrice) OVER (PARTITION BY name ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY name ORDER BY date DESC) * 100 AS prev,
-        (closePrice - LEAD(closePrice, 19) OVER (PARTITION BY name ORDER BY date DESC)) / LEAD(closePrice, 19) OVER (PARTITION BY name ORDER BY date DESC) * 100 AS month,
-        (closePrice - LEAD(closePrice, 249) OVER (PARTITION BY name ORDER BY date DESC)) / LEAD(closePrice, 249) OVER (PARTITION BY name ORDER BY date DESC) * 100 AS year
-      FROM macroEconomic.dbo.WorldIndices
-      WHERE name IN ('Dow Jones', 'Nikkei 225', 'Shanghai', 'FTSE 100')),
-      max_date
-      AS (SELECT
-        MAX(date) AS date,
-        name
-      FROM temp
-      GROUP BY name),
-      ytd_date
-      AS (SELECT
-        MIN(date) AS date,
-        name
-      FROM macroEconomic.dbo.WorldIndices
-      WHERE YEAR(date) = YEAR(GETDATE())
-      GROUP BY name),
-      ytd_price
-      AS (SELECT
-        t.name,
-        t.date,
-        t.closePrice
-      FROM temp t
-      INNER JOIN ytd_date y
-        ON t.name = y.name
-        AND t.date = y.date),
-
-      temp_1
-      AS (SELECT
-        code,
-        closePrice,
-        date,
-        (closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS prev,
-        (closePrice - LEAD(closePrice, 19) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice, 19) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS month,
-        (closePrice - LEAD(closePrice, 249) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice, 249) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS year
-      FROM marketTrade.dbo.indexTradeVND
-      WHERE code IN ('VNINDEX', 'HNX', 'UPCOM', 'VN30')),
-      max_date_1
-      AS (SELECT
-        MAX(date) AS date,
-        code
-      FROM temp_1
-      GROUP BY code),
-      ytd_date_1
-      AS (SELECT
-        MIN(date) AS date,
-        code
-      FROM marketTrade.dbo.indexTradeVND
-      WHERE YEAR(date) = YEAR(GETDATE())
-      GROUP BY code),
-      ytd_price_1
-      AS (SELECT
-        t.code,
-        t.date,
-        t.closePrice
-      FROM temp_1 t
-      INNER JOIN ytd_date_1 y
-        ON t.code = y.code
-        AND t.date = y.date)
-
-      SELECT
-        t.code,
-        t.closePrice AS price,
-        t.prev AS day,
-        t.month,
-        t.year,
-        (t.closePrice - y.closePrice) / y.closePrice * 100 AS ytd,
-        ${sort_1}
-      FROM temp_1 t
-      INNER JOIN max_date_1 m
-        ON t.date = m.date
-        AND t.code = m.code
-      INNER JOIN ytd_price_1 y
-        ON t.code = y.code
-
-      UNION ALL
-      SELECT
-        t.name AS code,
-        t.closePrice AS price,
-        t.prev AS day,
-        t.month,
-        t.year,
-        (t.closePrice - y.closePrice) / y.closePrice * 100 AS ytd,
-        ${sort}
-      FROM temp t
-      INNER JOIN max_date m
-        ON t.date = m.date
-        AND t.name = m.name
-      INNER JOIN ytd_price y
-        ON t.name = y.name
-      ORDER BY row_num ASC
+        lead(closePrice) over (partition by code order by date desc) as day,
+        lead(date) over (partition by code order by date desc) as day_d,
+        case when id = 1 then (select top 1 closePrice from macroEconomic.dbo.WorldIndices where date = (select max(date) from macroEconomic.dbo.WorldIndices where date <= week and name = temp.code) and name = temp.code)
+            when id = 0 then
+            (select top 1 closePrice from marketTrade.dbo.indexTradeVND where date = (select max(date) from marketTrade.dbo.indexTradeVND where date <= week and code = temp.code) and code = temp.code)
+            end as week,
+        case when id = 1 then (select max(date) from macroEconomic.dbo.WorldIndices where date <= week and name = temp.code)
+            when id = 0 then (select max(date) from marketTrade.dbo.indexTradeVND where date <= week and code = temp.code)
+            end as week_d,
+        case when id = 1 then (select top 1 closePrice from macroEconomic.dbo.WorldIndices where date = (select max(date) from macroEconomic.dbo.WorldIndices where date <= month and name = temp.code) and name = temp.code)
+            when id = 0 then
+            (select top 1 closePrice from marketTrade.dbo.indexTradeVND where date = (select max(date) from marketTrade.dbo.indexTradeVND where date <= month and code = temp.code) and code = temp.code)
+            end as month,
+        case when id = 1 then (select max(date) from macroEconomic.dbo.WorldIndices where date <= month and name = temp.code)
+            when id = 0 then (select max(date) from marketTrade.dbo.indexTradeVND where date <= month and code = temp.code)
+            end as month_d,
+        case when id = 1 then (select top 1 closePrice from macroEconomic.dbo.WorldIndices where date = (select max(date) from macroEconomic.dbo.WorldIndices where date <= year and name = temp.code) and name = temp.code)
+            when id = 0 then
+            (select top 1 closePrice from marketTrade.dbo.indexTradeVND where date = (select max(date) from marketTrade.dbo.indexTradeVND where date <= year and code = temp.code) and code = temp.code)
+            end as year,
+        case when id = 1 then (select max(date) from macroEconomic.dbo.WorldIndices where date <= year and name = temp.code)
+            when id = 0 then (select max(date) from marketTrade.dbo.indexTradeVND where date <= year and code = temp.code)
+            end as year_d,
+        case when id = 1 then (select top 1 closePrice from macroEconomic.dbo.WorldIndices where date = (select max(date) from macroEconomic.dbo.WorldIndices where date <= ytd and name = temp.code) and name = temp.code)
+            when id = 0 then
+            (select top 1 closePrice from marketTrade.dbo.indexTradeVND where date = (select max(date) from marketTrade.dbo.indexTradeVND where date <= ytd and code = temp.code) and code = temp.code)
+            end as ytd,
+        case when id = 1 then (select max(date) from macroEconomic.dbo.WorldIndices where date <= ytd and name = temp.code)
+            when id = 0 then (select max(date) from marketTrade.dbo.indexTradeVND where date <= ytd and code = temp.code)
+            end as year_to_date_d
+      FROM
+        temp),
+        temp_3 as (
+          select max(date) as date, code from temp_2 group by code
+      )
+      select
+          t2.code,
+          t2.date,
+          closePrice as price,
+              (closePrice - day) / day * 100 as day,
+              (closePrice - week) / week * 100 as week,
+              (closePrice - month) / month * 100 as month,
+              (closePrice - year) / year * 100 as year,
+              (closePrice - ytd) / ytd * 100 as ytd,
+              ${sort}
+              from temp_2 t2
+              inner join temp_3 t3 on t3.code = t2.code and t3.date = t2.date
+              where t2.code in (${index})
+              order by row_num asc
       `
+
       const data = await this.mssqlService.query<StockMarketResponse[]>(query)
       const dataMapped = StockMarketResponse.mapToList(data)
       return dataMapped
@@ -445,10 +493,10 @@ export class ReportService {
       WHERE date = (SELECT
         MAX(date)
       FROM temp)
-      `  
+      `
 
-      const [data, data_2] = await Promise.all([this.mssqlService.query<any[]>(query), this.mssqlService.query<any[]>(query_2)]) 
-        
+      const [data, data_2] = await Promise.all([this.mssqlService.query<any[]>(query), this.mssqlService.query<any[]>(query_2)])
+
       const reduceData = data.reduce((result, cur) => {
         const index = result.findIndex(item => item.code == cur.code)
         if (index == -1) {
@@ -652,22 +700,22 @@ export class ReportService {
       `)
 
       const [data_1, data_2, data_3] = await Promise.all([promise_1, promise_2, promise_3]) as any
-      
-      return { text: [data_1[0].text_1, data_1[0].text_2], stock: data_2, stock_sell: data_3}
-     
+
+      return { text: [data_1[0].text_1, data_1[0].text_2], stock: data_2, stock_sell: data_3 }
+
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async identifyMarketRedis(){
+  async identifyMarketRedis() {
     try {
       const [data_1, data_2, data_3] = await Promise.all([
-        this.redis.get(RedisKeys.saveIdentifyMarket), 
+        this.redis.get(RedisKeys.saveIdentifyMarket),
         this.redis.get(RedisKeys.saveStockRecommend),
         this.redis.get(RedisKeys.saveStockSellRecommend),
       ])
-      return {text: data_1, stock_buy: data_2, stock_sell: data_3}
+      return { text: data_1, stock_buy: data_2, stock_sell: data_3 }
     } catch (e) {
       throw new CatchException(e)
     }
@@ -686,16 +734,46 @@ export class ReportService {
         case 2:
           name_redis = RedisKeys.morningNewsEnterprise
           break
+        case 3:
+          name_redis = RedisKeys.weekNewsInternational
+          break
+        case 4:
+          name_redis = RedisKeys.weekNewsDomestic
+          break
         default:
           break;
       }
-      await this.redis.set(name_redis, value, {ttl: TimeToLive.OneYear})
+      if (id == 0) {
+        const data_week: any[] = await this.redis.get(RedisKeys.weekNewsInternationalNotFilter) || []
+        await this.redis.set(RedisKeys.weekNewsInternationalNotFilter, this.removeDuplicateObjects([...data_week, ...value]), { ttl: TimeToLive.OneDay })
+      }
+      if (id == 1) {
+        const data_week: any[] = await this.redis.get(RedisKeys.weekNewsDomesticNotFilter) || []
+        await this.redis.set(RedisKeys.weekNewsDomesticNotFilter, this.removeDuplicateObjects([...data_week, ...value]), { ttl: TimeToLive.OneDay })
+      }
+      await this.redis.set(name_redis, value, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async getNews(id: number){
+  removeDuplicateObjects(arr: any[]) {
+    const uniqueObjects = [];
+    const uniqueObjectStrings = [];
+
+    for (const obj of arr) {
+      const objString = JSON.stringify(obj);
+
+      if (!uniqueObjectStrings.includes(objString)) {
+        uniqueObjectStrings.push(objString);
+        uniqueObjects.push(obj);
+      }
+    }
+
+    return uniqueObjects;
+  }
+
+  async getNews(id: number) {
     try {
       let name_redis = ''
       switch (+id) {
@@ -708,6 +786,12 @@ export class ReportService {
         case 2:
           name_redis = RedisKeys.morningNewsEnterprise
           break
+        case 3:
+          name_redis = RedisKeys.weekNewsInternational
+          break
+        case 4:
+          name_redis = RedisKeys.weekNewsDomestic
+          break
         default:
           break;
       }
@@ -718,40 +802,64 @@ export class ReportService {
     }
   }
 
-  async saveIdentifyMarket(text: string[]){
+  async saveIdentifyMarket(text: string[]) {
     try {
-      await this.redis.set(RedisKeys.saveIdentifyMarket, text, {ttl: TimeToLive.OneYear})
+      await this.redis.set(RedisKeys.saveIdentifyMarket, text, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async saveStockRecommend(stock: any[], stock_sell: any[]){
+  async saveStockRecommend(stock: any[], stock_sell: any[]) {
     try {
-      await this.redis.set(RedisKeys.saveStockRecommend, stock, {ttl: TimeToLive.OneYear})
-      await this.redis.set(RedisKeys.saveStockSellRecommend, stock_sell, {ttl: TimeToLive.OneYear})
+      await this.redis.set(RedisKeys.saveStockRecommend, stock, { ttl: TimeToLive.OneYear })
+      await this.redis.set(RedisKeys.saveStockSellRecommend, stock_sell, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async saveMarketMovements(text: string[]){
+  async saveStockRecommendWeek(b: ISaveStockRecommendWeek[]) {
     try {
-      await this.redis.set(RedisKeys.saveMarketMovements, text, {ttl: TimeToLive.OneYear})
+      await this.redis.set(RedisKeys.saveStockRecommendWeek, b, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async saveMarketComment(text: string[]){
+  async saveMarketMovements(text: string[]) {
     try {
-      await this.redis.set(RedisKeys.saveMarketComment, text, {ttl: TimeToLive.OneYear})
+      await this.redis.set(RedisKeys.saveMarketMovements, text, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async afternoonReport1(){
+  async saveMarketComment(text: string[], img: string) {
+    try {
+      await this.redis.set(RedisKeys.saveMarketComment, { img, text }, { ttl: TimeToLive.OneYear })
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async saveMarketWeekComment(text: string[]) {
+    try {
+      await this.redis.set(RedisKeys.saveMarketWeekComment, text, { ttl: TimeToLive.OneYear })
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async saveMarketWeekPage2(text: string[]) {
+    try {
+      await this.redis.set(RedisKeys.saveMarketWeekPage2, text, { ttl: TimeToLive.OneYear })
+    } catch (error) {
+
+    }
+  }
+
+  async afternoonReport1() {
     try {
       //chart vnindex
       const promise_1 = this.mssqlService.query(`
@@ -853,7 +961,7 @@ export class ReportService {
         advances: data_2[0].advances,
         declines: data_2[0].declines,
         noChange: data_2[0].noChange,
-        ceilingStocks: data_2[0].ceilingStocks, 
+        ceilingStocks: data_2[0].ceilingStocks,
         floorStocks: data_2[0].floorStocks,
         highPrice: data_2[0].highPrice,
         lowPrice: data_2[0].lowPrice,
@@ -872,13 +980,15 @@ export class ReportService {
         stockDecline: data_5.slice(5, 10),
         topBuy: data_6.slice(0, 3),
         topSell: data_6.slice(5, 8),
-        chart: data_1.map(item => ({time: Date.UTC(
-          new Date().getFullYear(),
-          new Date().getMonth(),
-          new Date().getDate(),
-          new Date(item?.time)?.getHours(),
-          new Date(item?.time)?.getMinutes(),
-        ).valueOf(), value: item.value})),
+        chart: data_1.map(item => ({
+          time: Date.UTC(
+            new Date().getFullYear(),
+            new Date().getMonth(),
+            new Date().getDate(),
+            new Date(item?.time)?.getHours(),
+            new Date(item?.time)?.getMinutes(),
+          ).valueOf(), value: item.value
+        })),
         chartTopMarket: [...data_5.slice(0, 5), ...data_5.slice(5, 10).reverse()],
         chartTopForeign: [...data_6.slice(0, 5), ...data_6.slice(5, 10).reverse()],
         chartTopTotalVal: data_7,
@@ -891,66 +1001,11 @@ export class ReportService {
     }
   }
 
-  async afternoonReport2(){
+  async afternoonReport2() {
     try {
       const index = `'VNINDEX', 'HNX', 'UPCOM', 'VN30', 'HNX30'`
       const sort_1 = `case ${index.split(',').map((item, index) => `when t.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
-
       const query = `
-      with temp_1
-      AS (SELECT
-        code,
-        closePrice,
-        date,
-        totalVal,
-        (closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS prev,
-        (closePrice - LEAD(closePrice, 5) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice, 5) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS week,
-        (closePrice - LEAD(closePrice, 19) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice, 19) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS month,
-        (closePrice - LEAD(closePrice, 249) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice, 249) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS year
-      FROM marketTrade.dbo.indexTradeVND
-      WHERE code IN (${index})),
-      max_date_1
-      AS (SELECT
-        MAX(date) AS date,
-        code
-      FROM temp_1
-      GROUP BY code),
-      ytd_date_1
-      AS (SELECT
-        MIN(date) AS date,
-        code
-      FROM marketTrade.dbo.indexTradeVND
-      WHERE YEAR(date) = YEAR(GETDATE())
-      GROUP BY code),
-      ytd_price_1
-      AS (SELECT
-        t.code,
-        t.date,
-        t.closePrice
-      FROM temp_1 t
-      INNER JOIN ytd_date_1 y
-        ON t.code = y.code
-        AND t.date = y.date)
-
-      SELECT
-        t.code,
-        t.closePrice AS price,
-        t.prev AS day,
-        t.week,
-        t.month,
-        t.year,
-        (t.closePrice - y.closePrice) / y.closePrice * 100 AS ytd,
-        totalVal,
-        ${sort_1}
-      FROM temp_1 t
-      INNER JOIN max_date_1 m
-        ON t.date = m.date
-        AND t.code = m.code
-      INNER JOIN ytd_price_1 y
-        ON t.code = y.code
-      ORDER BY row_num ASC  
-      `
-      const query_1 = `
       with temp as (select code, closePrice,
               date,
               totalVal,
@@ -992,20 +1047,21 @@ export class ReportService {
               and code IN (${index})
               order by row_num asc
       `
-      const data = await this.mssqlService.query(query_1)
+      const data = await this.mssqlService.query(query)
+      const dataRedis: any = await this.redis.get(RedisKeys.saveMarketComment)
       return new AfterNoonReport2Response({
         table: data,
-        text: await this.redis.get(RedisKeys.saveMarketComment) || [],
-        image: await this.redis.get('image-report'),
+        text: dataRedis?.text || [],
+        image: dataRedis?.img || '',
       })
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  async uploadImageReport(file: any[]) {
+  async uploadImageReport(file: any[], type: number) {
     const now = moment().format('YYYYMMDDHHmmss')
-    await this.redis.set('image-report', `resources/report/${now}.jpg`, {ttl: TimeToLive.OneDay})
+    await this.redis.set(type ? 'image-report-week' : 'image-report', `resources/report/${now}.jpg`, { ttl: TimeToLive.OneDay })
     for (const item of file) {
       await this.minio.put(`resources`, `report/${now}.jpg`, item.buffer, {
         'Content-Type': item.mimetype,
@@ -1015,22 +1071,50 @@ export class ReportService {
     return
   }
 
-  async transactionValueFluctuations(){
+  async transactionValueFluctuations(type: number) {
     try {
       const industry = `N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ'`
-      const sort = `case ${industry.split(',').map((item, index) => `when code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
-      const query = `
+      const sort = `case ${industry.split(',').map((item, index) => `when n.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const { now, prev, prev_4 } = this.get2WeekNow()
+
+      const query = type == 0 ? `
       with temp as (select code,
               date,
               totalVal,
               lead(totalVal) over (partition by code order by date desc) as prevTotalVal,
               AVG(totalVal) OVER (partition by code order by date ROWS BETWEEN 19 preceding AND current row) AS avgTotalVal,
               ${sort}
-      from marketTrade.dbo.inDusTrade
+      from marketTrade.dbo.inDusTrade n
       where floor = 'HOSE'
       and code in (${industry}))
       select * from temp where date = (select max(date) from temp) order by row_num asc
+      ` : `
+      with now as (select sum(totalVal) as now, code
+                  from marketTrade.dbo.inDusTrade
+                  where date between '${now.from}' and '${now.to}'
+                    and floor = 'HOSE'
+                  group by code),
+      prev as (
+      select sum(totalVal) as prev, code
+                  from marketTrade.dbo.inDusTrade
+                  where date between '${prev.from}' and '${prev.to}'
+                    and floor = 'HOSE'
+                  group by code
+          ),
+          prev_4 as (
+              select sum(totalVal) / 4 as prev_4, code
+              from marketTrade.dbo.inDusTrade
+                  where date between '${prev_4.from}' and '${prev_4.to}'
+                    and floor = 'HOSE'
+                  group by code
+          )
+      select n.code, n.now as totalVal, p.prev as prevTotalVal, p4.prev_4 as avgTotalVal, ${sort} from now n
+      inner join prev p on n.code = p.code
+      inner join prev_4 p4 on n.code = p4.code
+      where n.code in (${industry})
+      order by row_num      
       `
+
       const data = await this.mssqlService.query<TransactionValueFluctuationsResponse[]>(query)
       const dataMapped = TransactionValueFluctuationsResponse.mapToList(data)
       return dataMapped
@@ -1039,7 +1123,7 @@ export class ReportService {
     }
   }
 
-  async liquidityMarket(){
+  async liquidityMarket() {
     try {
       const query = `
       select top 60 omVal as value, date from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' order by date desc
@@ -1052,7 +1136,7 @@ export class ReportService {
     }
   }
 
-  async cashFlowRatio(){
+  async cashFlowRatio() {
     try {
       const query = `
       with date as (
@@ -1136,12 +1220,12 @@ export class ReportService {
     }
   }
 
-  async topNetBuyingAndSelling(type: number){
+  async topNetBuyingAndSelling(type: number) {
     try {
       const query = `
       select netVal as value, code, date from marketTrade.dbo.${type == 0 ? 'inDusForeign' : 'inDusProprietary'} where floor = 'HOSE' and date = (select max(date) from marketTrade.dbo.${type == 0 ? 'inDusForeign' : 'inDusProprietary'}) order by netVal desc
       `
-      
+
       const data: any[] = await this.mssqlService.query(query)
       const dataMapped = IStockContribute.mapToList([...data.slice(0, 3), ...data.slice(-3)])
       return dataMapped
@@ -1150,7 +1234,7 @@ export class ReportService {
     }
   }
 
-  async cashFlow(type: number){
+  async cashFlow(type: number) {
     try {
       const query = `
       with temp as (select top 20 date, netVal as value from marketTrade.dbo.[${type == 0 ? 'foreign' : 'proprietary'}] where code = 'VNINDEX' order by date desc)
@@ -1164,7 +1248,7 @@ export class ReportService {
     }
   }
 
-  async industry(){
+  async industry(type: number) {
     try {
       const {
         latestDate,
@@ -1172,11 +1256,12 @@ export class ReportService {
         weekDate,
         monthDate,
         firstDateYear,
-      }: SessionDatesInterface = await this.stockService.getSessionDate(
+      } = await this.getDateSessionV2(
         '[RATIO].[dbo].[ratioInday]',
         'date',
-        this.dbServer
+        // this.dbServer
       );
+
       const marketCapQuery = `
           SELECT
           i.date AS date_time,
@@ -1201,7 +1286,7 @@ export class ReportService {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
       }, {});
-  
+
       //Calculate change percent per day, week, month
       const industryChanges = Object.entries(groupByIndustry).map(
         ([industry, values]: any) => {
@@ -1226,25 +1311,27 @@ export class ReportService {
           };
         },
       );
-  
+
       const query = (date): string => `
             SELECT
               i.LV2 AS industry,
               t.code AS ticker,
               t.closePrice AS close_price,
               t.highPrice AS high,
+              t.floorPrice,
+              t.ceilingPrice,
               t.lowPrice AS low,
               t.date AS date_time
             FROM marketTrade.dbo.tickerTradeVND t
             INNER JOIN marketInfor.dbo.info i
               ON t.code = i.code
-            WHERE t.date = '${date}'
+            WHERE t.date = '${UtilCommonTemplate.toDate(date)}'
             AND i.floor = 'HOSE'
             AND i.LV2 IN (N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ', N'Công nghệ', N'Dầu khí')
             `
       const dataToday = await this.dbServer.query(query(latestDate))
-      const dataYesterday = await this.dbServer.query(query(previousDate))
-  
+      const dataYesterday = await this.dbServer.query(query(type ? weekDate : previousDate))
+
       const result = dataToday.map((item) => {
         const yesterdayItem = dataYesterday.find(i => i.ticker === item.ticker);
         if (!yesterdayItem) return;
@@ -1253,11 +1340,11 @@ export class ReportService {
           equal: isEqual(yesterdayItem, item),
           increase: isIncrease(yesterdayItem, item),
           decrease: isDecrease(yesterdayItem, item),
-          high: isHigh(yesterdayItem, item),
-          low: isLow(yesterdayItem, item),
+          high: isHigh(yesterdayItem, item, type),
+          low: isLow(yesterdayItem, item, type),
         };
       });
-  
+
       const final = result.reduce((stats, record) => {
         const existingStats = stats.find(
           (s) => s?.industry === record?.industry,
@@ -1266,7 +1353,7 @@ export class ReportService {
           (i) => i?.industry == record?.industry,
         );
         if (!industryChange) return stats;
-  
+
         if (existingStats) {
           existingStats.equal += record.equal;
           existingStats.increase += record.increase;
@@ -1286,14 +1373,1099 @@ export class ReportService {
         }
         return stats;
       }, []);
-      
+
       const mappedData: IndustryResponse[] = [
         ...new IndustryResponse().mapToList(final),
       ].sort((a, b) => (a.industry > b.industry ? 1 : -1));
-  
+
       return mappedData
     } catch (e) {
       throw new CatchException(e)
     }
   }
+
+  get2WeekNow() {
+    let friday_1 = moment().format('YYYY-MM-DD')
+
+    if (moment(friday_1).day() !== 5) {
+      friday_1 = moment(friday_1).clone().day(5).subtract(1, 'weeks').startOf('day').format('YYYY-MM-DD');
+    }
+
+    const friday_2 = moment(friday_1).subtract(1, 'week').format('YYYY-MM-DD');
+    const monday_1 = moment(friday_1).subtract(4, 'day').format('YYYY-MM-DD')
+    const monday_2 = moment(friday_2).subtract(4, 'day').format('YYYY-MM-DD')
+
+    const monday_3 = moment(monday_1).subtract(3, 'week').format('YYYY-MM-DD')
+
+    return {
+      now: {
+        from: monday_1,
+        to: friday_1
+      },
+      prev: {
+        from: monday_2,
+        to: friday_2
+      },
+      prev_4: {
+        from: monday_3,
+        to: friday_1
+      }
+    }
+  }
+
+  async weekReport1() {
+    try {
+      const { now, prev } = this.get2WeekNow()
+      const date = await this.mssqlService.query(`with date_ranges as (
+        select
+            max(case when date <= '${moment(now.to).format('YYYY-MM-DD')}' then date else null end) as now,
+            max(case when date <= '${moment(now.to).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week
+        from marketTrade.dbo.tickerTradeVND
+    )
+    select now, week
+    from date_ranges;`)
+
+      //thong tin vnindex
+      const promise_1 = this.mssqlService.query(`
+      with temp as (SELECT
+        code,
+        i.date,
+        closePrice,
+        closePrice - lead(closePrice) over (partition by code order by date desc) as change,
+        (closePrice - lead(closePrice) over (partition by code order by date desc)) / lead(closePrice) over (partition by code order by date desc) * 100 as perChange
+      FROM marketTrade.dbo.indexTradeVND i
+      WHERE i.code IN ('VNINDEX', 'HNX')
+      AND date in ('${UtilCommonTemplate.toDate(date[0].week)}', '${UtilCommonTemplate.toDate(date[0].now)}')
+)
+select * from temp where date = (select max(date) from temp)
+      `)
+
+      //top nganh noi bat
+      const promise_2 = this.mssqlService.query(`
+      SELECT
+        SUM(point) AS value,
+        i.LV2 as code
+      FROM WEBSITE_SERVER.dbo.CPAH c
+      INNER JOIN marketInfor.dbo.info i
+        ON i.code = c.symbol
+      WHERE date BETWEEN '${now.from}' AND '${now.to}'
+      AND c.floor = 'HSX'
+      GROUP BY i.LV2
+      ORDER BY value DESC
+      `)
+
+
+      //top co phieu dong gop
+      const promise_3 = this.mssqlService.query(`
+      WITH temp
+      AS (SELECT
+        SUM(c.point) AS point,
+        symbol AS code,
+        '${now.to}' AS date
+      FROM WEBSITE_SERVER.dbo.CPAH c
+      WHERE date BETWEEN '${now.from}' AND '${now.to}'
+      AND c.floor = 'HSX'
+      GROUP BY symbol),
+      price
+      AS (SELECT
+        (closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS perChange,
+        code,
+        date
+      FROM marketTrade.dbo.tickerTradeVND
+      WHERE date IN ('${moment(date[0].week).format('YYYY-MM-DD')}', '${moment(date[0].now).format('YYYY-MM-DD')}')
+      AND floor = 'HOSE')
+      SELECT
+        t.point,
+        t.code,
+        v.perChange
+      FROM temp t
+      INNER JOIN price v
+        ON t.code = v.code
+        AND t.date = v.date
+      ORDER BY t.point DESC
+      `)
+
+      //tong gtgd
+      const promise_4 = this.mssqlService.query(`
+      WITH temp_1
+      AS (SELECT
+        SUM(omVal) AS omVal,
+        SUM(ptVal) AS ptVal,
+        'VNINDEX' AS code,
+        '${now.to}' AS date
+      FROM marketTrade.dbo.indexTradeVND
+      WHERE code = 'VNINDEX'
+      AND date BETWEEN '${now.from}' AND '${now.to}'),
+      temp_2
+      AS (SELECT
+        SUM(omVal) AS prevOmVal,
+        'VNINDEX' AS code
+      FROM marketTrade.dbo.indexTradeVND
+      WHERE code = 'VNINDEX'
+      AND date BETWEEN '${prev.from}' AND '${prev.to}')
+      SELECT
+        t1.omVal,
+        (t1.omVal - t2.prevOmVal) / t2.prevOmVal * 100 AS perOmVal,
+        t1.ptVal,
+        advances,
+        noChange,
+        declines
+      FROM temp_1 t1
+      INNER JOIN temp_2 t2
+        ON t1.code = t2.code
+      INNER JOIN marketTrade.dbo.indexTradeVND i
+        ON i.date = t1.date
+        AND i.code = t1.code
+      `)
+
+      //giao dich rong khoi ngoai
+      const promise_5 = this.mssqlService.query(`
+      SELECT
+        SUM(netVal) AS netVal
+      FROM marketTrade.dbo.[foreign]
+      WHERE code = 'VNINDEX'
+      AND date BETWEEN '${now.from}' AND '${now.to}'
+      `)
+
+      //top mua ban rong
+      const promise_6 = this.mssqlService.query(`
+      WITH temp
+      AS (SELECT
+        SUM(netVal) AS netVal,
+        code,
+        '${now.to}' AS date
+      FROM marketTrade.dbo.[foreign]
+      WHERE type = 'STOCK'
+      AND date BETWEEN '${now.from}' AND '${now.to}'
+      AND floor = 'HOSE'
+      GROUP BY code),
+      price
+      AS (SELECT
+        (closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS perChange,
+        code,
+        date
+      FROM marketTrade.dbo.tickerTradeVND
+      WHERE date IN ('${moment(date[0].week).format('YYYY-MM-DD')}', '${moment(date[0].now).format('YYYY-MM-DD')}')
+      AND floor = 'HOSE')
+      SELECT
+        netVal as point,
+        t.code,
+        v.perChange
+      FROM temp t
+      INNER JOIN price v
+        ON v.date = t.date
+        AND v.code = t.code
+        order by netVal desc  
+        `)
+
+      //text dien bien thi truong
+      const promise_7 = this.redis.get(RedisKeys.saveMarketWeekComment)
+
+      //Top gia tri giao dich hose qua 1 tuần
+      const promise_8 = this.mssqlService.query(`
+      WITH temp
+      AS (SELECT TOP 10
+        SUM(totalVal) AS totalVal,
+        code,
+        '${now.to}' AS date
+      FROM marketTrade.dbo.tickerTradeVND
+      WHERE floor = 'HOSE'
+      AND date BETWEEN '${now.from}' AND '${now.to}'
+      GROUP BY code
+      ORDER BY totalVal DESC),
+      price
+      AS (SELECT
+        (closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS perChange,
+        code,
+        date
+      FROM marketTrade.dbo.tickerTradeVND
+      WHERE date IN ('${moment(date[0].week).format('YYYY-MM-DD')}', '${moment(date[0].now).format('YYYY-MM-DD')}')
+      AND floor = 'HOSE')
+      SELECT
+        t.code,
+        t.totalVal,
+        v.perChange
+      FROM temp t
+      INNER JOIN price v
+        ON t.code = v.code
+        AND t.date = v.date
+        order by t.totalVal desc
+       `)
+
+      //Top 
+      const promise_9 = this.mssqlService.query(`
+      select netVal, date from marketTrade.dbo.[foreign] where date between '${now.from}' and '${now.to}' and code = 'VNINDEX' order by date asc
+      `)
+
+      const [data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9] = await Promise.all([promise_1, promise_2, promise_3, promise_4, promise_5, promise_6, promise_7, promise_8, promise_9]) as any
+
+      const vnindex = data_1.find(item => item.code == 'VNINDEX')
+      const hnx = data_1.find(item => item.code == 'HNX')
+
+      return {
+        text: data_7 || '',
+        closePrice: vnindex.closePrice,
+        change: vnindex.change,
+        perChange: vnindex.perChange,
+        hnxClosePrice: hnx.closePrice,
+        hnxChange: hnx.change,
+        hnxPerChange: hnx.perChange,
+        omVal: data_4[0]?.omVal || 0,
+        perOmVal: data_4[0]?.perOmVal || 0,
+        ptVal: data_4[0]?.ptVal || 0,
+        advances: data_4[0]?.advances || 0,
+        declines: data_4[0]?.declines || 0,
+        noChange: data_4[0]?.noChange || 0,
+        netVal: data_5[0].netVal,
+        industryAdvance: {
+          code: data_2[0]?.value <= 0 ? '' : data_2[0].code,
+          value: data_2[0]?.value <= 0 ? 0 : data_2[0].value
+        },
+        industryDecline: {
+          code: data_2[data_2.length - 1]?.value >= 0 ? '' : data_2[data_2.length - 1].code,
+          value: data_2[data_2.length - 1].value >= 0 ? 0 : data_2[data_2.length - 1].value
+        },
+        stockAdvance: data_3.slice(0, 5),
+        stockDecline: data_3.slice(-5).reverse(),
+        topBuy: data_6.slice(0, 3),
+        topSell: data_6.slice(-3).reverse(),
+        chartTopMarket: [...data_3.slice(0, 5), ...data_3.slice(-5)],
+        chartTopForeign: [...data_6.slice(0, 5), ...data_6.slice(-5)],
+        chartTopTotalVal: data_8.map((item, index) => ({ ...item, color: index == (data_8.length - 1) ? `rgba(1, 85, 183, 0.15)` : `rgba(1, 85, 183, ${(1 - (0.1 * index)).toFixed(1)})` })),
+        chartTopForeignTotalVal: data_9.reduce((acc, cur) => [...acc, { ...cur, value: (acc[acc.length - 1]?.value || 0) + cur.netVal, date: UtilCommonTemplate.toDate(cur.date) }], [])
+      }
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async weekReport2() {
+    try {
+      return {
+        table: (await this.afternoonReport2()).table,
+        image: await this.redis.get('image-report-week') || '',
+        text: await this.redis.get(RedisKeys.saveMarketWeekPage2) || []
+      }
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async profitablePerformanceIndex() {
+    try {
+      const arr = ['U.S.10Y', 'Dollar Index']
+      const data = await this.stockMarket(1)
+      return data.filter(item => !arr.includes(item.name)).map(item => ({ name: item.name, value: item.week })).sort((a, b) => b.value - a.value);
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async profitablePerformanceIndustry() {
+    try {
+      const promise_1 = this.industry(1)
+      const promise_2 = this.stockMarket(2)
+
+      const [data_1, data_2] = await Promise.all([promise_1, promise_2])
+      return [...data_1.map(item => ({ name: item.industry, value: item.week_change_percent })), ...data_2.map(item => ({ name: item.name, value: item.week }))].sort((a, b) => b.value - a.value)
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async exchangeRateUSDEUR() {
+    try {
+      const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.exchangeRateVCB order by date desc`))[0].date).format('YYYY-MM-DD')
+      const query = `
+      select code as name, date, bySell as value from macroEconomic.dbo.exchangeRateVCB where code in ('USD', 'EUR')
+      and date between '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' and '${now}' order by date, code
+      `
+      const data = await this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query)
+      return ExchangeRateUSDEURResponse.mapToList(data)
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async averageInterbankInterestRate() {
+    try {
+      const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.EconomicVN_byTriVo order by date desc`))[0].date).format('YYYY-MM-DD')
+      const query = `
+      select code as name, date, value from macroEconomic.dbo.EconomicVN_byTriVo where code in (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng')
+      and date between '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' and '${now}' order by date, code
+      `
+      const data = await this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query)
+      return ExchangeRateUSDEURResponse.mapToList(data)
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async commodityPriceFluctuations() {
+    try {
+      let name = ''
+      // let table = 'macroEconomic.dbo.HangHoa'
+      // switch (type) {
+      //   case 0: //brent và khí gas
+      //     name = `N'Dầu Brent', N'Khí Gas'`
+      //     break;
+      //   case 1: //Đồng và vàng
+      //     name = `N'Đồng', N'Vàng'`
+      //     break
+      //   case 2: //HRC và thép
+      //     name = `N'Thép HRC', N'Thép'`
+      //     break
+      //   case 3: //cotton và đường
+      //     name = `N'Bông', N'Đường'`
+      //     break
+      //   case 4: //cao su và ure
+      //     name = `N'Cao su', N'Ure'`
+      //     break
+      //   case 5: //dxy và us10y
+      //     name = `N'Dollar Index', N'U.S.10Y'`
+      //     table = 'macroEconomic.dbo.WorldIndices'
+      //     break
+      //   default:
+      //     break;
+      // }
+      // const query = `
+      // WITH temp
+      // AS (SELECT
+      //   date,
+      //   ${type == 5 ? 'name' : `name + ' (' + unit + ')' AS name`},
+      //   ${type == 5 ? 'closePrice as value' : 'price as value'}
+      // FROM ${table}
+      // WHERE name IN (${name})
+      // AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      // SELECT
+      //   *
+      // FROM temp
+      // WHERE date IN (SELECT
+      //   date
+      // FROM temp
+      // GROUP BY date
+      // HAVING COUNT(date) = 2)
+      // ORDER BY date, name
+      // `
+
+      const query = `
+      WITH temp
+      AS (SELECT
+        date,
+        name + ' (' + unit + ')' AS name,
+        price as value
+      FROM macroEconomic.dbo.HangHoa
+      WHERE name IN (N'Dầu Brent', N'Khí Gas')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+
+      const query_1 = `
+      WITH temp
+      AS (SELECT
+        date,
+        name + ' (' + unit + ')' AS name,
+        price as value
+      FROM macroEconomic.dbo.HangHoa
+      WHERE name IN (N'Đồng', N'Vàng')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+
+      const query_3 = `
+      WITH temp
+      AS (SELECT
+        date,
+        name + ' (' + unit + ')' AS name,
+        price as value
+      FROM macroEconomic.dbo.HangHoa
+      WHERE name IN (N'Thép HRC', N'Thép')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+
+      const query_4 = `
+      WITH temp
+      AS (SELECT
+        date,
+        name + ' (' + unit + ')' AS name,
+        price as value
+      FROM macroEconomic.dbo.HangHoa
+      WHERE name IN (N'Bông', N'Đường')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+
+      const query_5 = `
+      WITH temp
+      AS (SELECT
+        date,
+        name + ' (' + unit + ')' AS name,
+        price as value
+      FROM macroEconomic.dbo.HangHoa
+      WHERE name IN (N'Cao su', N'Ure')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+
+
+
+      const query_2 = `
+      WITH temp
+      AS (SELECT
+        date,
+        name,
+        closePrice as value
+      FROM macroEconomic.dbo.WorldIndices
+      WHERE name IN (N'Dollar Index', N'U.S.10Y')
+      AND date BETWEEN '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}')
+      SELECT
+        *
+      FROM temp
+      WHERE date IN (SELECT
+        date
+      FROM temp
+      GROUP BY date
+      HAVING COUNT(date) = 2)
+      ORDER BY date, name
+      `
+      const [data, data_2, data_1, data_3, data_4, data_5] = await Promise.all([
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query),
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query_2),
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query_1),
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query_3),
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query_4),
+        this.mssqlService.query<ExchangeRateUSDEURResponse[]>(query_5),
+      ])
+      // return {
+      //   data_0: data.filter(item => item.name.includes('Dầu Brent') || item.name.includes('Khí Gas'))
+      // }
+
+      return ExchangeRateUSDEURResponse.mapToListV2([...data, ...data_2, ...data_1, ...data_3, ...data_4, ...data_5])
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async getStockRecommendWeek() {
+    try {
+      // const data: ISaveStockRecommendWeek[] = await this.redis.get(RedisKeys.saveStockRecommendWeek)
+      // if (!data) return []
+
+      // const price: { price: number, code: string }[] = await this.mssqlService.query(`select closePrice as price, code from marketTrade.dbo.tickerTradeVND where code in (${data.map(item => `'${item.code}'`).join(', ')}) and date = (select max(date) from marketTrade.dbo.tickerTradeVND)`)
+
+      // return data.map(item => {
+      //   const gia_thi_truong = (price.find(price => price.code == item.code)).price || 0
+      //   return {
+      //     ...item,
+      //     gia_thi_truong,
+      //     ty_suat_sinh_loi_ky_vong: (item.gia_muc_tieu / item.gia_khuyen_nghi - 1) * 100,
+      //     ty_suat_loi_nhuan: item.is_buy == 1 ? (gia_thi_truong * 1000 / item.gia_khuyen_nghi - 1) * 100 : 0,
+      //     ty_suat_sinh_loi_lo: item.gia_ban != 0 ? (item.gia_ban / item.gia_khuyen_nghi - 1) * 100 : 0
+      //   }
+      // })
+
+      const query = `select code, date,
+      GiaKhuyenNghi as gia_khuyen_nghi,
+      GiaMucTieu as gia_muc_tieu,
+      GiaDungLo as gia_dung_lo,
+      TySuatSinhLoiKyVong as ty_suat_sinh_loi_ky_vong,
+      ThoiGianNamGiuDukien as thoi_gian_nam_giu_du_kien,
+      GhiChu as ghi_chu,
+      GiaThiTruong as gia_thi_truong,
+      TySuatloinhuan as ty_suat_loi_nhuan,
+      GiaBan as gia_ban,
+      TySuatSinhLoiLo as ty_suat_sinh_loi_lo,
+      ThoiGianNamGiu as thoi_gian_nam_giu,
+      GhiChu2 as ghi_chu_2
+      from PHANTICH.dbo.KhuyenNghiTuan
+      order by date asc
+      `
+      const data = await this.mssqlService.query<GetStockRecommendWeekResponse[]>(query)
+
+      const dataMapped = GetStockRecommendWeekResponse.mapToList(data)
+      return dataMapped
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async setFlexiblePage(b: SetFlexiblePageDto) {
+    try {
+      const now = moment().format('YYYYMMDDHHmmss')
+      let i = 1
+      for (const item of b.image) {
+        await this.minio.put(`resources`, `report/week/flexible_page/${b.page}/${now}_${i}.jpg`, item.buffer, {
+          'Content-Type': item.mimetype,
+          'X-Amz-Meta-Testing': 1234,
+        })
+        i++
+      }
+      await this.redis.set(`${RedisKeys.flexiblePage}:${b.page}`, { image: b.image.map((item, index) => `resources/week/flexible_page/${b.page}/${now}_${index + 1}`), text: b.text }, { ttl: TimeToLive.OneDay })
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async getFlexiblePage() {
+    try {
+      const keys = await this.redis.store.keys(`${RedisKeys.flexiblePage}:*`)
+      const data = await this.redis.store.mget(keys.join(','))
+      return data
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async stockInfo(code: string) {
+    try {
+      const query = `
+      WITH max_date
+      AS (SELECT
+        MAX(date) AS date,
+        ratioCode
+      FROM [RATIO].[dbo].[ratio]
+      WHERE code = '${code}'
+      GROUP BY ratioCode),
+      nuoc_ngoai
+      AS (SELECT
+        ([result] / [value]) * 100 AS [foreign],
+        '${code}' AS code
+      FROM (SELECT TOP (1) (SELECT TOP 1
+                            [totalRoom] - [currentRoom]
+                          FROM [marketTrade].[dbo].[foreign]
+                          WHERE code = '${code}'
+                          ORDER BY [date] DESC)
+                          AS [result],
+                          [value]
+      FROM [RATIO].[dbo].[ratio]
+      WHERE ratioCode = 'OUTSTANDING_SHARES'
+      AND code = '${code}') AS qw),
+      pi
+      AS (SELECT
+        *
+      FROM (SELECT
+        [code],
+        r.[ratioCode],
+        [value]
+      FROM [RATIO].[dbo].[ratio] r
+      INNER JOIN max_date m
+        ON m.ratioCode = r.ratioCode
+        AND m.date = r.date
+      WHERE (r.ratioCode IN ('PRICE_HIGHEST_CR_52W', 'PRICE_LOWEST_CR_52W', 'NMVALUE_AVG_CR_20D', 'NMVOLUME_AVG_CR_20D', 'STATE_OWNERSHIP'))
+      AND code = '${code}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_HIGHEST_CR_52W], [PRICE_LOWEST_CR_52W], [NMVALUE_AVG_CR_20D], [NMVOLUME_AVG_CR_20D], [STATE_OWNERSHIP])) AS chuyen)
+      SELECT
+        c.code,
+        marketCap,
+        shareout,
+        [PRICE_HIGHEST_CR_52W] AS high,
+        [PRICE_LOWEST_CR_52W] AS low,
+        [NMVOLUME_AVG_CR_20D] AS kl,
+        [NMVALUE_AVG_CR_20D] AS gia_tri,
+        EPS,
+        PE,
+        BVPS,
+        PB,
+        [STATE_OWNERSHIP] AS nha_nuoc,
+        [foreign] AS nuoc_ngoai,
+        LV2,
+        LV4,
+        companyName
+      FROM RATIO.dbo.ratioInday c
+      INNER JOIN marketInfor.dbo.info i
+        ON i.code = c.code
+      INNER JOIN pi p
+        ON i.code = c.code
+      INNER JOIN nuoc_ngoai n
+        ON n.code = c.code
+      WHERE c.code = '${code}'
+      AND c.date = (SELECT
+        MAX(date)
+      FROM RATIO.dbo.ratioInday
+      WHERE code = '${code}')
+      `
+      const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(RedisKeys.reportTechnical) as any])
+
+      return {
+        ...data[0],
+        text: data_redis?.text || [],
+        table: data_redis?.table || [],
+        img: data_redis?.img || '',
+        is_sell: data_redis?.is_sell || '',
+        gia_muc_tieu: data_redis?.gia_muc_tieu || 0,
+        gia_thi_truong: data_redis?.gia_thi_truong || 0,
+        loi_nhuan_ky_vong: data_redis?.loi_nhuan_ky_vong || 0,
+        gia_ban_dung_lo: data_redis?.gia_ban_dung_lo || 0,
+      }
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async priceFluctuationCorrelation(code: string) {
+    try {
+      const now = moment((await this.mssqlService.query(`select max(date) as date from marketTrade.dbo.historyTicker where code = '${code}'`))[0].date).format('YYYY-MM-DD')
+      const year = moment(now).subtract(1, 'year').format('YYYY-MM-DD')
+
+      const query_2 = `
+      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '2022-12-30' and code = '${code}'
+      union
+      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '2022-12-30' and code = 'VNINDEX'
+      union
+      select sum(t.closePrice) as closePrice, (select LV2 from marketInfor.dbo.info where code = '${code}') as code
+      from marketTrade.dbo.tickerTradeVND t
+      inner join marketInfor.dbo.info i on i.code = t.code
+      where date = '2022-12-30' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
+      temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.tickerTradeVND where code = '${code}' and date between '${year}' and '${now}'
+            union all
+            select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
+            union all
+            select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
+            )
+            select * from temp where date not in (select date from temp group by date having count(date) < 3) order by date asc, code desc` 
+      const data = await this.mssqlService.query<InterestRateResponse[]>(query_2)
+      return data.map(item => ({ ...item, date: UtilCommonTemplate.toDate(item.date) || '' }))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async priceChange(code: string) {
+    try {
+      const { latestDate, monthDate, month3Date, firstDateYear } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date')
+
+      const month = moment(monthDate).format('YYYY-MM-DD')
+      const month_3 = moment(month3Date).format('YYYY-MM-DD')
+      const ytd = moment(firstDateYear).format('YYYY-MM-DD')
+
+      const same_day = UtilCommonTemplate.checkSameDate([latestDate, month, month_3, ytd])
+      const pivot = same_day.map(item => `[${item}]`).join(',')
+
+      const query = `
+      WITH temp
+      AS (SELECT
+        closePrice,
+        code,
+        date
+      FROM marketTrade.dbo.tickerTradeVND
+      WHERE code = '${code}'
+      AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
+      UNION ALL
+      SELECT
+        closePrice,
+        code,
+        date
+      FROM marketTrade.dbo.indexTradeVND
+      WHERE code = 'VNINDEX'
+      AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
+      UNION ALL
+      SELECT
+        closePrice,
+        code,
+        date
+      FROM marketTrade.dbo.inDusTrade
+      WHERE code = (SELECT
+        LV2
+      FROM marketInfor.dbo.info
+      WHERE code = '${code}')
+      AND floor = 'ALL'
+      AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}'))
+      SELECT
+        ([${latestDate}] - [${month}]) / [${month}] * 100 AS month,
+        ([${latestDate}] - [${month_3}]) / [${month_3}] * 100 AS month_3,
+        ([${latestDate}] - [${ytd}]) / [${ytd}] * 100 AS ytd,
+        code
+      FROM (SELECT
+        *
+      FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
+      `
+      const data = await this.mssqlService.query(query)
+      return data
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async buyingAndSellingStatistics(code: string) {
+    try {
+      const query = `
+      SELECT
+        totalBuyOrder as buy,
+        totalSellOrder as sell,
+        date
+      FROM marketTrade.dbo.orderTicker
+      WHERE code = '${code}'
+      AND date BETWEEN DATEADD(MONTH, -3, (SELECT
+        MAX(date)
+      FROM marketTrade.dbo.orderTicker
+      WHERE code = '${code}')
+      ) AND (SELECT
+        MAX(date)
+      FROM marketTrade.dbo.orderTicker
+      WHERE code = '${code}')
+      ORDER BY date
+      `
+      const data = await this.mssqlService.query<BuyingAndSellingStatisticsResponse[]>(query)
+      return BuyingAndSellingStatisticsResponse.mapToList(data)
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async technicalIndex(code: string) {
+    try {
+      const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date')
+      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number }[] = await this.mssqlService.query(`select closePrice, highPrice, lowPrice, date from marketTrade.dbo.tickerTradeVND where code = '${code}' order by date`)
+
+      const day = data.map(item => item.date).filter(item => new Date(item) >= new Date(yearDate)).reverse()
+
+      const price = data.map(item => item.closePrice)
+      const lastPrice = price[price.length - 1]
+      const highPrice = data.map(item => item.highPrice)
+      const lowPrice = data.map(item => item.lowPrice)
+
+      const rsi = calTech.rsi({ values: price, period: 14 }).reverse()
+      const cci = calTech.cci({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const williams = calTech.williamsr({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const adx = calTech.adx({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const stochastic = calTech.stochastic({ close: price, low: lowPrice, high: highPrice, period: 14, signalPeriod: 3 }).reverse()
+      const stochasticRsi = calTech.stochasticrsi({ values: price, kPeriod: 3, dPeriod: 3, rsiPeriod: 14, stochasticPeriod: 14 }).reverse()
+      const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
+      const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
+
+      const arr = [5, 10, 20, 50, 100, 200]
+
+      const table = arr.map(item => {
+        const ma = calTech.sma({ period: item, values: price })
+        const ema = calTech.ema({ period: item, values: price })  
+
+        return {
+          name: `MA${item}`,
+          single: this.ratingTechnicalIndex('ma', { value: ma[ma.length - 1], price: lastPrice }),
+          hat: this.ratingTechnicalIndex('ma', { value: ema[ema.length - 1], price: lastPrice })
+        }
+      })
+
+      table.push({
+        name: `SAR`,
+        single: this.ratingTechnicalIndex('sar', { value: sar[sar.length - 1], price: lastPrice }),
+        hat: ''
+      })
+
+      const rsi_date = []
+      const cci_date = []
+      const williams_date = []
+      const adx_date = []
+      const stochastic_date = []
+      const stochasticRsi_date = []
+      const macd_date = []
+      const macd_histogram_date = []
+
+      day.map((item, index) => {
+        const date = UtilCommonTemplate.toDate(item)
+        rsi_date.push({ value: rsi[index], date })
+        cci_date.push({ value: cci[index], date })
+        williams_date.push({ value: williams[index], date })
+        adx_date.push({ ...adx[index], date })
+        stochastic_date.push({ ...stochastic[index], date })
+        stochasticRsi_date.push({ k: stochasticRsi[index].k, d: stochasticRsi[index].d, date })
+        macd_date.push({ k: macd[index].MACD, d: macd[index].signal, date })
+        macd_histogram_date.push({ value: macd[index].histogram, date })
+      }
+      )
+
+      const chart = {
+        rsi: {
+          value: rsi[0],
+          rate: this.ratingTechnicalIndex('rsi', { value: rsi[0] }),
+          chart: rsi_date.reverse(),
+        },
+        stochastic: {
+          value: stochastic[0],
+          rate: this.ratingTechnicalIndex('stochastic', { k: stochastic[0].k, d: stochastic[0].d }),
+          chart: stochastic_date.reverse()
+        },
+        cci: {
+          value: cci[0],
+          rate: this.ratingTechnicalIndex('cci', { value: cci[0] }),
+          chart: cci_date.reverse()
+        },
+        stochasticRsi: {
+          value: {
+            k: stochasticRsi[0].k,
+            d: stochasticRsi[0].d
+          },
+          rate: this.ratingTechnicalIndex('stochasticRsi', { value: stochasticRsi[0].stochRSI }),
+          chart: stochasticRsi_date.reverse()
+        },
+        williams: {
+          value: williams[0],
+          rate: this.ratingTechnicalIndex('williams', { value: williams[0] }),
+          chart: williams_date.reverse()
+        },
+        macd: {
+          value: {
+            macd: macd[0].MACD,
+            signal: macd[0].signal
+          },
+          rate: this.ratingTechnicalIndex('macd', { macd: macd[0].MACD, signal: macd[0].signal }),
+          chart: macd_date.reverse()
+        },
+        adx: {
+          value: adx[0],
+          rate: this.ratingTechnicalIndex('adx', { adx: adx[0].adx, pdi: adx[0].pdi, mdi: adx[0].mdi }),
+          chart: adx_date.reverse()
+        },
+        macdHistogram: {
+          value: macd[0].histogram,
+          rate: this.ratingTechnicalIndex('macdHistogram', { histogramT: macd[0].histogram, histogramT1: macd[1].histogram }),
+          chart: macd_histogram_date.reverse()
+        }
+      }
+
+      return {
+        ...chart,
+        table,
+        technicalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate]),
+        trendSignal: this.countRate(table.map(item => [item.single, item.hat]).flat()),
+        generalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate, ...table.map(item => [item.single, item.hat]).flat()])
+      }
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  ratingTechnicalIndex(name: 'ma' | 'rsi' | 'stochastic' | 'stochasticRsi' | 'macd' | 'macdHistogram' | 'adx' | 'williams' | 'cci' | 'sar',
+    o: { value?: number, d?: number, k?: number, macd?: number, signal?: number, histogramT?: number, histogramT1?: number, pdi?: number, mdi?: number, adx?: number, price?: number }) {
+    //0 - Tích cực, 1 - Tiêu cực, 2 - Trung lập
+    let rate = 0
+    switch (name) {
+      case 'rsi':
+        if (o.value < 30) {
+          rate = 0
+        } else if (o.value > 70) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break;
+      case 'stochastic':
+        if (o.k > o.d && o.k < 20) {
+          rate = 0
+        } else if (o.k < o.d && o.k > 80) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'stochasticRsi':
+        if (o.value < 20) {
+          rate = 0
+        } else if (o.value > 80) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'macd':
+        if (o.macd > o.signal) {
+          rate = 0
+        } else if (o.macd < o.signal) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'macdHistogram':
+        if (o.histogramT > o.histogramT1) {
+          rate = 0
+        } else if (o.histogramT < o.histogramT1) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'adx':
+        if (o.adx > 25 && o.pdi > o.mdi) {
+          rate = 0
+        } else if (o.adx > 25 && o.pdi < o.mdi) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'williams':
+        if (o.value < -80) {
+          rate = 0
+        } else if (o.value > -20) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'cci':
+        if (o.value < -100) {
+          rate = 0
+        } else if (o.value > 100) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      case 'ma':
+        if (o.value > o.price) {
+          rate = 1
+        } else if (o.value < o.price) {
+          rate = 0
+        } else {
+          rate = 2
+        }
+        break
+      case 'sar':
+        if (o.value < o.price) {
+          rate = 0
+        } else if (o.value > o.price) {
+          rate = 1
+        } else {
+          rate = 2
+        }
+        break
+      default:
+        break;
+    }
+    switch (rate) {
+      case 0:
+        return 'Tích cực'
+        break;
+      case 1:
+        return 'Tiêu cực'
+        break
+      case 2:
+        return 'Trung lập'
+        break
+      default:
+        break;
+    }
+  }
+
+  countRate(str: string[]) {
+    let positive = 0
+    let negative = 0
+    let neutral = 0
+
+    str.forEach(item => {
+      switch (item) {
+        case 'Tích cực':
+          positive = positive + 1
+          break;
+        case 'Tiêu cực':
+          negative = negative + 1
+          break;
+        case 'Trung lập':
+          neutral = neutral + 1
+          break;
+        default:
+          break;
+      }
+    })
+
+    return {
+      positive,
+      negative,
+      neutral
+    }
+  }
+
+  async getDateSessionV2(table: string, column: string) {
+    try {
+      const now = moment((await this.mssqlService.query(`select max(${column}) as date from ${table}`))[0].date).format('YYYY-MM-DD')
+
+      const date = await this.mssqlService.query(
+        `with date_ranges as (
+          select
+              max(case when ${column} <= '${moment(now).subtract(1, 'day').format('YYYY-MM-DD')}' then ${column} else null end) as prev,
+              max(case when ${column} <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then ${column} else null end) as week,
+              max(case when ${column} <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then ${column} else null end) as month,
+              max(case when ${column} <= '${moment(now).subtract(3, 'month').format('YYYY-MM-DD')}' then ${column} else null end) as month_3,
+              max(case when ${column} <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then ${column} else null end) as year,
+              max(case when ${column} <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then ${column} else null end) as ytd
+          from ${table}
+      )
+      select prev, week, month, month_3, year, ytd
+      from date_ranges;`
+      )
+
+      return {
+        latestDate: now,
+        previousDate: date[0].prev,
+        weekDate: date[0].week,
+        monthDate: date[0].month,
+        month3Date: date[0].month_3,
+        yearDate: date[0].year,
+        firstDateYear: date[0].ytd
+      }
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async setInfoReportTechnical(value: SetInfoReportTechnicalDto) {
+    try {
+      await this.minio.put(`resources`, `report/technical/${value.img.originalname}`, value.img.buffer, {
+        'Content-Type': value.img.mimetype,
+        'X-Amz-Meta-Testing': 1234,
+      })
+      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code}`, { ...value, img: `/resources/report/technical/${value.img.originalname}` }, { ttl: TimeToLive.OneWeek })
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
 }
+
+
+

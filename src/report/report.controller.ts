@@ -1,29 +1,37 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
+import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { getNewsDto } from './dto/get-news.dto';
 import { IdentifyMarketDto, SaveStockRecommendDto } from './dto/identifyMarket.dto';
 import { QueryNewsDto } from './dto/queryNews.dto';
 import { SaveNewsDto } from './dto/save-news.dto';
-import { SaveMarketCommentDto, SaveMarketMovementsDto } from './dto/saveMarketMovements.dto';
-import { StockImageDto } from './dto/stock-image.dto';
+import { SaveMarketCommentDto } from './dto/saveMarketMovements.dto';
+import { SaveStockRecommendWeekDto } from './dto/saveStockRecommendWeek.dto';
+import { SetFlexiblePageDto } from './dto/setFlexiblePage.dto';
+import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
+import { StockMarketDto } from './dto/stockMarket.dto';
 import { TopNetBuyingAndSellingDto } from './dto/topNetBuyingAndSelling.dto';
 import { ReportService } from './report.service';
 import { AfternoonReport1, IStockContribute } from './response/afternoonReport1.response';
+import { BuyingAndSellingStatisticsResponse } from './response/buyingAndSellingStatistics.response';
 import { EventResponse } from './response/event.response';
 import { ExchangeRateResponse } from './response/exchangeRate.response';
+import { ExchangeRateUSDEURResponse } from './response/exchangeRateUSDEUR.response';
+import { GetStockRecommendWeekResponse } from './response/getStockRecommendWeek.response';
 import { LiquidityMarketResponse } from './response/liquidityMarket.response';
 import { MerchandiseResponse } from './response/merchandise.response';
 import { MorningHoseResponse } from './response/morningHose.response';
 import { NewsEnterpriseResponse } from './response/newsEnterprise.response';
 import { NewsInternationalResponse } from './response/newsInternational.response';
 import { AfterNoonReport2Response } from './response/stockMarket.response';
+import { TechnicalIndexResponse } from './response/technicalIndex.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
-
 @Controller('report')
 @ApiTags('Report')
 export class ReportController {
@@ -68,7 +76,7 @@ export class ReportController {
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Get('tin-quoc-te')
   async newsInternational(@Query() q: QueryNewsDto, @Res() res: Response){
-    const data = await this.reportService.newsInternational(+q.quantity)
+    const data = await this.reportService.newsInternational(+q.quantity, +q.type || 0)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
@@ -76,7 +84,7 @@ export class ReportController {
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Get('tin-trong-nuoc')
   async newsDomestic(@Query() q: QueryNewsDto, @Res() res: Response){
-    const data = await this.reportService.newsDomestic(+q.quantity)
+    const data = await this.reportService.newsDomestic(+q.quantity, +q.type || 0)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
@@ -123,8 +131,8 @@ export class ReportController {
   @ApiOperation({summary: 'Thị trường chứng khoán Việt Nam và Quốc tế'})
   @ApiOkResponse({status: HttpStatus.OK, type: MerchandiseResponse})
   @Get('thi-truong-chung-khoan')
-  async stockMarket(@Res() res: Response){
-    const data = await this.reportService.stockMarket()
+  async stockMarket(@Query() q: StockMarketDto, @Res() res: Response){
+    const data = await this.reportService.stockMarket(q.type || 0)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
@@ -217,23 +225,23 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @Post('upload-image-report')
-  @UseInterceptors(AnyFilesInterceptor())
-  @ApiOperation({summary: 'Up hình report chiều trang 2', description: 'Truyền lên file jpg, tên gì cũng được'})
-  async uploadReportAfternoon(@UploadedFiles() file: any, @Res() res: Response){
-    try {
-      await this.reportService.uploadImageReport(file)
-      return res.status(HttpStatus.OK).send(new BaseResponse({}))
-    } catch (error) {
-      throw new CatchException(error)
-    }
-  }
+  // @Post('upload-image-report')
+  // @UseInterceptors(AnyFilesInterceptor())
+  // @ApiOperation({summary: 'Up hình report chiều trang 2', description: 'Truyền lên file jpg, tên gì cũng được'})
+  // async uploadReportAfternoon(@UploadedFiles() file: any, @Res() res: Response){
+  //   try {
+  //     await this.reportService.uploadImageReport(file, 0)
+  //     return res.status(HttpStatus.OK).send(new BaseResponse({}))
+  //   } catch (error) {
+  //     throw new CatchException(error)
+  //   }
+  // }
 
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-nhan-dinh-thi-truong-chieu')
   async saveMarketComment(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketComment(b.text)
+    const data = await this.reportService.saveMarketComment(b.text, b.img)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
@@ -248,8 +256,8 @@ export class ReportController {
   @ApiOperation({summary: 'Biến động GTGD một số ngành quan trọng'})
   @ApiOkResponse({status: HttpStatus.OK, type: TransactionValueFluctuationsResponse})
   @Get('bien-dong-gtgd')
-  async transactionValueFluctuations(@Res() res: Response){
-    const data = await this.reportService.transactionValueFluctuations()
+  async transactionValueFluctuations(@Query() q: StockMarketDto, @Res() res: Response){
+    const data = await this.reportService.transactionValueFluctuations(q.type || 0)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
@@ -288,8 +296,177 @@ export class ReportController {
   @ApiOperation({summary: 'Phân ngành'})
   @ApiOkResponse({status: HttpStatus.OK})
   @Get('phan-nganh')
-  async industry(@Res() res: Response){
-    const data = await this.reportService.industry()
+  async industry(@Query() q: StockMarketDto, @Res() res: Response){
+    const data = await this.reportService.industry(+q.type || 0)
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin tuần trang 1'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Post('luu-dien-bien-thi-truong-tuan')
+  async saveMarketWeekMovements(@Body() b: SaveMarketCommentDto, @Res() res: Response){
+    const data = await this.reportService.saveMarketWeekComment(b.text)
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Bản tin tuần trang 1'})
+  @ApiOkResponse({status: HttpStatus.OK, type: AfternoonReport1})
+  @Get('ban-tin-tuan-1')
+  async weekReport1(@Res() res: Response){
+    const data = await this.reportService.weekReport1()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Post('luu-nhan-dinh-thi-truong-tuan-trang-2')
+  async saveMarketWeekPage2(@Body() b: SaveMarketCommentDto, @Res() res: Response){
+    const data = await this.reportService.saveMarketWeekPage2(b.text)
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @Post('upload-image-report-2')
+  @UseInterceptors(AnyFilesInterceptor())
+  @ApiOperation({summary: 'Up hình report tuần trang 2', description: 'Truyền lên file jpg, tên gì cũng được'})
+  async uploadReportWeek(@UploadedFiles() file: any, @Res() res: Response){
+    try {
+      await this.reportService.uploadImageReport(file, 1)
+      return res.status(HttpStatus.OK).send(new BaseResponse({}))
+    } catch (error) {
+      throw new CatchException(error)
+    }
+  }
+
+  @ApiOperation({summary: 'Bản tin tuần trang 2'})
+  @ApiOkResponse({status: HttpStatus.OK, type: AfterNoonReport2Response})
+  @Get('ban-tin-tuan-2')
+  async weekReport2(@Res() res: Response){
+    const data = await this.reportService.weekReport2()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Hiệu suất sinh lời của các chỉ số trong tuần'})
+  @ApiOkResponse({status: HttpStatus.OK, type: IStockContribute})
+  @Get('hieu-suat-sinh-loi-chi-so-theo-tuan')
+  async profitablePerformanceIndex(@Res() res: Response){
+    const data = await this.reportService.profitablePerformanceIndex()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Hiệu suất sinh lời theo các nhóm ngành (Tuần)'})
+  @ApiOkResponse({status: HttpStatus.OK, type: IStockContribute})
+  @Get('hieu-suat-sinh-loi-nhom-nganh-theo-tuan')
+  async profitablePerformanceIndustry(@Res() res: Response){
+    const data = await this.reportService.profitablePerformanceIndustry()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Tỷ giá USD và EUR'})
+  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @Get('ty-gia-usd-eur')
+  async exchangeRateUSDEUR(@Res() res: Response){
+    const data = await this.reportService.exchangeRateUSDEUR()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Lãi suất BQ liên Ngân hàng (%/năm)'})
+  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @Get('lai-suat-binh-quan-lien-ngan-hang')
+  async averageInterbankInterestRate(@Res() res: Response){
+    const data = await this.reportService.averageInterbankInterestRate()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Biến động giá cả hàng hóa'})
+  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @Get('bien-dong-gia-ca-hang-hoa')
+  async commodityPriceFluctuations(@Res() res: Response){
+    const data = await this.reportService.commodityPriceFluctuations()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  // @ApiOperation({summary: 'Lưu danh sách cổ phiếu khuyến nghị bản tin tuần'})
+  // @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  // @Post('luu-co-phieu-khuyen-nghi-tuan')
+  // async saveStockRecommendWeek(@Body() b: SaveStockRecommendWeekDto, @Res() res: Response){
+  //   const data = await this.reportService.saveStockRecommendWeek(b.value)
+  //   return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  // }
+
+  @ApiOperation({summary: 'Danh sách cổ phiếu khuyến nghị bản tin tuần'})
+  @ApiOkResponse({status: HttpStatus.OK, type: GetStockRecommendWeekResponse})
+  @Get('co-phieu-khuyen-nghi-tuan')
+  async stockRecommendWeek(@Body() b: SaveStockRecommendWeekDto, @Res() res: Response){
+    const data = await this.reportService.getStockRecommendWeek()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @FormDataRequest()
+  @ApiOperation({summary: 'Lưu trang linh động'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Post('luu-trang-linh-dong')
+  async setFlexiblePage(@Body() b: SetFlexiblePageDto, @Res() res: Response){
+    await this.reportService.setFlexiblePage(b)
+    return res.status(HttpStatus.OK).send(new BaseResponse({}))
+  }
+
+  @ApiOperation({summary: 'Lấy trang linh động'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Get('trang-linh-dong')
+  async getFlexiblePage(@Body() b: SaveStockRecommendWeekDto, @Res() res: Response){
+    const data = await this.reportService.getFlexiblePage()
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  /**
+   * Báo cáo phân tích kỹ thuật
+   */
+  @FormDataRequest()
+  @ApiOperation({summary: 'Lưu thông tin báo cáo phân tích kỹ thuật'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Post('luu-thong-tin-bao-cao-ky-thuat')
+  async setInfoReportTechnical(@Body() b: SetInfoReportTechnicalDto, @Res() res: Response){
+    await this.reportService.setInfoReportTechnical(b)
+    return res.status(HttpStatus.OK).send(new BaseResponse({}))
+  }
+
+  @ApiOperation({summary: 'Thông tin cổ phiếu'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Get('thong-tin-co-phieu')
+  async stockInfo(@Query() b: StockDto, @Res() res: Response){
+    const data = await this.reportService.stockInfo(b.stock.toUpperCase())
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Tương quan biến động giá cổ phiếu trong 1 năm'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Get('tuong-quan-bien-dong-gia')
+  async priceFluctuationCorrelation(@Query() b: StockDto, @Res() res: Response){
+    const data = await this.reportService.priceFluctuationCorrelation(b.stock.toUpperCase())
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Biến động giá (%)'})
+  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @Get('bien-dong-gia')
+  async priceChange(@Query() b: StockDto, @Res() res: Response){
+    const data = await this.reportService.priceChange(b.stock.toUpperCase())
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Thống kê lệnh mua bán chủ động'})
+  @ApiOkResponse({status: HttpStatus.OK, type: BuyingAndSellingStatisticsResponse})
+  @Get('thong-ke-lenh-mua-ban')
+  async buyingAndSellingStatistics(@Query() b: StockDto, @Res() res: Response){
+    const data = await this.reportService.buyingAndSellingStatistics(b.stock.toUpperCase())
+    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  }
+
+  @ApiOperation({summary: 'Chỉ số kỹ thuật'})
+  @ApiOkResponse({status: HttpStatus.OK, type: TechnicalIndexResponse})
+  @Get('chi-so-ky-thuat')
+  async technicalIndex(@Query() b: StockDto, @Res() res: Response){
+    const data = await this.reportService.technicalIndex(b.stock.toUpperCase())
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 }

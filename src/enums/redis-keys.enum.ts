@@ -211,5 +211,18 @@ export enum RedisKeys {
 
   //Tin chiều
   saveMarketMovements = 'save-market-movements',
-  saveMarketComment = 'save-market-comment'
+  saveMarketWeekComment = 'save-market-week-comment',
+  saveMarketComment = 'save-market-comment',
+  saveMarketWeekPage2 = 'save-market-week-comment-page-2',
+
+  //Tin tuần
+  weekNewsInternational = 'week-news-international',
+  weekNewsInternationalNotFilter = 'week-news-international-not-filter',
+  weekNewsDomestic = 'week-news-domestic',
+  weekNewsDomesticNotFilter = 'week-news-domestic-not-filter',
+  saveStockRecommendWeek = 'save-stock-recommend-week',
+  flexiblePage = 'flexible-page-week',
+
+  //Báo cáo phân tích kỹ thuật
+  reportTechnical = 'report-technical'
 }
