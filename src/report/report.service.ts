@@ -2049,18 +2049,30 @@ select * from temp where date = (select max(date) from temp)
 
   async priceFluctuationCorrelation(code: string) {
     try {
-      const now = moment((await this.mssqlService.query(`select max(date) as date from marketTrade.dbo.historyTicker where code = '${code}'`))[0].date).format('YYYY-MM-DD')
-      const year = moment(now).subtract(1, 'year').format('YYYY-MM-DD')
+      // const now = moment((await this.mssqlService.query(`select max(date) as date from marketTrade.dbo.historyTicker where code = '${code}'`))[0].date).format('YYYY-MM-DD')
+      // const year = moment(now).subtract(1, 'year').format('YYYY-MM-DD')
+
+      const date = await this.mssqlService.query(`with date_ranges as (
+        select
+            max(case when date <= '${moment().format('YYYY-MM-DD')}' then date else null end) as now,
+            max(case when date <= '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as year
+        from marketTrade.dbo.historyTicker
+    )
+    select now, year
+    from date_ranges;`)
+
+    const now = moment(date[0].now).format('YYYY-MM-DD')
+    const year = moment(date[0].year).format('YYYY-MM-DD')
 
       const query_2 = `
-      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '2022-12-30' and code = '${code}'
+      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '${year}' and code = '${code}'
       union
-      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '2022-12-30' and code = 'VNINDEX'
+      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
       union
       select sum(t.closePrice) as closePrice, (select LV2 from marketInfor.dbo.info where code = '${code}') as code
       from marketTrade.dbo.tickerTradeVND t
       inner join marketInfor.dbo.info i on i.code = t.code
-      where date = '2022-12-30' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
+      where date = '${year}' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
       temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.tickerTradeVND where code = '${code}' and date between '${year}' and '${now}'
             union all
             select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
