@@ -2029,7 +2029,7 @@ select * from temp where date = (select max(date) from temp)
       FROM RATIO.dbo.ratioInday
       WHERE code = '${code}')
       `
-      const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(RedisKeys.reportTechnical) as any])
+      const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(`${RedisKeys.reportTechnical}:${code}`) as any])
 
       return {
         ...data[0],
@@ -2136,6 +2136,8 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
+      console.log(query);
+      
       const data = await this.mssqlService.query(query)
       return data
     } catch (e) {
@@ -2472,7 +2474,7 @@ select * from temp where date = (select max(date) from temp)
         'Content-Type': value.img.mimetype,
         'X-Amz-Meta-Testing': 1234,
       })
-      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code}`, { ...value, img: `/resources/report/technical/${value.img.originalname}` }, { ttl: TimeToLive.OneWeek })
+      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code.toUpperCase()}`, { ...value, img: `/resources/report/technical/${value.img.originalname}` }, { ttl: TimeToLive.OneWeek })
     } catch (e) {
       throw new CatchException(e)
     }
