@@ -2469,13 +2469,11 @@ select * from temp where date = (select max(date) from temp)
 
   async setInfoReportTechnical(value: SetInfoReportTechnicalDto) {
     try {
-      console.log(value.img);
-      
-      await this.minio.put(`resources`, `report/technical/${value.img.originalname}`, value.img.buffer, {
+      await this.minio.put(`resources`, `report/technical/${value.img.originalName}`, value.img.buffer, {
         'Content-Type': value.img.mimetype,
         'X-Amz-Meta-Testing': 1234,
       })
-      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code.toUpperCase()}`, { ...value, img: `/resources/report/technical/${value.img.originalname}` }, { ttl: TimeToLive.OneWeek })
+      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code.toUpperCase()}`, { ...value, img: `/resources/report/technical/${value.img.originalName}` }, { ttl: TimeToLive.OneWeek })
     } catch (e) {
       throw new CatchException(e)
     }
