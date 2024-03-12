@@ -2136,7 +2136,6 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
-      console.log(query);
       
       const data = await this.mssqlService.query(query)
       return data
