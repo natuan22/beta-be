@@ -2469,6 +2469,8 @@ select * from temp where date = (select max(date) from temp)
 
   async setInfoReportTechnical(value: SetInfoReportTechnicalDto) {
     try {
+      console.log(value.img);
+      
       await this.minio.put(`resources`, `report/technical/${value.img.originalname}`, value.img.buffer, {
         'Content-Type': value.img.mimetype,
         'X-Amz-Meta-Testing': 1234,
