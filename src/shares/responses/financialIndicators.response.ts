@@ -60,7 +60,7 @@ export class FinancialIndicatorsResponse {
                 this.name = data?.name || ''
                 break;
         }
-        this.date = data?.date || ''
+        this.date = data?.date.toString() || ''
     }
 
     static mapToList(data?: FinancialIndicatorsResponse[]) {
