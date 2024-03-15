@@ -306,6 +306,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-nhan-dinh-thi-truong-tuan-trang-2')
