@@ -835,9 +835,14 @@ export class ReportService {
     }
   }
 
-  async saveMarketComment(text: string[], img: string) {
+  async saveMarketComment(text: string[], img: any) {
     try {
-      await this.redis.set(RedisKeys.saveMarketComment, { img, text }, { ttl: TimeToLive.OneYear })
+      const now = moment().format('YYYYMMDDHHmmss')
+      await this.minio.put(`resources`, `report/${now}.jpg`, img.buffer, {
+        'Content-Type': img.mimetype,
+        'X-Amz-Meta-Testing': 1234,
+      })
+      await this.redis.set(RedisKeys.saveMarketComment, { img: `resources/report/${now}.jpg`, text }, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
@@ -851,9 +856,14 @@ export class ReportService {
     }
   }
 
-  async saveMarketWeekPage2(text: string[]) {
+  async saveMarketWeekPage2(text: string[], img: any) {
     try {
-      await this.redis.set(RedisKeys.saveMarketWeekPage2, text, { ttl: TimeToLive.OneYear })
+      const now = moment().format('YYYYMMDDHHmmss')
+      await this.minio.put(`resources`, `report/${now}.jpg`, img.buffer, {
+        'Content-Type': img.mimetype,
+        'X-Amz-Meta-Testing': 1234,
+      })
+      await this.redis.set(RedisKeys.saveMarketWeekPage2, {text, img: `/resources/report/${now}.jpg`}, { ttl: TimeToLive.OneYear })
     } catch (error) {
 
     }
@@ -1282,6 +1292,7 @@ export class ReportService {
           ORDER BY i.date DESC
           `
       const marketCap = await this.dbServer.query(marketCapQuery)
+      
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
@@ -1642,10 +1653,11 @@ select * from temp where date = (select max(date) from temp)
 
   async weekReport2() {
     try {
+      const data_redis: {text: string[], img: string} = await this.redis.get(RedisKeys.saveMarketWeekPage2)
       return {
         table: (await this.afternoonReport2()).table,
-        image: await this.redis.get('image-report-week') || '',
-        text: await this.redis.get(RedisKeys.saveMarketWeekPage2) || []
+        image:  data_redis.img || '',
+        text:  data_redis.text || []
       }
     } catch (e) {
       throw new CatchException(e)
@@ -2049,9 +2061,6 @@ select * from temp where date = (select max(date) from temp)
 
   async priceFluctuationCorrelation(code: string) {
     try {
-      // const now = moment((await this.mssqlService.query(`select max(date) as date from marketTrade.dbo.historyTicker where code = '${code}'`))[0].date).format('YYYY-MM-DD')
-      // const year = moment(now).subtract(1, 'year').format('YYYY-MM-DD')
-
       const date = await this.mssqlService.query(`with date_ranges as (
         select
             max(case when date <= '${moment().format('YYYY-MM-DD')}' then date else null end) as now,
@@ -2080,6 +2089,7 @@ select * from temp where date = (select max(date) from temp)
             select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
             )
             select * from temp where date not in (select date from temp group by date having count(date) < 3) order by date asc, code desc` 
+            
       const data = await this.mssqlService.query<InterestRateResponse[]>(query_2)
       return data.map(item => ({ ...item, date: UtilCommonTemplate.toDate(item.date) || '' }))
     } catch (e) {

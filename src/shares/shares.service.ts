@@ -1511,7 +1511,7 @@ export class SharesService {
     date as (${select})
     select * from date order by date asc, row asc
     `
-
+    
     const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query)
     const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart)
     await this.redis.set(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneDay })
