@@ -2042,6 +2042,7 @@ select * from temp where date = (select max(date) from temp)
       WHERE code = '${code}')
       `
       const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(`${RedisKeys.reportTechnical}:${code}`) as any])
+console.log(data);
 
       return {
         ...data[0],
@@ -2085,11 +2086,10 @@ select * from temp where date = (select max(date) from temp)
       temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.tickerTradeVND where code = '${code}' and date between '${year}' and '${now}'
             union all
             select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
-            union all
-            select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
             )
-            select * from temp where date not in (select date from temp group by date having count(date) < 3) order by date asc, code desc` 
-            
+            select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc` 
+            // union all
+            // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
       const data = await this.mssqlService.query<InterestRateResponse[]>(query_2)
       return data.map(item => ({ ...item, date: UtilCommonTemplate.toDate(item.date) || '' }))
     } catch (e) {
@@ -2099,7 +2099,7 @@ select * from temp where date = (select max(date) from temp)
 
   async priceChange(code: string) {
     try {
-      const { latestDate, monthDate, month3Date, firstDateYear } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date')
+      const { latestDate, monthDate, month3Date, firstDateYear } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date', `where type = 'STOCK'`)
 
       const month = moment(monthDate).format('YYYY-MM-DD')
       const month_3 = moment(month3Date).format('YYYY-MM-DD')
@@ -2125,18 +2125,8 @@ select * from temp where date = (select max(date) from temp)
       FROM marketTrade.dbo.indexTradeVND
       WHERE code = 'VNINDEX'
       AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
-      UNION ALL
-      SELECT
-        closePrice,
-        code,
-        date
-      FROM marketTrade.dbo.inDusTrade
-      WHERE code = (SELECT
-        LV2
-      FROM marketInfor.dbo.info
-      WHERE code = '${code}')
-      AND floor = 'ALL'
-      AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}'))
+      
+      )
       SELECT
         ([${latestDate}] - [${month}]) / [${month}] * 100 AS month,
         ([${latestDate}] - [${month_3}]) / [${month_3}] * 100 AS month_3,
@@ -2146,6 +2136,19 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
+      
+      // UNION ALL
+      // SELECT
+      //   closePrice,
+      //   code,
+      //   date
+      // FROM marketTrade.dbo.inDusTrade
+      // WHERE code = (SELECT
+      //   LV2
+      // FROM marketInfor.dbo.info
+      // WHERE code = '${code}')
+      // AND floor = 'ALL'
+      // AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
       
       const data = await this.mssqlService.query(query)
       return data
@@ -2444,7 +2447,7 @@ select * from temp where date = (select max(date) from temp)
     }
   }
 
-  async getDateSessionV2(table: string, column: string) {
+  async getDateSessionV2(table: string, column: string, condition?: string) {
     try {
       const now = moment((await this.mssqlService.query(`select max(${column}) as date from ${table}`))[0].date).format('YYYY-MM-DD')
 
@@ -2458,6 +2461,7 @@ select * from temp where date = (select max(date) from temp)
               max(case when ${column} <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then ${column} else null end) as year,
               max(case when ${column} <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then ${column} else null end) as ytd
           from ${table}
+          ${condition ? condition : ''}
       )
       select prev, week, month, month_3, year, ytd
       from date_ranges;`
