@@ -2050,6 +2050,7 @@ select * from temp where date = (select max(date) from temp)
         img: data_redis?.img || '',
         is_sell: data_redis?.is_sell || '',
         gia_muc_tieu: data_redis?.gia_muc_tieu || 0,
+        thoi_gian_nam_giu: data_redis?.thoi_gian_nam_giu || '',
         gia_thi_truong: data_redis?.gia_thi_truong || 0,
         loi_nhuan_ky_vong: data_redis?.loi_nhuan_ky_vong || 0,
         gia_ban_dung_lo: data_redis?.gia_ban_dung_lo || 0,

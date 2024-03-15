@@ -35,6 +35,13 @@ export class SetInfoReportTechnicalDto {
     gia_muc_tieu: number
 
     @ApiProperty({
+        type: String,
+        description: 'Thời gian nắm giữ, truyền lên string',
+        example: '01 tháng'
+    })
+    thoi_gian_nam_giu: string
+
+    @ApiProperty({
         type: Number
     })
     gia_thi_truong: number
