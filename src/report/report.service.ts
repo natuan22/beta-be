@@ -2075,7 +2075,7 @@ select * from temp where date = (select max(date) from temp)
     const year = moment(date[0].year).format('YYYY-MM-DD')
 
       const query_2 = `
-      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '${year}' and code = '${code}'
+      with base as (select closePrice, code from marketTrade.dbo.historyTicker where date = '${year}' and code = '${code}'
       union
       select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
       union
@@ -2083,7 +2083,7 @@ select * from temp where date = (select max(date) from temp)
       from marketTrade.dbo.tickerTradeVND t
       inner join marketInfor.dbo.info i on i.code = t.code
       where date = '${year}' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
-      temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.tickerTradeVND where code = '${code}' and date between '${year}' and '${now}'
+      temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.historyTicker where code = '${code}' and date between '${year}' and '${now}'
             union all
             select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
             )
