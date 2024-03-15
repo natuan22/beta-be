@@ -835,9 +835,14 @@ export class ReportService {
     }
   }
 
-  async saveMarketComment(text: string[], img: string) {
+  async saveMarketComment(text: string[], img: any) {
     try {
-      await this.redis.set(RedisKeys.saveMarketComment, { img, text }, { ttl: TimeToLive.OneYear })
+      const now = moment().format('YYYYMMDDHHmmss')
+      await this.minio.put(`resources`, `report/${now}.jpg`, img.buffer, {
+        'Content-Type': img.mimetype,
+        'X-Amz-Meta-Testing': 1234,
+      })
+      await this.redis.set(RedisKeys.saveMarketComment, { img: `/resources/report/${now}.jpg`, text }, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
@@ -851,9 +856,14 @@ export class ReportService {
     }
   }
 
-  async saveMarketWeekPage2(text: string[]) {
+  async saveMarketWeekPage2(text: string[], img: any) {
     try {
-      await this.redis.set(RedisKeys.saveMarketWeekPage2, text, { ttl: TimeToLive.OneYear })
+      const now = moment().format('YYYYMMDDHHmmss')
+      await this.minio.put(`resources`, `report/${now}.jpg`, img.buffer, {
+        'Content-Type': img.mimetype,
+        'X-Amz-Meta-Testing': 1234,
+      })
+      await this.redis.set(RedisKeys.saveMarketWeekPage2, {text, img: `/resources/report/${now}.jpg`}, { ttl: TimeToLive.OneYear })
     } catch (error) {
 
     }
@@ -1282,6 +1292,7 @@ export class ReportService {
           ORDER BY i.date DESC
           `
       const marketCap = await this.dbServer.query(marketCapQuery)
+      
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
@@ -1642,10 +1653,11 @@ select * from temp where date = (select max(date) from temp)
 
   async weekReport2() {
     try {
+      const data_redis: {text: string[], img: string} = await this.redis.get(RedisKeys.saveMarketWeekPage2)
       return {
         table: (await this.afternoonReport2()).table,
-        image: await this.redis.get('image-report-week') || '',
-        text: await this.redis.get(RedisKeys.saveMarketWeekPage2) || []
+        image:  data_redis.img || '',
+        text:  data_redis.text || []
       }
     } catch (e) {
       throw new CatchException(e)
@@ -2029,7 +2041,7 @@ select * from temp where date = (select max(date) from temp)
       FROM RATIO.dbo.ratioInday
       WHERE code = '${code}')
       `
-      const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(RedisKeys.reportTechnical) as any])
+      const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(`${RedisKeys.reportTechnical}:${code}`) as any])
 
       return {
         ...data[0],
@@ -2049,25 +2061,34 @@ select * from temp where date = (select max(date) from temp)
 
   async priceFluctuationCorrelation(code: string) {
     try {
-      const now = moment((await this.mssqlService.query(`select max(date) as date from marketTrade.dbo.historyTicker where code = '${code}'`))[0].date).format('YYYY-MM-DD')
-      const year = moment(now).subtract(1, 'year').format('YYYY-MM-DD')
+      const date = await this.mssqlService.query(`with date_ranges as (
+        select
+            max(case when date <= '${moment().format('YYYY-MM-DD')}' then date else null end) as now,
+            max(case when date <= '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as year
+        from marketTrade.dbo.historyTicker
+    )
+    select now, year
+    from date_ranges;`)
+
+    const now = moment(date[0].now).format('YYYY-MM-DD')
+    const year = moment(date[0].year).format('YYYY-MM-DD')
 
       const query_2 = `
-      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '2022-12-30' and code = '${code}'
+      with base as (select closePrice, code from marketTrade.dbo.tickerTradeVND where date = '${year}' and code = '${code}'
       union
-      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '2022-12-30' and code = 'VNINDEX'
+      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
       union
       select sum(t.closePrice) as closePrice, (select LV2 from marketInfor.dbo.info where code = '${code}') as code
       from marketTrade.dbo.tickerTradeVND t
       inner join marketInfor.dbo.info i on i.code = t.code
-      where date = '2022-12-30' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
+      where date = '${year}' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
       temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.tickerTradeVND where code = '${code}' and date between '${year}' and '${now}'
             union all
             select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
-            union all
-            select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
             )
-            select * from temp where date not in (select date from temp group by date having count(date) < 3) order by date asc, code desc` 
+            select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc` 
+            // union all
+            // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
       const data = await this.mssqlService.query<InterestRateResponse[]>(query_2)
       return data.map(item => ({ ...item, date: UtilCommonTemplate.toDate(item.date) || '' }))
     } catch (e) {
@@ -2077,7 +2098,7 @@ select * from temp where date = (select max(date) from temp)
 
   async priceChange(code: string) {
     try {
-      const { latestDate, monthDate, month3Date, firstDateYear } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date')
+      const { latestDate, monthDate, month3Date, firstDateYear } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date', `where type = 'STOCK'`)
 
       const month = moment(monthDate).format('YYYY-MM-DD')
       const month_3 = moment(month3Date).format('YYYY-MM-DD')
@@ -2103,18 +2124,8 @@ select * from temp where date = (select max(date) from temp)
       FROM marketTrade.dbo.indexTradeVND
       WHERE code = 'VNINDEX'
       AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
-      UNION ALL
-      SELECT
-        closePrice,
-        code,
-        date
-      FROM marketTrade.dbo.inDusTrade
-      WHERE code = (SELECT
-        LV2
-      FROM marketInfor.dbo.info
-      WHERE code = '${code}')
-      AND floor = 'ALL'
-      AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}'))
+      
+      )
       SELECT
         ([${latestDate}] - [${month}]) / [${month}] * 100 AS month,
         ([${latestDate}] - [${month_3}]) / [${month_3}] * 100 AS month_3,
@@ -2124,6 +2135,20 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
+      
+      // UNION ALL
+      // SELECT
+      //   closePrice,
+      //   code,
+      //   date
+      // FROM marketTrade.dbo.inDusTrade
+      // WHERE code = (SELECT
+      //   LV2
+      // FROM marketInfor.dbo.info
+      // WHERE code = '${code}')
+      // AND floor = 'ALL'
+      // AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
+      
       const data = await this.mssqlService.query(query)
       return data
     } catch (e) {
@@ -2421,7 +2446,7 @@ select * from temp where date = (select max(date) from temp)
     }
   }
 
-  async getDateSessionV2(table: string, column: string) {
+  async getDateSessionV2(table: string, column: string, condition?: string) {
     try {
       const now = moment((await this.mssqlService.query(`select max(${column}) as date from ${table}`))[0].date).format('YYYY-MM-DD')
 
@@ -2435,6 +2460,7 @@ select * from temp where date = (select max(date) from temp)
               max(case when ${column} <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then ${column} else null end) as year,
               max(case when ${column} <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then ${column} else null end) as ytd
           from ${table}
+          ${condition ? condition : ''}
       )
       select prev, week, month, month_3, year, ytd
       from date_ranges;`
@@ -2456,11 +2482,11 @@ select * from temp where date = (select max(date) from temp)
 
   async setInfoReportTechnical(value: SetInfoReportTechnicalDto) {
     try {
-      await this.minio.put(`resources`, `report/technical/${value.img.originalname}`, value.img.buffer, {
+      await this.minio.put(`resources`, `report/technical/${value.img.originalName}`, value.img.buffer, {
         'Content-Type': value.img.mimetype,
         'X-Amz-Meta-Testing': 1234,
       })
-      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code}`, { ...value, img: `/resources/report/technical/${value.img.originalname}` }, { ttl: TimeToLive.OneWeek })
+      await this.redis.set(`${RedisKeys.reportTechnical}:${value.code.toUpperCase()}`, { ...value, img: `/resources/report/technical/${value.img.originalName}` }, { ttl: TimeToLive.OneWeek })
     } catch (e) {
       throw new CatchException(e)
     }

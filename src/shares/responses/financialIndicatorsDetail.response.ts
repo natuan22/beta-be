@@ -119,7 +119,7 @@ export class FinancialIndicatorsDetailResponse {
                 break;
         }
         this.value = data?.value || 0
-        this.date = data?.date || ''
+        this.date = data?.date.toString() || ''
         this.color = is_chart ? { // Thêm thuộc tính color ở đây
             linearGradient: {
                 x1: 0,

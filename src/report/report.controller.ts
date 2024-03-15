@@ -225,18 +225,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @Post('upload-image-report')
-  // @UseInterceptors(AnyFilesInterceptor())
-  // @ApiOperation({summary: 'Up hình report chiều trang 2', description: 'Truyền lên file jpg, tên gì cũng được'})
-  // async uploadReportAfternoon(@UploadedFiles() file: any, @Res() res: Response){
-  //   try {
-  //     await this.reportService.uploadImageReport(file, 0)
-  //     return res.status(HttpStatus.OK).send(new BaseResponse({}))
-  //   } catch (error) {
-  //     throw new CatchException(error)
-  //   }
-  // }
-
+  @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-nhan-dinh-thi-truong-chieu')
@@ -317,24 +306,13 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-nhan-dinh-thi-truong-tuan-trang-2')
   async saveMarketWeekPage2(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketWeekPage2(b.text)
+    const data = await this.reportService.saveMarketWeekPage2(b.text, b.img)
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
-  }
-
-  @Post('upload-image-report-2')
-  @UseInterceptors(AnyFilesInterceptor())
-  @ApiOperation({summary: 'Up hình report tuần trang 2', description: 'Truyền lên file jpg, tên gì cũng được'})
-  async uploadReportWeek(@UploadedFiles() file: any, @Res() res: Response){
-    try {
-      await this.reportService.uploadImageReport(file, 1)
-      return res.status(HttpStatus.OK).send(new BaseResponse({}))
-    } catch (error) {
-      throw new CatchException(error)
-    }
   }
 
   @ApiOperation({summary: 'Bản tin tuần trang 2'})

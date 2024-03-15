@@ -15,7 +15,6 @@ export class SaveMarketCommentDto {
     text: string[]
 
     @ApiProperty({
-        type: String,
     })
-    img: string
+    img: any
 }
