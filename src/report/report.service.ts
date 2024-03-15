@@ -2042,7 +2042,6 @@ select * from temp where date = (select max(date) from temp)
       WHERE code = '${code}')
       `
       const [data, data_redis] = await Promise.all([this.mssqlService.query(query) as any, this.redis.get(`${RedisKeys.reportTechnical}:${code}`) as any])
-console.log(data);
 
       return {
         ...data[0],
