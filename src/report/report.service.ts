@@ -842,7 +842,7 @@ export class ReportService {
         'Content-Type': img.mimetype,
         'X-Amz-Meta-Testing': 1234,
       })
-      await this.redis.set(RedisKeys.saveMarketComment, { img: `resources/report/${now}.jpg`, text }, { ttl: TimeToLive.OneYear })
+      await this.redis.set(RedisKeys.saveMarketComment, { img: `/resources/report/${now}.jpg`, text }, { ttl: TimeToLive.OneYear })
     } catch (e) {
       throw new CatchException(e)
     }
