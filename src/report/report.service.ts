@@ -2054,6 +2054,7 @@ select * from temp where date = (select max(date) from temp)
         gia_thi_truong: data_redis?.gia_thi_truong || 0,
         loi_nhuan_ky_vong: data_redis?.loi_nhuan_ky_vong || 0,
         gia_ban_dung_lo: data_redis?.gia_ban_dung_lo || 0,
+        analyst_name: data_redis?.analyst_name || '',
       }
     } catch (e) {
       throw new CatchException(e)

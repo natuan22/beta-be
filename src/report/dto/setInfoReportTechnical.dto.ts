@@ -56,4 +56,8 @@ export class SetInfoReportTechnicalDto {
     })
     gia_ban_dung_lo: number
 
+    @ApiProperty({
+        type: String
+    })
+    analyst_name: string
 }
