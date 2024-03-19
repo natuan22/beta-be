@@ -1030,7 +1030,7 @@ export class MarketService {
       _.orderBy(data, 'date').filter(
         (i) => UtilCommonTemplate.toDate(i.date) != startDate,
       ),
-    );
+    ).map(item => ({...item, date: moment(item.date).year().toString() + moment(item.date).quarter().toString()}));
 
     await this.redis.set(
       `${RedisKeys.CashDividend}:${floor}:${order}:${type}`,
