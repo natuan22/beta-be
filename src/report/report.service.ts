@@ -1,15 +1,16 @@
-import { CACHE_MANAGER, Catch, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment';
+import * as calTech from 'technicalindicators';
 import { DataSource } from 'typeorm';
 import { DB_SERVER } from '../constants';
 import { TimeToLive } from '../enums/common.enum';
 import { RedisKeys } from '../enums/redis-keys.enum';
-import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
+import { CatchException } from '../exceptions/common.exception';
+import { InterestRateResponse } from '../macro/responses/interest-rate.response';
 import { MinioOptionService } from '../minio/minio.service';
 import { MssqlService } from '../mssql/mssql.service';
-import { SessionDatesInterface } from '../stock/interfaces/session-dates.interface';
 import { isDecrease, isEqual, isHigh, isIncrease, isLow } from '../stock/processes/industry-data-child';
 import { IndustryResponse } from '../stock/responses/Industry.response';
 import { InvestorTransactionRatioResponse } from '../stock/responses/InvestorTransactionRatio.response';
@@ -18,10 +19,13 @@ import { UtilCommonTemplate } from '../utils/utils.common';
 import { INews } from './dto/save-news.dto';
 import { ISaveStockRecommendWeek } from './dto/saveStockRecommendWeek.dto';
 import { SetFlexiblePageDto } from './dto/setFlexiblePage.dto';
+import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
 import { AfternoonReport1, IStockContribute } from './response/afternoonReport1.response';
+import { BuyingAndSellingStatisticsResponse } from './response/buyingAndSellingStatistics.response';
 import { EventResponse } from './response/event.response';
 import { ExchangeRateResponse } from './response/exchangeRate.response';
 import { ExchangeRateUSDEURResponse } from './response/exchangeRateUSDEUR.response';
+import { GetStockRecommendWeekResponse } from './response/getStockRecommendWeek.response';
 import { ReportIndexResponse } from './response/index.response';
 import { LiquidityMarketResponse } from './response/liquidityMarket.response';
 import { MerchandiseResponse } from './response/merchandise.response';
@@ -32,13 +36,6 @@ import { NewsInternationalResponse } from './response/newsInternational.response
 import { AfterNoonReport2Response, StockMarketResponse } from './response/stockMarket.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
-import { InterestRateResponse } from '../macro/responses/interest-rate.response'
-import { BuyingAndSellingStatisticsResponse } from './response/buyingAndSellingStatistics.response';
-import * as calTech from 'technicalindicators';
-import { GetStockRecommendWeekResponse } from './response/getStockRecommendWeek.response';
-import { Time } from 'mssql';
-import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
-
 @Injectable()
 export class ReportService {
   constructor(
@@ -863,7 +860,7 @@ export class ReportService {
         'Content-Type': img.mimetype,
         'X-Amz-Meta-Testing': 1234,
       })
-      await this.redis.set(RedisKeys.saveMarketWeekPage2, {text, img: `/resources/report/${now}.jpg`}, { ttl: TimeToLive.OneYear })
+      await this.redis.set(RedisKeys.saveMarketWeekPage2, { text, img: `/resources/report/${now}.jpg` }, { ttl: TimeToLive.OneYear })
     } catch (error) {
 
     }
@@ -1292,7 +1289,7 @@ export class ReportService {
           ORDER BY i.date DESC
           `
       const marketCap = await this.dbServer.query(marketCapQuery)
-      
+
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
@@ -1653,11 +1650,11 @@ select * from temp where date = (select max(date) from temp)
 
   async weekReport2() {
     try {
-      const data_redis: {text: string[], img: string} = await this.redis.get(RedisKeys.saveMarketWeekPage2)
+      const data_redis: { text: string[], img: string } = await this.redis.get(RedisKeys.saveMarketWeekPage2)
       return {
         table: (await this.afternoonReport2()).table,
-        image:  data_redis.img || '',
-        text:  data_redis.text || []
+        image: data_redis.img || '',
+        text: data_redis.text || []
       }
     } catch (e) {
       throw new CatchException(e)
@@ -2072,8 +2069,8 @@ select * from temp where date = (select max(date) from temp)
     select now, year
     from date_ranges;`)
 
-    const now = moment(date[0].now).format('YYYY-MM-DD')
-    const year = moment(date[0].year).format('YYYY-MM-DD')
+      const now = moment(date[0].now).format('YYYY-MM-DD')
+      const year = moment(date[0].year).format('YYYY-MM-DD')
 
       const query_2 = `
       with base as (select closePrice, code from marketTrade.dbo.historyTicker where date = '${year}' and code = '${code}'
@@ -2088,9 +2085,9 @@ select * from temp where date = (select max(date) from temp)
             union all
             select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
             )
-            select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc` 
-            // union all
-            // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
+            select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc`
+      // union all
+      // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
       const data = await this.mssqlService.query<InterestRateResponse[]>(query_2)
       return data.map(item => ({ ...item, date: UtilCommonTemplate.toDate(item.date) || '' }))
     } catch (e) {
@@ -2137,7 +2134,7 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
-      
+
       // UNION ALL
       // SELECT
       //   closePrice,
@@ -2150,7 +2147,7 @@ select * from temp where date = (select max(date) from temp)
       // WHERE code = '${code}')
       // AND floor = 'ALL'
       // AND date IN ('${latestDate}', '${month}', '${month_3}', '${ytd}')
-      
+
       const data = await this.mssqlService.query(query)
       return data
     } catch (e) {
@@ -2186,15 +2183,15 @@ select * from temp where date = (select max(date) from temp)
 
   async technicalIndex(code: string) {
     try {
-      const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.tickerTradeVND', 'date')
-      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number }[] = await this.mssqlService.query(`select closePrice, highPrice, lowPrice, date from marketTrade.dbo.tickerTradeVND where code = '${code}' order by date`)
+      const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
+      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number }[] = await this.mssqlService.query(`select closePrice, highPrice, lowPrice, date from marketTrade.dbo.historyTicker where code = '${code}' order by date`)
 
       const day = data.map(item => item.date).filter(item => new Date(item) >= new Date(yearDate)).reverse()
 
-      const price = data.map(item => item.closePrice)
+      const price = data.map(item => item.closePrice / 1000)
       const lastPrice = price[price.length - 1]
-      const highPrice = data.map(item => item.highPrice)
-      const lowPrice = data.map(item => item.lowPrice)
+      const highPrice = data.map(item => item.highPrice / 1000)
+      const lowPrice = data.map(item => item.lowPrice / 1000)
 
       const rsi = calTech.rsi({ values: price, period: 14 }).reverse()
       const cci = calTech.cci({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
@@ -2209,7 +2206,7 @@ select * from temp where date = (select max(date) from temp)
 
       const table = arr.map(item => {
         const ma = calTech.sma({ period: item, values: price })
-        const ema = calTech.ema({ period: item, values: price })  
+        const ema = calTech.ema({ period: item, values: price })
 
         return {
           name: `MA${item}`,
@@ -2245,7 +2242,7 @@ select * from temp where date = (select max(date) from temp)
         macd_histogram_date.push({ value: macd[index].histogram, date })
       }
       )
-
+      
       const chart = {
         rsi: {
           value: rsi[0],
@@ -2494,6 +2491,3 @@ select * from temp where date = (select max(date) from temp)
     }
   }
 }
-
-
-
