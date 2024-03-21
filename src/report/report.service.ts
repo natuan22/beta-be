@@ -2190,6 +2190,8 @@ select * from temp where date = (select max(date) from temp)
 
       const price = data.map(item => item.closePrice / 1000)
       const lastPrice = price[price.length - 1]
+      console.log(lastPrice);
+      
       const highPrice = data.map(item => item.highPrice / 1000)
       const lowPrice = data.map(item => item.lowPrice / 1000)
 
@@ -2210,16 +2212,20 @@ select * from temp where date = (select max(date) from temp)
 
         return {
           name: `MA${item}`,
+          ma: ma[ma.length - 1],
+          ema: ema[ema.length - 1],
           single: this.ratingTechnicalIndex('ma', { value: ma[ma.length - 1], price: lastPrice }),
           hat: this.ratingTechnicalIndex('ma', { value: ema[ema.length - 1], price: lastPrice })
         }
       })
+      console.log(table);
+      
 
-      table.push({
-        name: `SAR`,
-        single: this.ratingTechnicalIndex('sar', { value: sar[sar.length - 1], price: lastPrice }),
-        hat: ''
-      })
+      // table.push({
+        // name: `SAR`,
+        // single: this.ratingTechnicalIndex('sar', { value: sar[sar.length - 1], price: lastPrice }),
+        // hat: ''
+      // })
 
       const rsi_date = []
       const cci_date = []
@@ -2242,7 +2248,10 @@ select * from temp where date = (select max(date) from temp)
         macd_histogram_date.push({ value: macd[index].histogram, date })
       }
       )
+
+      console.log('stoch', stochasticRsi[0]);
       
+
       const chart = {
         rsi: {
           value: rsi[0],
@@ -2355,9 +2364,9 @@ select * from temp where date = (select max(date) from temp)
         }
         break
       case 'adx':
-        if (o.adx > 25 && o.pdi > o.mdi) {
+        if (o.pdi > o.mdi) {
           rate = 0
-        } else if (o.adx > 25 && o.pdi < o.mdi) {
+        } else if (o.pdi < o.mdi) {
           rate = 1
         } else {
           rate = 2
