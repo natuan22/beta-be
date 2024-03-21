@@ -2265,7 +2265,7 @@ select * from temp where date = (select max(date) from temp)
             k: stochasticRsi[0].k,
             d: stochasticRsi[0].d
           },
-          rate: this.ratingTechnicalIndex('stochasticRsi', { value: stochasticRsi[0].stochRSI }),
+          rate: this.ratingTechnicalIndex('stochasticRsi', { value: stochasticRsi[0].k }),
           chart: stochasticRsi_date.reverse()
         },
         williams: {
