@@ -2042,6 +2042,7 @@ select * from temp where date = (select max(date) from temp)
 
       return {
         ...data[0],
+        nuoc_ngoai: data[0]?.nuoc_ngoai > 49 ? 49 : data[0]?.nuoc_ngoai,
         text: data_redis?.text || [],
         table: data_redis?.table || [],
         img: data_redis?.img || '',
