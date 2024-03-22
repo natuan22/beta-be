@@ -2007,9 +2007,13 @@ select * from temp where date = (select max(date) from temp)
         ON m.ratioCode = r.ratioCode
         AND m.date = r.date
       WHERE (r.ratioCode IN ('PRICE_HIGHEST_CR_52W', 'PRICE_LOWEST_CR_52W', 'NMVALUE_AVG_CR_20D', 'NMVOLUME_AVG_CR_20D', 'STATE_OWNERSHIP'))
-      AND code = '${code}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_HIGHEST_CR_52W], [PRICE_LOWEST_CR_52W], [NMVALUE_AVG_CR_20D], [NMVOLUME_AVG_CR_20D], [STATE_OWNERSHIP])) AS chuyen)
+      AND code = '${code}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_HIGHEST_CR_52W], [PRICE_LOWEST_CR_52W], [NMVALUE_AVG_CR_20D], [NMVOLUME_AVG_CR_20D], [STATE_OWNERSHIP])) AS chuyen),
+      closePrice as (
+        select top 1 closePrice, code from marketTrade.dbo.tickerTradeVND where code = '${code}' order by date desc
+    )
       SELECT
         c.code,
+        g.closePrice,
         marketCap,
         shareout,
         [PRICE_HIGHEST_CR_52W] AS high,
@@ -2032,6 +2036,8 @@ select * from temp where date = (select max(date) from temp)
         ON i.code = c.code
       INNER JOIN nuoc_ngoai n
         ON n.code = c.code
+      INNER JOIN closePrice g
+        ON g.code = c.code  
       WHERE c.code = '${code}'
       AND c.date = (SELECT
         MAX(date)
@@ -2049,7 +2055,7 @@ select * from temp where date = (select max(date) from temp)
         is_sell: data_redis?.is_sell || '',
         gia_muc_tieu: data_redis?.gia_muc_tieu || 0,
         thoi_gian_nam_giu: data_redis?.thoi_gian_nam_giu || '',
-        gia_thi_truong: data_redis?.gia_thi_truong || 0,
+        gia_thi_truong: data[0]?.closePrice || 0,
         loi_nhuan_ky_vong: data_redis?.loi_nhuan_ky_vong || 0,
         gia_ban_dung_lo: data_redis?.gia_ban_dung_lo || 0,
         analyst_name: data_redis?.analyst_name || '',
@@ -2191,7 +2197,7 @@ select * from temp where date = (select max(date) from temp)
 
       const price = data.map(item => item.closePrice / 1000)
       const lastPrice = price[price.length - 1]
-      
+
       const highPrice = data.map(item => item.highPrice / 1000)
       const lowPrice = data.map(item => item.lowPrice / 1000)
 
@@ -2203,18 +2209,6 @@ select * from temp where date = (select max(date) from temp)
       const stochasticRsi = calTech.stochasticrsi({ values: price, kPeriod: 3, dPeriod: 3, rsiPeriod: 14, stochasticPeriod: 14 }).reverse()
       const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
       const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
-
-      console.log({
-        rsi: rsi[rsi.length - 1],
-        cci: cci[cci.length - 1],
-        williams: williams[williams.length - 1],
-        adx: adx[adx.length - 1],
-        stochastic: stochastic[stochastic.length - 1],
-        stochasticRsi: stochasticRsi[stochasticRsi.length - 1],
-        macd: macd[macd.length - 1],
-        sar: sar[sar.length - 1],
-      });
-      
 
       const arr = [5, 10, 20, 50, 100, 200]
 
