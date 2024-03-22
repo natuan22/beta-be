@@ -2042,7 +2042,7 @@ select * from temp where date = (select max(date) from temp)
 
       return {
         ...data[0],
-        nuoc_ngoai: data[0]?.nuoc_ngoai > 49 ? 49 : data[0]?.nuoc_ngoai,
+        nuoc_ngoai: data[0]?.nuoc_ngoai,
         text: data_redis?.text || [],
         table: data_redis?.table || [],
         img: data_redis?.img || '',
@@ -2203,6 +2203,18 @@ select * from temp where date = (select max(date) from temp)
       const stochasticRsi = calTech.stochasticrsi({ values: price, kPeriod: 3, dPeriod: 3, rsiPeriod: 14, stochasticPeriod: 14 }).reverse()
       const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
       const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
+
+      console.log({
+        rsi: rsi[rsi.length - 1],
+        cci: cci[cci.length - 1],
+        williams: williams[williams.length - 1],
+        adx: adx[adx.length - 1],
+        stochastic: stochastic[stochastic.length - 1],
+        stochasticRsi: stochasticRsi[stochasticRsi.length - 1],
+        macd: macd[macd.length - 1],
+        sar: sar[sar.length - 1],
+      });
+      
 
       const arr = [5, 10, 20, 50, 100, 200]
 
