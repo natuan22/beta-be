@@ -2191,8 +2191,8 @@ select * from temp where date = (select max(date) from temp)
   async technicalIndex(code: string) {
     try {
       const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
-      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number }[] = await this.mssqlService.query(`
-      select closePrice, highPrice, lowPrice, volume, f.netVal, h.date
+      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number, openPrice: number }[] = await this.mssqlService.query(`
+      select closePrice, highPrice, lowPrice, openPrice, volume, f.netVal, h.date
       from marketTrade.dbo.historyTicker h
       inner join marketTrade.dbo.[foreign] f on h.code = f.code and h.date = f.date
       where h.code = '${code}'
@@ -2205,12 +2205,14 @@ select * from temp where date = (select max(date) from temp)
       const lastPrice = price[price.length - 1]
       const highPrice = data.map(item => item.highPrice / 1000)
       const lowPrice = data.map(item => item.lowPrice / 1000)
+      const openPrice = data.map(item => item.openPrice / 1000)
       const volume = data.map(item => item.volume)
 
       const volume_reverse = [...volume].reverse()
       const price_reverse = [...price].reverse()
       const high_reverse = [...highPrice].reverse()
       const low_reverse = [...lowPrice].reverse()
+      const open_reverse = [...openPrice].reverse()
       const net_reverse = data.map(item => item.netVal).reverse()
 
       const rsi = calTech.rsi({ values: price, period: 14 }).reverse()
@@ -2273,6 +2275,7 @@ select * from temp where date = (select max(date) from temp)
           closePrice: price_reverse[index],
           highPrice: high_reverse[index],
           lowPrice: low_reverse[index],
+          openPrice: open_reverse[index],
           volume: volume_reverse[index],
           volume_ma20: volume_ma20[index],
           ma10: ma10[index],
