@@ -2191,6 +2191,8 @@ select * from temp where date = (select max(date) from temp)
   async technicalIndex(code: string) {
     try {
       const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
+      console.log(yearDate);
+      
       const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number, openPrice: number }[] = await this.mssqlService.query(`
       select closePrice, highPrice, lowPrice, openPrice, volume, f.netVal, h.date
       from marketTrade.dbo.historyTicker h
@@ -2199,7 +2201,7 @@ select * from temp where date = (select max(date) from temp)
       order by h.date
       `)
 
-      const day = data.map(item => item.date).filter(item => new Date(item) >= new Date(yearDate)).reverse()
+      const day = data.map(item => item.date).filter(item => new Date(item) >= new Date('2023-10-22T00:00:00.000Z')).reverse()
 
       const price = data.map(item => item.closePrice / 1000)
       const lastPrice = price[price.length - 1]
