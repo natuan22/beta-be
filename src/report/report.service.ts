@@ -2191,15 +2191,27 @@ select * from temp where date = (select max(date) from temp)
   async technicalIndex(code: string) {
     try {
       const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
-      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number }[] = await this.mssqlService.query(`select closePrice, highPrice, lowPrice, date from marketTrade.dbo.historyTicker where code = '${code}' order by date`)
+      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number }[] = await this.mssqlService.query(`
+      select closePrice, highPrice, lowPrice, volume, f.netVal, h.date
+      from marketTrade.dbo.historyTicker h
+      inner join marketTrade.dbo.[foreign] f on h.code = f.code and h.date = f.date
+      where h.code = '${code}'
+      order by h.date
+      `)
 
       const day = data.map(item => item.date).filter(item => new Date(item) >= new Date(yearDate)).reverse()
 
       const price = data.map(item => item.closePrice / 1000)
       const lastPrice = price[price.length - 1]
-
       const highPrice = data.map(item => item.highPrice / 1000)
       const lowPrice = data.map(item => item.lowPrice / 1000)
+      const volume = data.map(item => item.volume)
+
+      const volume_reverse = [...volume].reverse()
+      const price_reverse = [...price].reverse()
+      const high_reverse = [...highPrice].reverse()
+      const low_reverse = [...lowPrice].reverse()
+      const net_reverse = data.map(item => item.netVal).reverse()
 
       const rsi = calTech.rsi({ values: price, period: 14 }).reverse()
       const cci = calTech.cci({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
@@ -2209,6 +2221,14 @@ select * from temp where date = (select max(date) from temp)
       const stochasticRsi = calTech.stochasticrsi({ values: price, kPeriod: 3, dPeriod: 3, rsiPeriod: 14, stochasticPeriod: 14 }).reverse()
       const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
       const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
+      const sar_reverse = [...sar].reverse()
+      const ma10 = calTech.sma({ period: 10, values: price }).reverse()
+      const ma20 = calTech.sma({ period: 20, values: price }).reverse()
+      const ma50 = calTech.sma({ period: 50, values: price }).reverse()
+      const ma100 = calTech.sma({ period: 100, values: price }).reverse()
+      const ma200 = calTech.sma({ period: 200, values: price }).reverse()
+
+      const volume_ma20 = calTech.sma({ period: 20, values: volume }).reverse()
 
       const arr = [5, 10, 20, 50, 100, 200]
 
@@ -2237,6 +2257,7 @@ select * from temp where date = (select max(date) from temp)
       const stochasticRsi_date = []
       const macd_date = []
       const macd_histogram_date = []
+      const volume_ma20_date = []
 
       day.map((item, index) => {
         const date = UtilCommonTemplate.toDate(item)
@@ -2248,6 +2269,21 @@ select * from temp where date = (select max(date) from temp)
         stochasticRsi_date.push({ k: stochasticRsi[index].k, d: stochasticRsi[index].d, date })
         macd_date.push({ k: macd[index].MACD, d: macd[index].signal, date })
         macd_histogram_date.push({ value: macd[index].histogram, date })
+        volume_ma20_date.push({
+          closePrice: price_reverse[index],
+          highPrice: high_reverse[index],
+          lowPrice: low_reverse[index],
+          volume: volume_reverse[index],
+          volume_ma20: volume_ma20[index],
+          ma10: ma10[index],
+          ma20: ma20[index],
+          ma50: ma50[index],
+          ma100: ma100[index],
+          ma200: ma200[index],
+          sar: sar_reverse[index],
+          net: net_reverse[index],
+          date: UtilCommonTemplate.changeDateUTC(item, 1)
+        })
       }
       )
 
@@ -2305,7 +2341,8 @@ select * from temp where date = (select max(date) from temp)
         table,
         technicalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate]),
         trendSignal: this.countRate(table.map(item => [item.single, item.hat]).flat()),
-        generalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate, ...table.map(item => [item.single, item.hat]).flat()])
+        generalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate, ...table.map(item => [item.single, item.hat]).flat()]),
+        chart: volume_ma20_date.reverse()
       }
     } catch (e) {
       throw new CatchException(e)

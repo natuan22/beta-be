@@ -556,11 +556,17 @@ export class UtilCommonTemplate {
 
   }
 
-  static changeDateUTC(time: string){
-    return Date.UTC(
+  static changeDateUTC(time: string, is_date?: number){
+    return !is_date ? Date.UTC(
       new Date().getFullYear(),
       new Date().getMonth(),
       new Date().getDate(),
+      moment(time, 'HH:mm:ss').hour(),
+      moment(time, 'HH:mm:ss').minute(),
+    ).valueOf() : Date.UTC(
+      new Date(time).getFullYear(),
+      new Date(time).getMonth(),
+      new Date(time).getDate(),
       moment(time, 'HH:mm:ss').hour(),
       moment(time, 'HH:mm:ss').minute(),
     ).valueOf()
