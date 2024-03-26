@@ -1982,19 +1982,7 @@ select * from temp where date = (select max(date) from temp)
       WHERE code = '${code}'
       GROUP BY ratioCode),
       nuoc_ngoai
-      AS (SELECT
-        ([result] / [value]) * 100 AS [foreign],
-        '${code}' AS code
-      FROM (SELECT TOP (1) (SELECT TOP 1
-                            [totalRoom] - [currentRoom]
-                          FROM [marketTrade].[dbo].[foreign]
-                          WHERE code = '${code}'
-                          ORDER BY [date] DESC)
-                          AS [result],
-                          [value]
-      FROM [RATIO].[dbo].[ratio]
-      WHERE ratioCode = 'OUTSTANDING_SHARES'
-      AND code = '${code}') AS qw),
+      AS (select [TyleNDTNNdangnamgiu] * 100 as [foreign], maCK as code from [PHANTICH].[dbo].[soHuuNN] where maCK = '${code}'),
       pi
       AS (SELECT
         *
@@ -2225,6 +2213,7 @@ select * from temp where date = (select max(date) from temp)
       const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
       const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
       const sar_reverse = [...sar].reverse()
+      
       const ma10 = calTech.sma({ period: 10, values: price }).reverse()
       const ma20 = calTech.sma({ period: 20, values: price }).reverse()
       const ma50 = calTech.sma({ period: 50, values: price }).reverse()
