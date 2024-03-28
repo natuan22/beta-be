@@ -1462,20 +1462,6 @@ select * from temp where date = (select max(date) from temp)
       ORDER BY value DESC
       `)
 
-      console.log(`
-      SELECT
-        SUM(point) AS value,
-        i.LV2 as code
-      FROM WEBSITE_SERVER.dbo.CPAH c
-      INNER JOIN marketInfor.dbo.info i
-        ON i.code = c.symbol
-      WHERE date BETWEEN '${now.from}' AND '${now.to}'
-      AND c.floor = 'HSX'
-      GROUP BY i.LV2
-      ORDER BY value DESC
-      `);
-      
-
       //top co phieu dong gop
       const promise_3 = this.mssqlService.query(`
       WITH temp
