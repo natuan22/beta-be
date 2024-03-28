@@ -1462,6 +1462,19 @@ select * from temp where date = (select max(date) from temp)
       ORDER BY value DESC
       `)
 
+      console.log(`
+      SELECT
+        SUM(point) AS value,
+        i.LV2 as code
+      FROM WEBSITE_SERVER.dbo.CPAH c
+      INNER JOIN marketInfor.dbo.info i
+        ON i.code = c.symbol
+      WHERE date BETWEEN '${now.from}' AND '${now.to}'
+      AND c.floor = 'HSX'
+      GROUP BY i.LV2
+      ORDER BY value DESC
+      `);
+      
 
       //top co phieu dong gop
       const promise_3 = this.mssqlService.query(`
@@ -1625,16 +1638,16 @@ select * from temp where date = (select max(date) from temp)
         declines: data_4[0]?.declines || 0,
         noChange: data_4[0]?.noChange || 0,
         netVal: data_5[0].netVal,
-        industryAdvance: {
+        industryAdvance: data_2.length != 0 ? {
           code: data_2[0]?.value <= 0 ? '' : data_2[0].code,
           value: data_2[0]?.value <= 0 ? 0 : data_2[0].value
-        },
-        industryDecline: {
+        } : {},
+        industryDecline: data_2.length != 0 ? {
           code: data_2[data_2.length - 1]?.value >= 0 ? '' : data_2[data_2.length - 1].code,
           value: data_2[data_2.length - 1].value >= 0 ? 0 : data_2[data_2.length - 1].value
-        },
-        stockAdvance: data_3.slice(0, 5),
-        stockDecline: data_3.slice(-5).reverse(),
+        } : {},
+        stockAdvance: data_3.length != 0 ? data_3.slice(0, 5) : [],
+        stockDecline: data_3.length != 0 ? data_3.slice(-5).reverse() : [],
         topBuy: data_6.slice(0, 3),
         topSell: data_6.slice(-3).reverse(),
         chartTopMarket: [...data_3.slice(0, 5), ...data_3.slice(-5)],
