@@ -1641,11 +1641,17 @@ select * from temp where date = (select max(date) from temp)
         industryAdvance: data_2.length != 0 ? {
           code: data_2[0]?.value <= 0 ? '' : data_2[0].code,
           value: data_2[0]?.value <= 0 ? 0 : data_2[0].value
-        } : {},
+        } : {
+          code: '',
+          value: 0
+        },
         industryDecline: data_2.length != 0 ? {
           code: data_2[data_2.length - 1]?.value >= 0 ? '' : data_2[data_2.length - 1].code,
           value: data_2[data_2.length - 1].value >= 0 ? 0 : data_2[data_2.length - 1].value
-        } : {},
+        } : {
+          code: '',
+          value: 0
+        },
         stockAdvance: data_3.length != 0 ? data_3.slice(0, 5) : [],
         stockDecline: data_3.length != 0 ? data_3.slice(-5).reverse() : [],
         topBuy: data_6.slice(0, 3),
