@@ -76,7 +76,7 @@ export class SharesService {
 
     const query = `
     WITH temp
-    AS (SELECT top 1
+    AS (SELECT
       i.code,
       CASE
         WHEN i.floor = 'HOSE' THEN 'VNINDEX'
@@ -93,11 +93,10 @@ export class SharesService {
     FROM marketInfor.dbo.info i
     INNER JOIN marketInfor.dbo.overview o
       ON i.code = o.code
-    INNER JOIN tradeIntraday.dbo.tickerTradeVNDIntraday t
+      INNER JOIN marketTrade.dbo.tickerTradeVND t
       ON i.code = t.code
     WHERE i.code = '${stock}'
     AND t.date = '${UtilCommonTemplate.toDate(dateTickerTrade)}'
-    order by t.timeInday desc
     ),
     pivotted
     AS (SELECT
@@ -150,7 +149,7 @@ export class SharesService {
     INNER JOIN vh v
       ON v.code = t.code
     `
-
+      
     const data = await this.mssqlService.query<HeaderStockResponse[]>(query)
     const dataMapped = new HeaderStockResponse(data[0])
     await this.redis.set(`${RedisKeys.headerStock}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.Minute })

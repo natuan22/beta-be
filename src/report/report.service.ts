@@ -1289,7 +1289,7 @@ export class ReportService {
           ORDER BY i.date DESC
           `
       const marketCap = await this.dbServer.query(marketCapQuery)
-
+            
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
@@ -2129,7 +2129,6 @@ select * from temp where date = (select max(date) from temp)
         *
       FROM temp) AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
       `
-
       // UNION ALL
       // SELECT
       //   closePrice,
