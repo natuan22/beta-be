@@ -2027,7 +2027,7 @@ select * from temp where date = (select max(date) from temp)
         ON i.code = c.code
       INNER JOIN pi p
         ON i.code = c.code
-      INNER JOIN nuoc_ngoai n
+      LEFT JOIN nuoc_ngoai n
         ON n.code = c.code
       INNER JOIN closePrice g
         ON g.code = c.code  
@@ -2041,7 +2041,7 @@ select * from temp where date = (select max(date) from temp)
 
       return {
         ...data[0],
-        nuoc_ngoai: data[0]?.nuoc_ngoai,
+        nuoc_ngoai: data[0]?.nuoc_ngoai || 0,
         text: data_redis?.text || [],
         table: data_redis?.table || [],
         img: data_redis?.img || '',
