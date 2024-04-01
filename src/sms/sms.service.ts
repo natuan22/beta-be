@@ -11,6 +11,18 @@ export class SmsService {
     //Call API INCOM
     async sendSMS(to: string, body: string) {
         try {
+            console.log({
+                Username: process.env.INCOM_SMS_ACCOUNT,
+                Password: process.env.INCOM_SMS_PASSWORD,
+                PhoneNumber: to,
+                PrefixId: process.env.INCOM_SMS_BRAND_NAME,
+                CommandCode: process.env.INCOM_SMS_BRAND_NAME,
+                RequestId: "0",
+                MsgContent: body,
+                MsgContentTypeId: 0,
+                FeeTypeId: 0
+            });
+            
             return await this.httpService.post(process.env.INCOM_SMS_URL,
                 {
                     Username: process.env.INCOM_SMS_ACCOUNT,
