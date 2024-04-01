@@ -427,7 +427,8 @@ export class AuthService {
       user.phone,
       `Your OTP is: ${verifyOTP} (5 minutes)`,
     );
-
+      console.log(response_incom);
+      
     if (response_incom.StatusCode != 1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Lỗi khi gửi OTP vui lòng thử lại sau')
 
     // Lưu mã OTP vào cơ sở dữ liệu và đặt một công việc trong hàng đợi để xóa mã OTP sau 5 phút
