@@ -14,8 +14,10 @@ export class AdminGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request: MRequest = context.switchToHttp().getRequest();
     const bearer: string = request.headers.authorization;
-    const token: string = bearer.split(' ')[1];
-    if (!bearer || !token) {
+
+    const token: string = bearer?.split(' ')[1];
+
+    if (!token || !bearer) {
       throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token not found!');
     }
 

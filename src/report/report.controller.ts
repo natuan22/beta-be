@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
@@ -32,6 +32,7 @@ import { AfterNoonReport2Response } from './response/stockMarket.response';
 import { TechnicalIndexResponse } from './response/technicalIndex.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
+import { AdminGuard } from '../guards/admin.guard';
 @Controller('report')
 @ApiTags('Report')
 export class ReportController {
@@ -168,6 +169,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu tin'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-tin')
@@ -184,6 +187,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu nhận định thị trường'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-nhan-dinh-thi-truong')
@@ -192,6 +197,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu cổ phiếu khuyến nghị'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-co-phieu-khuyen-nghi')
@@ -209,6 +216,8 @@ export class ReportController {
   }
 
   //Bản tin chiều
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin chiều trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-dien-bien-thi-truong')
@@ -225,6 +234,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -290,6 +301,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin tuần trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
   @Post('luu-dien-bien-thi-truong-tuan')
@@ -306,6 +319,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -379,6 +394,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu trang linh động'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -399,6 +416,8 @@ export class ReportController {
   /**
    * Báo cáo phân tích kỹ thuật
    */
+  @UseGuards(AdminGuard)
+  @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu thông tin báo cáo phân tích kỹ thuật'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})

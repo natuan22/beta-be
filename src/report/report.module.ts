@@ -5,10 +5,11 @@ import { MssqlService } from '../mssql/mssql.service';
 import { NestjsFormDataModule } from 'nestjs-form-data';
 import { MinioOptionModule } from '../minio/minio.module';
 import { StockService } from '../stock/stock.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Module({
   imports: [NestjsFormDataModule, MinioOptionModule],
   controllers: [ReportController],
-  providers: [ReportService, MssqlService, StockService]
+  providers: [ReportService, MssqlService, StockService, JwtService]
 })
 export class ReportModule {}
