@@ -420,12 +420,14 @@ export class AuthService {
     // Tạo mã OTP ngẫu nhiên
     const verifyOTP: string = UtilCommonTemplate.generateOTP();
 
+    console.log(user.phone);
+    
     // Gửi tin nhắn SMS chứa mã OTP đến số điện thoại của người dùng (có thời hạn 5 phút)
     const response_incom = await this.smsService.sendSMS(
       user.phone,
       `Your OTP is: ${verifyOTP} (5 minutes)`,
     );
-      
+
     if (response_incom.StatusCode != 1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Lỗi khi gửi OTP vui lòng thử lại sau')
 
     // Lưu mã OTP vào cơ sở dữ liệu và đặt một công việc trong hàng đợi để xóa mã OTP sau 5 phút
