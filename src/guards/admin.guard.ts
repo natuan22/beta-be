@@ -22,7 +22,7 @@ export class AdminGuard implements CanActivate {
     }
 
     const decoded: any = await this.jwtService.decode(token);
-    if (decoded.role != RoleEnum.Admin) {
+    if (!decoded?.role || decoded.role != RoleEnum.Admin) {
       throw new ExceptionResponse(HttpStatus.FORBIDDEN, 'You are not allowed to do that!')
     }
 
