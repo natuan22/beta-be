@@ -434,6 +434,10 @@ export class AuthService {
       user: user,
       verify_otp: verifyOTP,
     });
+
+    console.log(verifyData);
+    
+
     await this.queueService.addJob(
       'delete-expired-otp',
       verifyData,
