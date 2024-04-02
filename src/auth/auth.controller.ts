@@ -134,8 +134,8 @@ export class AuthController {
     };
 
 
-    @Get('test-queue')
-    async testQueue(){
-        await this.authService.testQueue()
-    }
+    // @Get('test-queue')
+    // async testQueue(){
+    //     await this.authService.testQueue()
+    // }
 }

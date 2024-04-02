@@ -435,13 +435,12 @@ export class AuthService {
       verify_otp: verifyOTP,
     });
 
-    console.log({verifyData});
     
-    await this.queueService.addJob(
-      'delete-expired-otp',
-      verifyData,
-      TimeToLive.FiveMinutesMilliSeconds,
-    );
+    // await this.queueService.addJob(
+    //   'delete-expired-otp',
+    //   verifyData,
+    //   TimeToLive.FiveMinutesMilliSeconds,
+    // );
   }
 
   async getHistorySession(userId: number) {
@@ -459,9 +458,9 @@ export class AuthService {
     return `remove ${device_id} login session successfully`;
   }
 
-  async testQueue(){
-    console.log('hjaha');
+  // async testQueue(){
+  //   console.log('hjaha');
     
-    await this.queueService.addJob('hahaha', {text: 'Hello'}, 300000)
-  }
+  //   await this.queueService.addJob('hahaha', {text: 'Hello'}, 60000)
+  // }
 }
