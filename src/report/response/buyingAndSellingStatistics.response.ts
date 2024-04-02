@@ -13,6 +13,11 @@ export class BuyingAndSellingStatisticsResponse {
     sell: number
 
     @ApiProperty({
+        type: Number
+    })
+    buy_sell: number
+
+    @ApiProperty({
         type: String
     })
     date: string
@@ -20,6 +25,7 @@ export class BuyingAndSellingStatisticsResponse {
     constructor(data?: BuyingAndSellingStatisticsResponse){
         this.buy = data?.buy || 0
         this.sell = data?.sell || 0
+        this.buy_sell = data?.buy_sell || 0
         this.date = data?.date ? UtilCommonTemplate.toDate(data?.date) : '' 
     }
 
