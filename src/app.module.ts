@@ -93,7 +93,7 @@ import { UserModule } from './user/user.module';
     SocketModule,
     MarketModule,
     MacroModule,
-    // KafkaModule,
+    KafkaModule,
     RetailModule,
     NewsModule,
     ReportModule,
