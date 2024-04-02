@@ -435,14 +435,13 @@ export class AuthService {
       verify_otp: verifyOTP,
     });
 
-    console.log(verifyData);
+    console.log({verifyData});
     
-
-    // await this.queueService.addJob(
-    //   'delete-expired-otp',
-    //   verifyData,
-    //   TimeToLive.FiveMinutesMilliSeconds,
-    // );
+    await this.queueService.addJob(
+      'delete-expired-otp',
+      verifyData,
+      TimeToLive.FiveMinutesMilliSeconds,
+    );
   }
 
   async getHistorySession(userId: number) {
