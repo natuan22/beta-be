@@ -2156,23 +2156,37 @@ select * from temp where date = (select max(date) from temp)
 
   async buyingAndSellingStatistics(code: string) {
     try {
+      // const query = `
+      // SELECT
+      //   totalBuyOrder as buy,
+      //   totalSellOrder as sell,
+      //   date
+      // FROM marketTrade.dbo.orderTicker
+      // WHERE code = '${code}'
+      // AND date BETWEEN DATEADD(MONTH, -3, (SELECT
+      //   MAX(date)
+      // FROM marketTrade.dbo.orderTicker
+      // WHERE code = '${code}')
+      // ) AND (SELECT
+      //   MAX(date)
+      // FROM marketTrade.dbo.orderTicker
+      // WHERE code = '${code}')
+      // ORDER BY date
+      // `
+
       const query = `
-      SELECT
-        totalBuyOrder as buy,
-        totalSellOrder as sell,
-        date
-      FROM marketTrade.dbo.orderTicker
-      WHERE code = '${code}'
-      AND date BETWEEN DATEADD(MONTH, -3, (SELECT
-        MAX(date)
-      FROM marketTrade.dbo.orderTicker
-      WHERE code = '${code}')
-      ) AND (SELECT
-        MAX(date)
-      FROM marketTrade.dbo.orderTicker
-      WHERE code = '${code}')
-      ORDER BY date
+      select Mua as buy, Ban as sell, Ngay as date from [PHANTICH].[dbo].[MBChuDong] where MCK = '${code}'
+      and Ngay BETWEEN DATEADD(MONTH, -3, (SELECT
+        MAX(Ngay)
+      FROM [PHANTICH].[dbo].[MBChuDong]
+      WHERE MCK = '${code}')
+      ) and (SELECT
+        MAX(Ngay)
+      FROM [PHANTICH].[dbo].[MBChuDong]
+      WHERE MCK = '${code}')
+      order by Ngay
       `
+      
       const data = await this.mssqlService.query<BuyingAndSellingStatisticsResponse[]>(query)
       return BuyingAndSellingStatisticsResponse.mapToList(data)
     } catch (e) {
