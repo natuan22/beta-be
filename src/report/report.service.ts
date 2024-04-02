@@ -2048,7 +2048,7 @@ select * from temp where date = (select max(date) from temp)
         is_sell: data_redis?.is_sell || '',
         gia_muc_tieu: data_redis?.gia_muc_tieu || 0,
         thoi_gian_nam_giu: data_redis?.thoi_gian_nam_giu || '',
-        gia_thi_truong: data[0]?.closePrice || 0,
+        gia_khuyen_nghi: data_redis?.gia_khuyen_nghi || 0,
         loi_nhuan_ky_vong: data_redis?.loi_nhuan_ky_vong || 0,
         gia_ban_dung_lo: data_redis?.gia_ban_dung_lo || 0,
         analyst_name: data_redis?.analyst_name || '',

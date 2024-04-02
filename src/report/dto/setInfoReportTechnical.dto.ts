@@ -44,7 +44,7 @@ export class SetInfoReportTechnicalDto {
     @ApiProperty({
         type: Number
     })
-    gia_thi_truong: number
+    gia_khuyen_nghi: number
 
     @ApiProperty({
         type: Number
