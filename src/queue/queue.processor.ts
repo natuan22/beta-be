@@ -26,4 +26,16 @@ export class QueueProcessor {
     this.logger.debug('Finished processing job');
   }
 
+  @Process('hahaha')
+  async handleJobHaha(job: Job<any>): Promise<void> {
+    this.logger.debug('Start processing job');
+    // Xử lý công việc ở đây
+    // const verifyEntity: VerifyEntity = job.data;
+    // await this.verifyRepo.delete({id: verifyEntity.id});
+    console.log(job.data);
+    
+
+    this.logger.debug('Finished processing job');
+  }
+
 }

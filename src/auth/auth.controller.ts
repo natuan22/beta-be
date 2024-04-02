@@ -132,4 +132,10 @@ export class AuthController {
             throw new CatchException(e);
         }
     };
+
+
+    @Get('test-queue')
+    async testQueue(){
+        await this.authService.testQueue()
+    }
 }
