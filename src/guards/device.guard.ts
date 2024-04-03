@@ -44,6 +44,9 @@ export class DeviceGuard implements CanActivate {
             throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'device is expired');
         }
 
+        console.log(secret_key);
+        
+
         try {
             // Kiểm tra tính hợp lệ của token
             return !!this.jwtService.verify(token, { secret: secret_key });
