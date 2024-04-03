@@ -31,7 +31,7 @@ export class AdminGuard implements CanActivate {
 
     // Lấy deviceId từ token và từ request
     const deviceId: string = this.jwtService.decode(token)?.['deviceId'];
-    
+
     // Lấy secret key từ authService và kiểm tra tính hợp lệ của token
     const { secret_key, expired_at }: Awaited<Pick<DeviceEntity, "secret_key" | "expired_at">>
       = await this.authService.getSecretKey(deviceId);
@@ -41,8 +41,12 @@ export class AdminGuard implements CanActivate {
       throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'device is expired');
     }
 
-    // Kiểm tra tính hợp lệ của token
-    return !!this.jwtService.verify(token, { secret: secret_key });
+    try {
+      // Kiểm tra tính hợp lệ của token
+      return !!this.jwtService.verify(token, { secret: secret_key });
+    } catch (e) {
+      return false;
+    }
 
   }
 }
