@@ -51,6 +51,8 @@ export class DeviceGuard implements CanActivate {
             // Kiểm tra tính hợp lệ của token
             return !!this.jwtService.verify(token, { secret: secret_key });
         } catch (e) {
+            console.log(e);
+            
             throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token invalid');
             // return false;
         }
