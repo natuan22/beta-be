@@ -268,7 +268,7 @@ export class AuthService {
     res: Response,
   ): Promise<RefreshTokenResponse> {
     // Lấy refresh token từ cookies của request
-    const refreshToken: string = req.cookies['refreshToken'];
+    const refreshToken: string = req.cookies['rf'];
     if (!refreshToken) {
       // Nếu không tìm thấy refresh token trong cookies thì trả về lỗi BAD_REQUEST
       throw new ExceptionResponse(
