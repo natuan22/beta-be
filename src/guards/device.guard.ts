@@ -37,7 +37,7 @@ export class DeviceGuard implements CanActivate {
         // }
         // Lấy secret key từ authService và kiểm tra tính hợp lệ của token
         const {secret_key, expired_at}: Awaited<Pick<DeviceEntity, "secret_key" | "expired_at">>
-            = await this.authService.getSecretKey(deviceId);
+            = await this.authService.getSecretKey(checkDeviceId);
 
         // Kiểm tra thiết bị còn hợp lệ hay không
         if (expired_at < new Date()) {
