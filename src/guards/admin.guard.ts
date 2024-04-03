@@ -41,11 +41,15 @@ export class AdminGuard implements CanActivate {
       throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'device is expired');
     }
 
+    console.log(expired_at);
+    
+
     try {
       // Kiểm tra tính hợp lệ của token
       return !!this.jwtService.verify(token, { secret: secret_key });
+
     } catch (e) {
-      return false;
+      throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token invalid');
     }
 
   }
