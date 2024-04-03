@@ -32,9 +32,9 @@ export class DeviceGuard implements CanActivate {
         const deviceId: string = req?.deviceId;
 
         // Kiểm tra xem deviceId có hợp lệ hay không
-        if (checkDeviceId !== deviceId) {
-            throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'device is not valid');
-        }
+        // if (checkDeviceId !== deviceId) {
+        //     throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'device is not valid');
+        // }
         // Lấy secret key từ authService và kiểm tra tính hợp lệ của token
         const {secret_key, expired_at}: Awaited<Pick<DeviceEntity, "secret_key" | "expired_at">>
             = await this.authService.getSecretKey(deviceId);
@@ -48,7 +48,8 @@ export class DeviceGuard implements CanActivate {
             // Kiểm tra tính hợp lệ của token
             return !!this.jwtService.verify(token, { secret: secret_key });
         } catch (e) {
-            return false;
+            throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token invalid');
+            // return false;
         }
     }
 
