@@ -169,7 +169,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu tin'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -187,7 +187,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu nhận định thị trường'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -197,7 +197,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu cổ phiếu khuyến nghị'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -216,7 +216,7 @@ export class ReportController {
   }
 
   //Bản tin chiều
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin chiều trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -234,7 +234,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
@@ -301,7 +301,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin tuần trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -319,7 +319,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
@@ -394,7 +394,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu trang linh động'})
@@ -416,7 +416,7 @@ export class ReportController {
   /**
    * Báo cáo phân tích kỹ thuật
    */
-  @UseGuards(AdminGuard)
+  // @UseGuards(AdminGuard)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu thông tin báo cáo phân tích kỹ thuật'})
