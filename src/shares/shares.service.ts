@@ -149,7 +149,7 @@ export class SharesService {
     INNER JOIN vh v
       ON v.code = t.code
     `
-      
+
     const data = await this.mssqlService.query<HeaderStockResponse[]>(query)
     const dataMapped = new HeaderStockResponse(data[0])
     await this.redis.set(`${RedisKeys.headerStock}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.Minute })
@@ -158,9 +158,17 @@ export class SharesService {
 
   async candleChart(stock: string) {
     const query = `select distinct openPrice, closePrice, highPrice, lowPrice, totalVol, timeInday as time from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}' and date = (select MAX(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}') order by time asc`
-    const data = await this.mssqlService.query<CandleChartResponse[]>(query)
-    const dataMapped = CandleChartResponse.mapToList(data)
-    return dataMapped
+    const query_2 = `
+    select closePrice from marketTrade.dbo.tickerTradeVND
+    where date = (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where date < (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday)
+    ) and code = '${stock}'
+    `
+    const [data_1, data_2] = await Promise.all([this.mssqlService.query<CandleChartResponse[]>(query), this.mssqlService.query(query_2)])
+    const dataMapped = CandleChartResponse.mapToList(data_1)
+    return {
+      prevClosePrice: data_2[0].closePrice,
+      chart: dataMapped,
+    }
   }
 
   async transactionStatistics(stock: string) {
@@ -211,7 +219,7 @@ export class SharesService {
       ON f.date = t.date
     ORDER BY t.date desc  
     `
-    
+
     const data = await this.mssqlService.query<TransactionStatisticsResponse[]>(query)
     const dataMapped = TransactionStatisticsResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.transactionStatistics}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour })
@@ -222,16 +230,16 @@ export class SharesService {
     let name = ``
     switch (type) {
       case 'NH':
-        name = `N'Thu nhập lãi thuần', N'Chi phí hoạt động', N'Tổng lợi nhuận trước thuế', N'Lợi nhuận sau thuế thu nhập doanh nghiệp', N'Lãi/Lỗ thuần từ hoạt động dịch vụ'`
+        name = `1, 2, 8, 11, 13`
         break;
       case 'BH':
-        name = `N'7. Doanh thu thuần hoạt động kinh doanh bảo hiểm', N'20. Chi phí bán hàng', N'IX. TỔNG LỢI NHUẬN KẾ TOÁN TRƯỚC THUẾ', N'35. Lợi nhuận sau thuế thu nhập doanh nghiệp', N'8. Chi bồi thường bảo hiểm gốc, trả tiền bảo hiểm'`
+        name = `7, 8, 20, 31, 35`
         break;
       case 'CK':
-        name = `N'Cộng doanh thu hoạt động', N'Cộng doanh thu hoạt động tài chính', N'31. Tổng lợi nhuận trước thuế thu nhập doanh nghiệp', N'XI. LỢI NHUẬN KẾ TOÁN SAU THUẾ TNDN', N'VII. KẾT QUẢ HOẠT ĐỘNG'`
+        name = `112, 305, 9, 11`
         break;
       default:
-        name = `N'3. Doanh thu thuần (1)-(2)', N'5. Lợi nhuận gộp (3)-(4)', N'18. Chi phí thuế TNDN (16)+(17)', N'15. Tổng lợi nhuận kế toán trước thuế (11)+(14)', N'19. Lợi nhuận sau thuế thu nhập doanh nghiệp (15)-(18)'`
+        name = `3, 5, 15, 18, 19`
         break;
     }
     return name
@@ -241,19 +249,38 @@ export class SharesService {
     let name = ``
     switch (type) {
       case 'NH':
-        name = `N'II. Tiền gửi tại NHNN', N'TỔNG CỘNG TÀI SẢN', N'III. Tiền gửi khách hàng', N'VIII. Chứng khoán đầu tư', N'VIII. Vốn chủ sở hữu'`
+        name = `102, 303, 108, 2, 308`
         break;
       case 'BH':
-        name = `N'I. Tiền', N'TỔNG CỘNG TÀI SẢN', N'A. NỢ PHẢI TRẢ', N'IV. Hàng tồn kho', N'I. Vốn chủ sở hữu'`
+        name = `10101, 10104, 2, 301, 30201`
         break;
       case 'CK':
-        name = `N'I. Tài sản tài chính', N'I. Tài sản tài chính dài hạn', N'C. NỢ PHẢI TRẢ', N'TỔNG CỘNG TÀI SẢN', N'D. VỐN CHỦ SỞ HỮU'`
+        name = `101, 102, 2, 3, 401`
         break;
       default:
-        name = `N'A. Tài sản lưu động và đầu tư ngắn hạn', N'B. Tài sản cố định và đầu tư dài hạn', N'A. Nợ phải trả', N'TỔNG CỘNG NGUỒN VỐN', N'I. Vốn chủ sở hữu'`
+        name = `101, 102, 301, 30201, 4`
         break;
     }
     return name
+  }
+
+  private getIDCastflow(type: string) {
+    let id = ``
+    switch (type) {
+      case 'NH':
+        id = `112, 211, 307, 4, 7`
+        break;
+      case 'BH':
+        id = `104, 208, 307, 4, 7`
+        break;
+      case 'CK':
+        id = `107, 206, 307, 4, 6`
+        break;
+      default:
+        id = `104, 212, 311, 4, 7`
+        break;
+    }
+    return id
   }
 
   async businessResults(stock: string, order: number, type: string) {
@@ -269,25 +296,27 @@ export class SharesService {
         break;
       case TimeTypeEnum.Year:
         select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name order by year desc`
+        group = `group by year, name, id order by year desc`
         break;
       default:
         break;
     }
-    const name = this.getNameBusinessResults(type)
+    const id = this.getNameBusinessResults(type)
 
     const query = `
-      SELECT TOP 20
-      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name,
+      with temp as (SELECT TOP ${type == 'CK' ? 16 : 20}
+      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id,
         ${select}
       FROM financialReport.dbo.financialReportV2 f
       WHERE f.code = '${stock}'
       AND f.type = 'KQKD'
-      AND f.name IN (${name})
-      ${group}
+      AND f.id IN (${id})
+      ${group})
+      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
     `
+
     const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data.reverse())
+    const dataMapped = BusinessResultsResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.businessResults}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay })
     return dataMapped
   }
@@ -295,6 +324,7 @@ export class SharesService {
   async balanceSheet(stock: string, order: number, type: string) {
     const redisData = await this.redis.get(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`)
     if (redisData) return redisData
+
     let group = ``
     let select = ``
     switch (order) {
@@ -304,32 +334,36 @@ export class SharesService {
         break;
       case TimeTypeEnum.Year:
         select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name order by year desc`
+        group = `group by year, name, id order by year desc`
         break;
       default:
         break;
     }
-    const name = this.getNameBalanceSheet(type)
+    const id = this.getNameBalanceSheet(type)
 
     const query = `
-      SELECT TOP 20
-      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name,
+      with temp as (SELECT TOP 20
+      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id,
         ${select}
       FROM financialReport.dbo.financialReportV2 f
       WHERE f.code = '${stock}'
       AND f.type = 'CDKT'
-      AND f.name IN (${name})
-      ${group}
+      AND f.id IN (${id})
+      ${group})
+      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
     `
     const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data.reverse())
+    const dataMapped = BusinessResultsResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay })
     return dataMapped
   }
 
-  async castFlow(stock: string, order: number) {
+  async castFlow(stock: string, order: number, type: string) {
     const redisData = await this.redis.get(`${RedisKeys.castFlow}:${order}:${stock}`)
     if (redisData) return redisData
+
+    const id = this.getIDCastflow(type)
+
     let group = ``
     let select = ``
     switch (order) {
@@ -339,24 +373,26 @@ export class SharesService {
         break;
       case TimeTypeEnum.Year:
         select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name order by year desc`
+        group = `group by year, name, id order by year desc`
         break;
       default:
         break;
     }
 
     const query = `
-      SELECT TOP 20
-      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name,
+      with temp as (SELECT TOP 20
+      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id,
         ${select}
       FROM financialReport.dbo.financialReportV2 f
       WHERE f.code = '${stock}'
       AND f.type like 'LC%'
-      AND f.name IN (N'Lưu chuyển tiền thuần từ hoạt động kinh doanh', N'Lưu chuyển tiền thuần từ hoạt động đầu tư', N'Lưu chuyển tiền thuần trong kỳ', N'Tiền và tương đương tiền đầu kỳ', N'Tiền và tương đương tiền cuối kỳ')
-      ${group}
+      AND f.id IN (${id})
+      ${group})
+      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
     `
+
     const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data.reverse())
+    const dataMapped = BusinessResultsResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.castFlow}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
     return dataMapped
   }
@@ -540,7 +576,7 @@ export class SharesService {
     const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD')
 
     //Xoá những ngày trùng nhau
-    const same_day = UtilCommonTemplate.checkSameDate([now, week, month, year, quarter_end, quarter_start, week_52]) 
+    const same_day = UtilCommonTemplate.checkSameDate([now, week, month, year, quarter_end, quarter_start, week_52])
     const pivot = same_day.map(item => `[${item}]`).join(',')
 
     const query = `
@@ -587,7 +623,7 @@ export class SharesService {
     return dataMapped
   }
 
-  
+
 
   async averageTradingVolume(stock: string) {
     const redisData = await this.redis.get(`${RedisKeys.averageTradingVolume}:${stock.toUpperCase()}`)
@@ -705,7 +741,7 @@ export class SharesService {
     WHERE code = '${stock}'
     ${group}
     `
-    
+
     const data = await this.mssqlService.query<StatisticsMonthQuarterYearResponse[]>(query)
     const dataMapped = StatisticsMonthQuarterYearResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.statisticsMonthQuarterYear}:${order}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.OneWeek })
@@ -1510,7 +1546,7 @@ export class SharesService {
     date as (${select})
     select * from date order by date asc, row asc
     `
-    
+
     const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query)
     const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart)
     await this.redis.set(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneDay })

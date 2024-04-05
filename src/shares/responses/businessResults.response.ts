@@ -28,7 +28,7 @@ export class BusinessResultsResponse {
                 this.name = 'Tổng cộng tài sản'
                 break
             case 'NỢ PHẢI TRẢ':
-                this.name = 'Nợ phải trả' 
+                this.name = 'Nợ phải trả'
                 break
             case 'VỐN CHỦ SỞ HỮU':
                 this.name = 'Vốn chủ sở hữu'
@@ -36,6 +36,23 @@ export class BusinessResultsResponse {
             case 'TỔNG CỘNG NGUỒN VỐN':
                 this.name = 'Tổng cộng nguồn vốn'
                 break
+            case 'Cộng doanh thu hoạt động':
+                this.name = 'Doanh thu hoạt động'
+                break
+            case 'Cộng doanh thu hoạt động tài chính':
+                this.name = 'Doanh thu hoạt động tài chính'
+                break
+            case 'TỔNG LỢI NHUẬN KẾ TOÁN TRƯỚC THUẾ':
+                this.name = 'Tổng lợi nhuận kế toán trước thuế'
+                break
+            case 'TÀI SẢN NGẮN HẠN':
+                this.name = 'Tài sản ngắn hạn'
+                break
+            case 'TÀI SẢN DÀI HẠN':
+                this.name = 'Tài sản dài hạn'
+                break
+
+
             default:
                 this.name = data?.name && data.name.indexOf('(') != -1 ? data.name.slice(0, data.name.indexOf('(')).trim() : data?.name
                 break;

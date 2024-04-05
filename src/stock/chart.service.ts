@@ -32,7 +32,7 @@ export class ChartService {
     @InjectDataSource(DB_SERVER) private readonly dbServer: DataSource,
     private readonly stockService: StockService,
     private readonly mssqlService: MssqlService,
-  ) {}
+  ) { }
 
   timeCheck(): boolean {
     const now = new Date();
@@ -117,11 +117,6 @@ export class ChartService {
         return await this.getLineChartNow(index);
       }
 
-      const redisData: VnIndexResponse[] = await this.redis.get(
-        `${RedisKeys.LineChart}:${type}:${index}`,
-      );
-      if (redisData) return redisData;
-
       const { latestDate, weekDate, monthDate }: SessionDatesInterface =
         await this.stockService.getSessionDate(
           '[marketTrade].[dbo].[indexTradeVND]',
@@ -160,18 +155,26 @@ export class ChartService {
               and date >= '${startDate}' and date <= '${latestDate}'
           order by code desc, date;
         `;
-      
+
+      const query_2 = `
+        select closePrice from marketTrade.dbo.indexTradeVND
+        where date = (select max(date) from marketTrade.dbo.indexTradeVND where date < '${startDate}'
+        ) and code = '${index}'
+        `
+
+      const [data_1, data_2] = await Promise.all([this.mssqlService.query<LineChartInterface[]>(query), this.mssqlService.query(query_2)])
+
       const mappedData = new VnIndexResponse().mapToList(
-        await this.mssqlService.query<LineChartInterface[]>(query),
+        data_1,
         type,
       );
 
-      await this.redis.set(
-        `${RedisKeys.LineChart}:${type}:${index}`,
-        mappedData,
-      );
+      const data = {
+        prevClosePrice: data_2[0].closePrice,
+        chart: mappedData
+      }
 
-      return mappedData;
+      return data;
     } catch (e) {
       throw new CatchException(e);
     }
@@ -193,8 +196,17 @@ export class ChartService {
           order by code desc, timeInday;
         `;
 
-      const data = await this.mssqlService.query<LineChartInterface[]>(query);
-      return new LineChartResponse().mapToList(data);
+      const query_2 = `
+        select closePrice from marketTrade.dbo.indexTradeVND
+        where date = (select max(date) from tradeIntraday.dbo.indexTradeVNDIntraday where date < (select max(date) from tradeIntraday.dbo.indexTradeVNDIntraday)
+        ) and code = '${index}'
+        `
+
+      const [data_1, data_2] = await Promise.all([this.mssqlService.query<LineChartInterface[]>(query), this.mssqlService.query(query_2)]);
+      return {
+        prevClosePrice: data_2[0].closePrice,
+        chart: new LineChartResponse().mapToList(data_1)
+      };
     } catch (e) {
       throw new CatchException(e);
     }

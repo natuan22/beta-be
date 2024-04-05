@@ -31,7 +31,7 @@ export class LineChartSwagger extends PartialType(BaseResponse) {
     type: LineChartResponse,
     isArray: true,
   })
-  data: LineChartResponse[];
+  chart: LineChartResponse[];
 }
 
 export class LineChartResponseV2 {

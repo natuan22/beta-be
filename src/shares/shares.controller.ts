@@ -114,9 +114,9 @@ export class SharesController {
   @Get('luu-chuyen-tien-te')
   @ApiOperation({summary: 'Lưu chuyển tiền tệ'})
   @ApiOkResponse({type: BusinessResultsResponse})
-  async castFlow(@Query() q: CastFlowDto, @Res() res: Response) {
+  async castFlow(@Query() q: StockOrderDto, @Res() res: Response) {
     try {
-      const data = await this.sharesService.castFlow(q.stock, +q.order)
+      const data = await this.sharesService.castFlow(q.stock, +q.order, q.type)
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e)
