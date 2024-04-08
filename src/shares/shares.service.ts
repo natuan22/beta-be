@@ -397,7 +397,7 @@ export class SharesService {
     return dataMapped
   }
 
-  async financialIndicators(stock: string) {
+  async financialIndicators(stock: string, order: number, type: string) {
     const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}`)
     if (redisData) return redisData
 
@@ -449,15 +449,17 @@ export class SharesService {
       'ROA' AS name,
       yearQuarter as date
     FROM financialReport.dbo.calBCTC
-    WHERE code = '${stock}')
-    SELECT TOP 20
+    WHERE code = '${stock}'),
+    top_20 as (SELECT TOP 20
       *
     FROM temp
-    ORDER BY date desc
+    WHERE right(date, 1) ${order == 1 ? '=' : '<>'} 0
+    ORDER BY date desc)
+    select * from top_20 order by date asc,
+    case when name = 'EPS' then 0 when name = 'BVPS' then 1 when name = 'PE' then 2 when name = 'ROE' then 3 when name = 'ROA' then 4 end asc
     `
-
     const data = await this.mssqlService.query<FinancialIndicatorsResponse[]>(query_2)
-    const dataMapped = FinancialIndicatorsResponse.mapToList(data.reverse())
+    const dataMapped = FinancialIndicatorsResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.financialIndicators}:${stock}`, dataMapped, { ttl: TimeToLive.OneWeek })
     return dataMapped
   }

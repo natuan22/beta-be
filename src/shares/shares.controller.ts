@@ -126,9 +126,9 @@ export class SharesController {
   @Get('chi-so-tai-chinh')
   @ApiOperation({summary: 'Chỉ số tài chính'})
   @ApiOkResponse({type: FinancialIndicatorsResponse})
-  async financialIndicators(@Query() q: StockDto, @Res() res: Response) {
+  async financialIndicators(@Query() q: StockOrderDto, @Res() res: Response) {
     try {
-      const data = await this.sharesService.financialIndicators(q.stock)
+      const data = await this.sharesService.financialIndicators(q.stock, +q.order, q.type)
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e)
