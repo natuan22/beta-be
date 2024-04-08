@@ -398,7 +398,7 @@ export class SharesService {
   }
 
   async financialIndicators(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}`)
+    const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}:${order}`)
     if (redisData) return redisData
 
     const query = `
