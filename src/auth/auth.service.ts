@@ -9,7 +9,7 @@ import { UserEntity } from '../user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { DeviceEntity } from './entities/device.entity';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { BooleanEnum, TimeToLive } from '../enums/common.enum';
 import { MRequest } from '../types/middleware';
 import { randomUUID } from 'crypto';
@@ -24,6 +24,7 @@ import { RedisKeys } from '../enums/redis-keys.enum';
 import { Cache } from 'cache-manager';
 import { RegisterResponse } from './responses/Register.response';
 import { DB_SERVER } from '../constants';
+import { AnyCnameRecord } from 'dns';
 
 @Injectable()
 export class AuthService {
@@ -241,6 +242,10 @@ export class AuthService {
         );
       }
 
+      const mac_id = req['headers']['mac'] as string
+      const user_agent = req['headers']['user-agent']
+      const ip_address = req['realIP'] || req['ip']
+
       const sessionId = randomUUID()
       const secretKey = UtilCommonTemplate.uuid()
 
@@ -250,11 +255,11 @@ export class AuthService {
       //Tạo session mới
       const session = this.deviceRepo.create({
         user: userByPhone,
-        mac_id: req.headers['mac'],
+        mac_id,
         id: sessionId,
         device_id: '',
-        user_agent: req.headers['user-agent'],
-        ip_address: req['realIP'] || req['ip'],
+        user_agent,
+        ip_address,
         refresh_token: refreshToken,
         secret_key: secretKey,
         expired_at: new Date()

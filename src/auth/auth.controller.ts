@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { CatchException } from "../exceptions/common.exception";
 import { AuthGuard } from '../guards/auth.guard';
 import { RefreshTokenGuard } from '../guards/refresh_token.guard';
