@@ -737,6 +737,15 @@ export class ReportService {
         case 4:
           name_redis = RedisKeys.weekNewsDomestic
           break
+        case 5:
+          name_redis = RedisKeys.afternoonNewsInternational
+          break
+        case 6:
+          name_redis = RedisKeys.afternoonNewsDomestic
+          break
+        case 7:
+          name_redis = RedisKeys.afternoonNewsEnterprise
+          break
         default:
           break;
       }
@@ -788,6 +797,15 @@ export class ReportService {
           break
         case 4:
           name_redis = RedisKeys.weekNewsDomestic
+          break
+        case 5:
+          name_redis = RedisKeys.afternoonNewsInternational
+          break
+        case 6:
+          name_redis = RedisKeys.afternoonNewsDomestic
+          break
+        case 7:
+          name_redis = RedisKeys.afternoonNewsEnterprise
           break
         default:
           break;
@@ -1288,8 +1306,10 @@ export class ReportService {
           GROUP BY f.LV2, i.date
           ORDER BY i.date DESC
           `
+      console.log(marketCapQuery);
+
       const marketCap = await this.dbServer.query(marketCapQuery)
-            
+
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
         return result;
@@ -2186,7 +2206,7 @@ select * from temp where date = (select max(date) from temp)
       WHERE MCK = '${code}')
       order by Ngay
       `
-      
+
       const data = await this.mssqlService.query<BuyingAndSellingStatisticsResponse[]>(query)
       return BuyingAndSellingStatisticsResponse.mapToList(data)
     } catch (e) {
@@ -2197,7 +2217,7 @@ select * from temp where date = (select max(date) from temp)
   async technicalIndex(code: string) {
     try {
       const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
-      
+
       const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number, openPrice: number }[] = await this.mssqlService.query(`
       select closePrice, highPrice, lowPrice, openPrice, volume, f.netVal, h.date
       from marketTrade.dbo.historyTicker h
@@ -2231,7 +2251,7 @@ select * from temp where date = (select max(date) from temp)
       const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
       const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
       const sar_reverse = [...sar].reverse()
-      
+
       const ma10 = calTech.sma({ period: 10, values: price }).reverse()
       const ma20 = calTech.sma({ period: 20, values: price }).reverse()
       const ma50 = calTech.sma({ period: 50, values: price }).reverse()

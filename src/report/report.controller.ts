@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Query, Req, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -33,6 +33,9 @@ import { TechnicalIndexResponse } from './response/technicalIndex.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
 import { AdminGuard } from '../guards/admin.guard';
+import { AuthGuard2 } from '../guards/auth_2.guard';
+import { Role, Roles } from '../guards/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
 @Controller('report')
 @ApiTags('Report')
 export class ReportController {
@@ -169,7 +172,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+  @UseGuards(AuthGuard2)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu tin'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -226,6 +229,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
+  @UseGuards(AuthGuard2, RolesGuard)
+  @Roles(Role.Admin)
   @ApiOperation({summary: 'Bản tin chiều trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: AfternoonReport1})
   @Get('ban-tin-chieu-1')
