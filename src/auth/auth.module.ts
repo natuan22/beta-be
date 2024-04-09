@@ -38,7 +38,7 @@ import { VerifyEntity } from './entities/verify.entity';
   ],
   exports: [AuthService]
 })
-export class AuthModule {}
+export class AuthModule { }
 
 // implements NestModule {
 //   configure(consumer: MiddlewareConsumer): void {

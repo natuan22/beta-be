@@ -1,10 +1,9 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
-// import { AuthGuard2 } from '../guards/auth_2.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { getNewsDto } from './dto/get-news.dto';
@@ -39,18 +38,6 @@ export class ReportController {
   constructor(
     private readonly reportService: ReportService
     ) {}
-
-  // @ApiOperation({summary: 'Chỉ số'})
-  // @ApiOkResponse({status: HttpStatus.OK, type: ReportIndexResponse})
-  // @Get('chi-so')
-  // async getIndex(@Res() res: Response) {
-  //   try {
-  //     const data = await this.reportService.getIndex();
-  //     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
-  //   } catch (error) {
-  //     throw new CatchException(error)
-  //   }
-  // }
 
   // @Post('upload')
   // @UseInterceptors(AnyFilesInterceptor())

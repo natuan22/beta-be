@@ -3,7 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
-import { ExceptionResponse } from '../exceptions/common.exception';
+import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
 import { UserResponse } from '../user/responses/UserResponse';
 import { UserEntity } from '../user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -44,14 +44,14 @@ export class AuthService {
   generateAccessToken(
     userId: number,
     role: number,
-    deviceId: string,
+    sessionId: string,
     secretKey: string,
   ): string {
     return this.jwtService.sign(
       {
         userId: userId,
         role: role,
-        deviceId: deviceId,
+        sessionId: sessionId,
       },
       {
         secret: secretKey,
@@ -60,14 +60,14 @@ export class AuthService {
     );
   }
 
-  generateRefreshToken(userId: number, deviceId: string): string {
+  generateRefreshToken(userId: number, sessionId: string, secretKey: string): string {
     return this.jwtService.sign(
       {
         userId: userId,
-        deviceId: deviceId,
+        sessionId: sessionId,
       },
       {
-        secret: process.env.REFRESH_TOKEN_SECRET,
+        secret: secretKey,
         expiresIn: TimeToLive.OneWeek,
       },
     );
@@ -149,12 +149,10 @@ export class AuthService {
       );
 
     res.cookie('rt', refreshToken, {
-      // httpOnly: true,
       path: '/',
     });
 
     res.cookie('at', accessToken, {
-      // httpOnly: true,
       path: '/',
     });
 
@@ -175,9 +173,9 @@ export class AuthService {
     userAgent: string,
   ): Promise<DeviceLoginInterface> {
     // Tìm kiếm thiết bị hiện tại theo device_id
-    const currentDevice = await this.deviceRepo.findOne({
-      where: { device_id: deviceId },
-    });
+    // const currentDevice = await this.deviceRepo.findOne({
+    //   where: { device_id: deviceId },
+    // });
 
     // Tạo secretKey ngẫu nhiên bằng uuid
     const secretKey: string = UtilCommonTemplate.uuid();
@@ -192,6 +190,7 @@ export class AuthService {
     const refreshToken: string = this.generateRefreshToken(
       user.user_id,
       deviceId,
+      secretKey
     );
     const expiredAt: Date = new Date(
       Date.now() + TimeToLive.OneDayMilliSeconds,
@@ -199,7 +198,7 @@ export class AuthService {
 
     // Lưu thông tin của thiết bị mới vào database
     const newDevice = await this.deviceRepo.save({
-      id: currentDevice?.id || randomUUID(),
+      id: randomUUID(),
       user: user,
       mac_id: macId,
       device_id: deviceId,
@@ -216,6 +215,71 @@ export class AuthService {
 
     // Trả về accessToken, refreshToken và expiredAt mới
     return { accessToken, refreshToken, expiredAt };
+  }
+
+  async loginV2(loginDto: any, req: Request, res: Response) {
+    try {
+      //Láy user ra
+      const { phone, password } = loginDto;
+      const userByPhone = await this.userRepo.findOne({ where: { phone } });
+      if (!userByPhone) {
+        throw new ExceptionResponse(
+          HttpStatus.BAD_REQUEST,
+          'Số điện thoại chưa được đăng ký',
+        );
+      }
+
+      // Kiểm tra mật khẩu của người dùng
+      const isPasswordMatch = await bcrypt.compare(
+        password,
+        userByPhone.password,
+      );
+      if (!isPasswordMatch) {
+        throw new ExceptionResponse(
+          HttpStatus.BAD_REQUEST,
+          'Số điện thoại / mật khẩu không chính xác',
+        );
+      }
+
+      const sessionId = randomUUID()
+      const secretKey = UtilCommonTemplate.uuid()
+
+      const accessToken = this.generateAccessToken(userByPhone.user_id, userByPhone.role, sessionId, secretKey)
+      const refreshToken = this.generateRefreshToken(userByPhone.user_id, sessionId, secretKey)
+
+      //Tạo session mới
+      const session = this.deviceRepo.create({
+        user: userByPhone,
+        mac_id: req.headers['mac'],
+        id: sessionId,
+        device_id: '',
+        user_agent: req.headers['user-agent'],
+        ip_address: req['realIP'] || req['ip'],
+        refresh_token: refreshToken,
+        secret_key: secretKey,
+        expired_at: new Date()
+      })
+
+      await this.deviceRepo.save(session)
+
+      res.cookie('rt', refreshToken, {
+        path: '/',
+      });
+  
+      res.cookie('at', accessToken, {
+        path: '/',
+      });
+
+      return new UserResponse({
+        ...userByPhone,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expired_at: '',
+      });
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
   }
 
   async logout(
@@ -254,6 +318,27 @@ export class AuthService {
     return 'logged out successfully';
   }
 
+  async logoutV2(user: any, res: Response){
+    try {
+      res.cookie('rt', '', {
+        maxAge: -1,
+        path: '/',
+        // httpOnly: true,
+      });
+  
+      res.cookie('at', '', {
+        maxAge: -1,
+        path: '/',
+        // httpOnly: true,
+      });
+      const sessionId = user['sessionId']
+      await this.deviceRepo.delete({id: sessionId})
+      return 'logged out successfully'
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
   async getSecretKey(
     deviceId: string,
   ): Promise<Pick<DeviceEntity, 'secret_key' | 'expired_at'>> {
@@ -261,6 +346,17 @@ export class AuthService {
       where: { device_id: deviceId },
       select: ['secret_key', 'expired_at'],
     });
+  }
+
+  async getSecretKeyV2(
+    sessionId: string
+  ){
+    return await this.deviceRepo.findOne({
+      where: {
+        id: sessionId
+      },
+      select: ['secret_key']
+    })
   }
 
   async refreshToken(
@@ -332,6 +428,7 @@ export class AuthService {
     const newRefreshToken: string = this.generateRefreshToken(
       currentDevice.user.user_id,
       deviceId,
+      secretKey
     );
 
     // Lưu refreshToken mới vào cookies của response
@@ -351,6 +448,70 @@ export class AuthService {
     return new RefreshTokenResponse({
       access_token: newAccessToken,
     });
+  }
+
+  async refreshTokenV2(req: Request, res: Response) {
+    try {
+      const token = req['token']
+      const user_id = req['user'].userId
+
+      const session = await this.deviceRepo.findOne({ where: { refresh_token: token } })
+      if (!session) throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid')
+
+      // Tạo secretKey mới để sử dụng cho accessToken
+      const secretKey = UtilCommonTemplate.uuid();
+
+      // Tạo accessToken mới
+      const newAccessToken: string = this.generateAccessToken(
+        user_id,
+        req['user'].role,
+        session.id,
+        secretKey,
+      );
+      // Tạo refreshToken mới
+      const newRefreshToken: string = this.generateRefreshToken(
+        user_id,
+        session.id,
+        secretKey
+      );
+
+      // Lưu refreshToken mới vào cookies của response
+      res.cookie('rt', newRefreshToken, {
+        // httpOnly: true,
+        path: '/',
+      });
+
+      res.cookie('at', newAccessToken, {
+        // httpOnly: true,
+        path: '/',
+      });
+
+      // Cập nhật thông tin của device trong database
+      await this.deviceRepo.update(
+        { id: session.id },
+        {
+          secret_key: secretKey,
+          refresh_token: newRefreshToken,
+        },
+      );
+
+      // Trả về đối tượng RefreshTokenResponse cho client
+      return new RefreshTokenResponse({
+        access_token: newAccessToken,
+        refresh_token: newRefreshToken
+      });
+
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async removeSession(sessionId: string){
+    try {
+      await this.deviceRepo.delete({id: sessionId})
+    } catch (e) {
+      throw new CatchException(e)
+    }
   }
 
   async getVerifyOTP(userId: number): Promise<string> {
@@ -425,7 +586,7 @@ export class AuthService {
       user.phone,
       `Your OTP is: ${verifyOTP} (5 minutes)`,
     );
-      
+
     if (response_incom.StatusCode != 1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Lỗi khi gửi OTP vui lòng thử lại sau')
 
     // Lưu mã OTP vào cơ sở dữ liệu và đặt một công việc trong hàng đợi để xóa mã OTP sau 5 phút
@@ -435,7 +596,7 @@ export class AuthService {
       verify_otp: verifyOTP,
     });
 
-    
+
     // await this.queueService.addJob(
     //   'delete-expired-otp',
     //   verifyData,
@@ -460,7 +621,7 @@ export class AuthService {
 
   // async testQueue(){
   //   console.log('hjaha');
-    
+
   //   await this.queueService.addJob('hahaha', {text: 'Hello'}, 60000)
   // }
 }

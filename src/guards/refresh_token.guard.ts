@@ -11,7 +11,7 @@ import { AuthService } from '../auth/auth.service';
 import { ExceptionResponse } from '../exceptions/common.exception';
 
 @Injectable()
-export class AuthGuard implements CanActivate {
+export class RefreshTokenGuard implements CanActivate {
     constructor(
         private jwtService: JwtService,
         private readonly authService: AuthService
@@ -20,17 +20,14 @@ export class AuthGuard implements CanActivate {
     async canActivate(context: ExecutionContext): Promise<boolean> {
         const request = context.switchToHttp().getRequest();
         const token = this.extractTokenFromHeader(request);
-        console.log({token});
-        
         if (!token) {
-            throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid');
+            throw new UnauthorizedException();
         }
         const decode_token = this.jwtService.decode(token)
 
         const sessionId = decode_token['sessionId']
 
         const { secret_key } = await this.authService.getSecretKeyV2(sessionId)
-        
         if(!secret_key) throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'DeviceId invalid')
 
         try {
@@ -43,6 +40,7 @@ export class AuthGuard implements CanActivate {
             request['user'] = payload;
             request['token'] = token
         } catch {
+            await this.authService.removeLoginSession(sessionId)
             throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid');
         }
         return true;
@@ -50,6 +48,6 @@ export class AuthGuard implements CanActivate {
 
     private extractTokenFromHeader(request: Request): string | undefined {
         const [type, token] = request.headers.authorization?.split(' ') ?? [];
-        return token != 'undefined' ? token : undefined;
+        return type === 'Bearer' ? token : undefined;
     }
 }

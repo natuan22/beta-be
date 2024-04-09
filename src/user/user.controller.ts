@@ -6,7 +6,6 @@ import {UserService} from "./user.service";
 import {GetUserIdFromToken} from "../utils/utils.decorators";
 import {CatchException} from "../exceptions/common.exception";
 import {UserResponseSwagger} from "./responses/UserResponse";
-import {DeviceGuard} from "../guards/device.guard";
 
 @ApiTags('User - API')
 @Controller('user')
@@ -19,7 +18,6 @@ export class UserController {
     @ApiOperation({ summary: 'Thông tin người dùng by token' })
     @ApiOkResponse({ type: UserResponseSwagger })
     @ApiBearerAuth()
-    @UseGuards(DeviceGuard)
     @Get('info')
     async getInfo(@GetUserIdFromToken() user_id: number, @Res() res: Response) {
         try {

@@ -1,8 +1,7 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { ApiOkResponse, ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
-import { Request, Response } from 'express';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Response } from 'express';
 import { CatchException } from '../exceptions/common.exception';
-import { DeviceGuard } from '../guards/device.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { GetUserIdFromToken } from '../utils/utils.decorators';
 import { BaseResponse } from '../utils/utils.response';
@@ -49,7 +48,6 @@ export class InvestmentController {
     }
   }
 
-  @UseGuards(DeviceGuard)
   @Post('save-filter')
   @ApiOperation({summary: 'Lưu bộ lọc'})
   async saveFilter(@GetUserIdFromToken() user_id: number, @Body() b: SaveFilterDto, @Res() res: Response){
@@ -57,7 +55,6 @@ export class InvestmentController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(DeviceGuard)
   @Get('your-filter')
   @ApiOperation({summary: 'Lấy bộ lọc'})
   async getFilter(@GetUserIdFromToken() user_id: number, @Res() res: Response){
@@ -65,7 +62,6 @@ export class InvestmentController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(DeviceGuard)
   @Post('update-filter/:id')
   @ApiOperation({summary: 'Chỉnh sửa bộ lọc'})
   async updateFilter(@GetUserIdFromToken() user_id: number, @Param() p: IdParamDto, @Body() b: SaveFilterDto, @Res() res: Response){
@@ -73,7 +69,6 @@ export class InvestmentController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(DeviceGuard)
   @Post('delete-filter/:id')
   @ApiOperation({summary: 'Xoá bộ lọc'})
   async deleteFilter(@GetUserIdFromToken() user_id: number, @Param() p: IdParamDto, @Res() res: Response){
