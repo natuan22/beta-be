@@ -4,7 +4,7 @@ import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swa
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
-import { AuthGuard2 } from '../guards/auth_2.guard';
+// import { AuthGuard2 } from '../guards/auth_2.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { getNewsDto } from './dto/get-news.dto';
@@ -169,7 +169,7 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  @UseGuards(AuthGuard2)
+  // @UseGuards(AuthGuard2)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu tin'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
