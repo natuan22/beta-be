@@ -1306,9 +1306,21 @@ export class ReportService {
           GROUP BY f.LV2, i.date
           ORDER BY i.date DESC
           `
-      console.log(marketCapQuery);
 
-      const marketCap = await this.dbServer.query(marketCapQuery)
+          const marketCapQuery2 = `
+          with temp as (select distinct i.closePrice, i.shareout, i.code, f.LV2 ,date FROM RATIO.dbo.ratioInday i inner join marketInfor.dbo.info f on f.code = i.code
+            where date in ('${UtilCommonTemplate.toDate(latestDate)}', 
+            '${UtilCommonTemplate.toDate(previousDate)}', 
+            '${UtilCommonTemplate.toDate(weekDate)}', 
+            '${UtilCommonTemplate.toDate(monthDate)}', 
+            '${UtilCommonTemplate.toDate(
+          firstDateYear,
+        )}')
+            AND f.floor = 'HOSE'
+                      AND f.LV2 IN (N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ', N'Công nghệ', N'Dầu khí'))
+            select sum(closePrice * shareout) as total_market_cap, LV2 as industry, date as date_time from temp group by LV2, date ORDER BY date DESC
+          `
+      const marketCap = await this.dbServer.query(marketCapQuery2)
 
       const groupByIndustry = marketCap.reduce((result, item) => {
         (result[item.industry] || (result[item.industry] = [])).push(item);
