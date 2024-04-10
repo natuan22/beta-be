@@ -466,6 +466,8 @@ export class AuthService {
       // Tạo secretKey mới để sử dụng cho accessToken
       const secretKey = UtilCommonTemplate.uuid();
 
+      console.log({role: req['user'].role});
+      
       // Tạo accessToken mới
       const newAccessToken: string = this.generateAccessToken(
         user_id,
