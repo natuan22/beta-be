@@ -460,18 +460,18 @@ export class AuthService {
       const token = req['token']
       const user_id = req['user'].userId
 
-      const session = await this.deviceRepo.findOne({ where: { refresh_token: token } })
+      const session = await this.deviceRepo.findOne({ where: { refresh_token: token }, relations: {user: true} })
       if (!session) throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid')
 
       // Tạo secretKey mới để sử dụng cho accessToken
       const secretKey = UtilCommonTemplate.uuid();
 
-      console.log({role: req['user'].role});
+      console.log({role: session.user.role});
       
       // Tạo accessToken mới
       const newAccessToken: string = this.generateAccessToken(
         user_id,
-        req['user'].role,
+        session.user.role,
         session.id,
         secretKey,
       );
