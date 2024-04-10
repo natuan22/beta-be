@@ -1,9 +1,12 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
+import { Role, Roles } from '../guards/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { getNewsDto } from './dto/get-news.dto';
@@ -156,7 +159,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AuthGuard2)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu tin'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -174,7 +178,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu nhận định thị trường'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -184,7 +189,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu cổ phiếu khuyến nghị'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -203,7 +209,8 @@ export class ReportController {
   }
 
   //Bản tin chiều
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin chiều trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -223,7 +230,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
@@ -290,7 +298,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin tuần trang 1'})
   @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
@@ -308,7 +317,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
@@ -383,7 +393,8 @@ export class ReportController {
     return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   }
 
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu trang linh động'})
@@ -405,7 +416,8 @@ export class ReportController {
   /**
    * Báo cáo phân tích kỹ thuật
    */
-  // @UseGuards(AdminGuard)
+   @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
   @ApiOperation({summary: 'Lưu thông tin báo cáo phân tích kỹ thuật'})
