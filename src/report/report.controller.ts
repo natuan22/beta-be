@@ -1,10 +1,10 @@
 import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
+import { AuthGuard } from '../guards/auth.guard';
 import { Role, Roles } from '../guards/roles.decorator';
 import { RolesGuard } from '../guards/roles.guard';
 import { StockDto } from '../shares/dto/stock.dto';
