@@ -323,7 +323,7 @@ export class AuthService {
     return 'logged out successfully';
   }
 
-  async logoutV2(user: any, res: Response){
+  async logoutV2(sessionId: string, res: Response){
     try {
       res.cookie('rt', '', {
         maxAge: -1,
@@ -336,7 +336,6 @@ export class AuthService {
         path: '/',
         // httpOnly: true,
       });
-      const sessionId = user['sessionId']
       await this.deviceRepo.delete({id: sessionId})
       return 'logged out successfully'
     } catch (e) {
@@ -466,8 +465,6 @@ export class AuthService {
       // Tạo secretKey mới để sử dụng cho accessToken
       const secretKey = UtilCommonTemplate.uuid();
 
-      console.log({role: session.user.role});
-      
       // Tạo accessToken mới
       const newAccessToken: string = this.generateAccessToken(
         user_id,
@@ -476,8 +473,6 @@ export class AuthService {
         secretKey,
       );
 
-      console.log({newAccessToken});
-      
       // Tạo refreshToken mới
       const newRefreshToken: string = this.generateRefreshToken(
         user_id,

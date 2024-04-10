@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiBody, ApiCookieAuth, ApiOperation, ApiResponse, ApiTa
 import { Request, Response } from 'express';
 import { CatchException } from "../exceptions/common.exception";
 import { AuthGuard } from '../guards/auth.guard';
+import { LogoutGuard } from '../guards/logout.guard';
 import { RefreshTokenGuard } from '../guards/refresh_token.guard';
 import { UserResponse, UserResponseSwagger } from '../user/responses/UserResponse';
 import { GetDeviceId, GetUserIdFromToken } from "../utils/utils.decorators";
@@ -51,12 +52,11 @@ export class AuthController {
     @ApiOperation({summary: 'Đăng xuất'})
     @ApiResponse({status: HttpStatus.OK, type: BaseResponse})
     @ApiBearerAuth()
-    @UseGuards(AuthGuard)
+    @UseGuards(LogoutGuard)
     @Post('logout')
-    async logout(@GetUserIdFromToken() userId: number, @GetDeviceId() deviceId: string, @Req() req: Request, @Res() res: Response) {
+    async logout(@Req() req: Request, @Res() res: Response) {
         try {
-            // const message = await this.authService.logout(userId, deviceId, res);
-            const message = await this.authService.logoutV2(req['user'], res);
+            const message = await this.authService.logoutV2(req['sessionId'], res);
             return res.status(HttpStatus.OK).send(new BaseResponse({message}));
         } catch (e) {
             throw new CatchException(e)
