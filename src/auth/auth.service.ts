@@ -473,6 +473,9 @@ export class AuthService {
         session.id,
         secretKey,
       );
+
+      console.log({newAccessToken});
+      
       // Tạo refreshToken mới
       const newRefreshToken: string = this.generateRefreshToken(
         user_id,
