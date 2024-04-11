@@ -25,6 +25,11 @@ export class WatchlistService {
       })
 
       await this.watchListRepo.save(new_watch_list)
+
+      return {
+        id: new_watch_list.id,
+        name: new_watch_list.name
+      }
     } catch (e) {
       throw new CatchException(e)
     }
