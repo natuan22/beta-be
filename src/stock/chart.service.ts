@@ -288,7 +288,8 @@ export class ChartService {
                     contribute_price DESC;
                 `;
       }
-
+      console.log(query);
+      
       const data = await this.mssqlService.query<TickerContributeInterface[]>(
         query,
       );
