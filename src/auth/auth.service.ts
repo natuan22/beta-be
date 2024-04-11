@@ -623,10 +623,4 @@ export class AuthService {
     await this.deviceRepo.delete({ device_id });
     return `remove ${device_id} login session successfully`;
   }
-
-  // async testQueue(){
-  //   console.log('hjaha');
-
-  //   await this.queueService.addJob('hahaha', {text: 'Hello'}, 60000)
-  // }
 }

@@ -23,21 +23,19 @@ export class UserEntity extends BaseModel {
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: '',
   })
   password: string;
 
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: '',
   })
   name: string;
 
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: '',
+    default: ''
   })
   avatar: string;
 
@@ -51,7 +49,6 @@ export class UserEntity extends BaseModel {
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: '',
   })
   phone: string;
 
@@ -82,7 +79,7 @@ export class UserEntity extends BaseModel {
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: '',
+    default: ''
   })
   address: string;
 

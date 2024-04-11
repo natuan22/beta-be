@@ -1,16 +1,16 @@
 import { Column, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn } from "typeorm"
-import {BaseModel} from '../../models/base.entity';
-import { UserEntity } from "../../user/entities/user.entity";
+import { BaseModel } from "../../models/base.entity"
+import { UserEntity } from "../../user/entities/user.entity"
 
 @Entity({
-    name: 'filter_user',
-    database: 'AUTH'
+    database: 'AUTH',
+    name: 'watch_list',
 })
-export class FilterUserEntity extends BaseModel {
+export class WatchListEntity extends BaseModel {
     @PrimaryGeneratedColumn('increment', {
         type: 'int',
-      })
-    filter_id: number
+    })
+    id: number
 
     @Column({
         type: 'nvarchar',
@@ -20,18 +20,12 @@ export class FilterUserEntity extends BaseModel {
     name: string
 
     @ManyToOne(() => UserEntity, (user) => user.user_id)
-    @JoinColumn({name: 'user_id'})
+    @JoinColumn({ name: 'user_id' })
     user: UserEntity
 
     @Column({
         type: 'nvarchar',
-        length: 'max'
+        length: '255'
     })
-    value: string
-}
-
-interface IValueFilter {
-    key: string
-    min: number
-    max: number
+    code: string
 }

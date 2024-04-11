@@ -13,13 +13,15 @@ export class DeviceEntity extends BaseModel {
 
     @Column({
         type: 'nvarchar',
-        length: '255'
+        length: '255',
+        default: ''
     })
     mac_id: string;
 
     @Column({
         type: 'nvarchar',
-        length: '255'
+        length: '255',
+        default: ''
     })
     device_id: string;
 
@@ -52,6 +54,7 @@ export class DeviceEntity extends BaseModel {
     @Column({
         type: 'nvarchar',
         length: '255',
+        default: ''
     })
     ip_address: string;
 

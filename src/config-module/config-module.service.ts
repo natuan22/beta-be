@@ -9,21 +9,21 @@ import { BullModuleOptions } from '@nestjs/bull';
 
 @Injectable()
 export class ConfigServiceProvider {
-  createTypeOrmOptions(): TypeOrmModuleOptions {
-    return {
-      type: 'mssql',
-      host: process.env.MSSQL_HOST,
-      port: parseInt(process.env.MSSQL_PORT),
-      username: process.env.MSSQL_USERNAME,
-      password: process.env.MSSQL_PASSWORD,
-      schema: 'dbo',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      autoLoadEntities: true,
-      synchronize: false,
-      options: { encrypt: false },
-      requestTimeout: 30000
-    };
-  }
+  // createTypeOrmOptions(): TypeOrmModuleOptions {
+  //   return {
+  //     type: 'mssql',
+  //     host: process.env.MSSQL_HOST,
+  //     port: parseInt(process.env.MSSQL_PORT),
+  //     username: process.env.MSSQL_USERNAME,
+  //     password: process.env.MSSQL_PASSWORD,
+  //     schema: 'dbo',
+  //     entities: [__dirname + '/**/*.entity{.ts,.js}'],
+  //     autoLoadEntities: true,
+  //     // synchronize: true,
+  //     options: { encrypt: false },
+  //     requestTimeout: 30000
+  //   };
+  // }
 
   createMssqlOptions(): TypeOrmModuleOptions {
     return {
