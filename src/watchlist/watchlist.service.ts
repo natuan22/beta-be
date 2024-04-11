@@ -16,9 +16,6 @@ export class WatchlistService {
 
   async create(body: CreateWatchlistDto, user_id: number) {
     try {
-      const watch_list = await this.watchListRepo.findOne({where: {user: {user_id}, name: body.name}})
-      if(watch_list) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Tên watch list đã được sử dụng')
-      
       const new_watch_list = this.watchListRepo.create({
         name: body.name,
         code: JSON.stringify([]),
