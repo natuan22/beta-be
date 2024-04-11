@@ -28,7 +28,7 @@ export class AuthGuard implements CanActivate {
 
         const sessionId = decode_token['sessionId']
 
-        const { secret_key } = await this.authService.getSecretKeyV2(sessionId)
+        const secret_key = await this.authService.getSecretKeyV2(sessionId)
         
         if(!secret_key) throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'DeviceId invalid')
 

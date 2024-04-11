@@ -56,7 +56,7 @@ export class AuthService {
       },
       {
         secret: secretKey,
-        expiresIn: 10,
+        expiresIn: TimeToLive.OneHour,
       },
     );
   }
@@ -355,12 +355,12 @@ export class AuthService {
   async getSecretKeyV2(
     sessionId: string
   ){
-    return await this.deviceRepo.findOne({
+    return (await this.deviceRepo.findOne({
       where: {
         id: sessionId
       },
       select: ['secret_key']
-    })
+    }))?.secret_key
   }
 
   async refreshToken(
