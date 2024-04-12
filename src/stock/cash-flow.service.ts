@@ -285,7 +285,7 @@ export class CashFlowService {
 
   async getInvestorTransactionRatio() {
     const redisData = await this.redis.get(RedisKeys.InvestorTransactionRatio);
-    // if (redisData) return redisData;
+    if (redisData) return redisData;
 
     const query: string = `
     WITH market AS (
