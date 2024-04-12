@@ -782,7 +782,7 @@ export class StockService {
       const redisData: TopNetForeignByExResponse[] = await this.redis.get(
         `${RedisKeys.TopNetForeignByEx}:${exchange.toUpperCase()}`,
       );
-      if (redisData) return redisData;
+      // if (redisData) return redisData;
 
       const { latestDate, weekDate }: SessionDatesInterface =
         await this.getSessionDate(`[PHANTICH].[dbo].[BCN_netvalue]`);
@@ -799,7 +799,7 @@ export class StockService {
                 GROUP BY t1.ticker, c.floor
                 ORDER BY net_value ${order}
             `;
-
+        
       const [dataTop, dataBot]: [
         TopNetForeignByExInterface[],
         TopNetForeignByExInterface[],

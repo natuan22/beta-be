@@ -169,6 +169,14 @@ export class ChartService {
         type,
       );
 
+      const lastData = mappedData[mappedData.length - 1]
+
+      mappedData[mappedData.length - 1] = {
+        ...lastData,
+        indexChange: data_2[0].closePrice - lastData.indexValue,
+        percentIndexChange: (data_2[0].closePrice - lastData.indexValue) / lastData.indexValue * 100
+      } as any
+
       const data = {
         prevClosePrice: data_2[0].closePrice,
         chart: mappedData
