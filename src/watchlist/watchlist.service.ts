@@ -65,4 +65,24 @@ export class WatchlistService {
       throw new CatchException(e)
     }
   }
+
+  async watchListData(id: number, user_id: number){
+    try {
+      const watch_list = await this.watchListRepo.findOne({where: {id, user: {user_id}}})
+      if(!watch_list) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'watch list not found')
+
+      const codes: string[] = JSON.parse(watch_list.code)
+      
+      const query = `
+      select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, perChange from marketTrade.dbo.tickerTradeVND t
+                            inner join marketInfor.dbo.info i on i.code = t.code
+      where t.code in (${codes.map(item => `'${item}'`).join(',')})
+      and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND)
+      `
+      const data = await this.watchListRepo.query(query)
+      return data
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
 }

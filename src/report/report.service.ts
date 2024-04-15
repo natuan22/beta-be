@@ -223,7 +223,6 @@ export class ReportService {
         ([${now}] - [${year}]) / [${year}] * 100 AS year
       FROM temp AS source PIVOT (SUM(bySell) FOR date IN (${pivot})) AS chuyen
       `
-
       const data = await this.mssqlService.query<ExchangeRateResponse[]>(query)
       const dataMapped = ExchangeRateResponse.mapToList(data)
       return dataMapped

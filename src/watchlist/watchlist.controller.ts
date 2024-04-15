@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthGuard } from '../guards/auth.guard';
@@ -6,6 +6,7 @@ import { BaseResponse } from '../utils/utils.response';
 import { CreateWatchlistDto } from './dto/create-watchlist.dto';
 import { DeleteWatchlistDto } from './dto/delete-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
+import { WatchListDataDto } from './dto/watchlist-data.dto';
 import { WatchlistService } from './watchlist.service';
 
 @UseGuards(AuthGuard)
@@ -39,6 +40,13 @@ export class WatchlistController {
   @Get()
   async getAll(@Req() req: Request, @Res() res: Response) {
     const data = await this.watchlistService.getAll(req['user'].userId);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }))
+  }
+
+  @ApiOperation({ summary: 'watchlist data' })
+  @Get(':id')
+  async getDetail(@Req() req: Request, @Param() p: WatchListDataDto, @Res() res: Response) {
+    const data = await this.watchlistService.watchListData(p.id, req['user'].userId);
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }))
   }
 }
