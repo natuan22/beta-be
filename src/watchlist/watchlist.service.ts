@@ -72,6 +72,7 @@ export class WatchlistService {
       if(!watch_list) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'watch list not found')
 
       const codes: string[] = JSON.parse(watch_list.code)
+      if(codes.length === 0) return []
       
       const query = `
       select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, perChange from marketTrade.dbo.tickerTradeVND t
