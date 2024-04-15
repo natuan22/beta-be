@@ -1,9 +1,9 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsNumber } from "class-validator";
+import { IsInt, IsNotEmpty, IsNumberString } from "class-validator";
 
 export class WatchListDataDto {
     @IsNotEmpty()
-    @IsNumber()
+    @IsNumberString()
     @ApiProperty({
         type: Number
     })
