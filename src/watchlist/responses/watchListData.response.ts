@@ -22,42 +22,56 @@ export class WatchListDataResponse {
     LV2: string
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'KLGD (CP)'
     })
     totalVol: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'GTGD (Tỷ đồng)'
     })
     totalVal: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: '%D'
     })
     perChange: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'KLNN mua ròng (cp)'
     })
     buyVol: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Giá trị NN mua ròng (tỷ đồng)'
     })
     buyVal: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Vốn hoá (tỷ đồng)'
+    })
+    marketCap: number
+
+    @ApiProperty({
+        type: Number,
+        description: 'KL Mua chủ động (cp) (M)'
     })
     Mua: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'KL Bán chủ động (cp) (B)'
     })
     Ban: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'M/B'
     })
     MB: number
 
@@ -92,22 +106,26 @@ export class WatchListDataResponse {
     ROA: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Biên lợi nhuận gộp quý gần nhất (%)'
     })
     grossProfitMarginQuarter: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Biên lợi nhuận ròng quý gần nhất (%)'
     })
     netProfitMarginQuarter: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Biên lợi nhuận gộp năm gần nhất (%)'
     })
     grossProfitMarginYear: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Biên lợi nhuận ròng năm gần nhất (%)'
     })
     netProfitMarginYear: number
 
@@ -116,12 +134,14 @@ export class WatchListDataResponse {
     ROANH: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Giá cao nhất 52 tuần'
     })
     PRICE_HIGHEST_CR_52W: number
 
     @ApiProperty({
-        type: Number
+        type: Number,
+        description: 'Giá thấp nhất 52 tuần'
     })
     PRICE_LOWEST_CR_52W: number
 
