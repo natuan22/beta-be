@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthGuard } from '../guards/auth.guard';
+import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { CreateWatchlistDto } from './dto/create-watchlist.dto';
 import { DeleteWatchlistDto } from './dto/delete-watchlist.dto';
@@ -40,6 +41,13 @@ export class WatchlistController {
   @Get()
   async getAll(@Req() req: Request, @Res() res: Response) {
     const data = await this.watchlistService.getAll(req['user'].userId);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }))
+  }
+
+  @ApiOperation({ summary: 'watchlist data stock' })
+  @Get('data')
+  async getDetailWithStock(@Query() q: StockDto, @Res() res: Response) {
+    const data = await this.watchlistService.watchListDataStock(q.stock);
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }))
   }
 

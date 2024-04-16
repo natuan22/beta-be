@@ -66,6 +66,15 @@ export class WatchlistService {
     }
   }
 
+  queryDataWatchList(codes: string[]){
+    return `
+    select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, perChange from marketTrade.dbo.tickerTradeVND t
+                            inner join marketInfor.dbo.info i on i.code = t.code
+      where t.code in (${codes.map(item => `'${item}'`).join(',')})
+      and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND)
+    `
+  }
+
   async watchListData(id: number, user_id: number){
     try {
       const watch_list = await this.watchListRepo.findOne({where: {id, user: {user_id}}})
@@ -74,14 +83,19 @@ export class WatchlistService {
       const codes: string[] = JSON.parse(watch_list.code)
       if(codes.length === 0) return []
       
-      const query = `
-      select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, perChange from marketTrade.dbo.tickerTradeVND t
-                            inner join marketInfor.dbo.info i on i.code = t.code
-      where t.code in (${codes.map(item => `'${item}'`).join(',')})
-      and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND)
-      `
+      const query = this.queryDataWatchList(codes)
       const data = await this.watchListRepo.query(query)
       return data
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  async watchListDataStock(code: string){
+    try {
+      const query = this.queryDataWatchList([code])
+      const data = await this.watchListRepo.query(query)
+      return data[0]
     } catch (e) {
       throw new CatchException(e)
     }
