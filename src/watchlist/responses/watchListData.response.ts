@@ -161,6 +161,7 @@ export class WatchListDataResponse {
         this.PE = data?.PE || 0
         this.EPS = data?.EPS || 0
         this.PB = data?.PB || 0
+        this.marketCap = data?.marketCap || 0
         this.BVPS = data?.BVPS || 0
         this.ROE = data?.ROE || data?.ROENH || 0
         this.ROA = data?.ROA || data?.ROENH || 0

@@ -83,7 +83,7 @@ export class WatchlistService {
       select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, t.perChange,
              f.buyVol, f.buyVal,
              m.Mua, m.Ban, m.MB,
-             r.PE, r.EPS, r.PB, r.BVPS,
+             r.PE, r.EPS, r.PB, r.BVPS, r.marketCap,
              c.ROE, c.ROA, c.grossProfitMargin as grossProfitMarginQuarter, c.netProfitMargin as netProfitMarginQuarter, y.grossProfitMargin as grossProfitMarginYear, y.netProfitMargin as netProfitMarginYear,
              n.ROE as ROENH, n.ROA as ROANH,
              p.PRICE_HIGHEST_CR_52W, p.PRICE_LOWEST_CR_52W
