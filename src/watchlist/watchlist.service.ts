@@ -68,13 +68,6 @@ export class WatchlistService {
   }
 
   queryDataWatchList(codes: string[]) {
-    // return
-    // `
-    // select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, perChange from marketTrade.dbo.tickerTradeVND t
-    //                         inner join marketInfor.dbo.info i on i.code = t.code
-    //   where t.code in (${codes.map(item => `'${item}'`).join(',')})
-    //   and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND)
-    // `
     return `
     with temp as (
       select * from (select value, code, ratioCode from RATIO.dbo.ratio where code in (${codes.map(item => `'${item}'`).join(',')})
@@ -89,7 +82,7 @@ export class WatchlistService {
              p.PRICE_HIGHEST_CR_52W, p.PRICE_LOWEST_CR_52W
       from marketTrade.dbo.tickerTradeVND t
       inner join marketInfor.dbo.info i on i.code = t.code
-      inner join marketTrade.dbo.[foreign] f on f.code = t.code and f.date = t.date
+      inner join marketTrade.dbo.[foreign] f on f.code = t.code
       inner join PHANTICH.dbo.MBChuDong m on m.MCK = t.code
       inner join RATIO.dbo.ratioInday r on r.code = t.code and r.date = t.date
       left join financialReport.dbo.calBCTC c on c.code = t.code and c.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC)
@@ -99,6 +92,7 @@ export class WatchlistService {
       where t.code in (${codes.map(item => `'${item}'`).join(',')})
       and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND)
       and m.Ngay = (select max(Ngay) from PHANTICH.dbo.MBChuDong)
+      and f.date = (select max(date) from marketTrade.dbo.[foreign])
     `
   }
 
@@ -111,6 +105,7 @@ export class WatchlistService {
       if (codes.length === 0) return []
 
       const query = this.queryDataWatchList(codes)
+      
       const data = await this.watchListRepo.query(query)
       return WatchListDataResponse.mapToList(data)
     } catch (e) {
