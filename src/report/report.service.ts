@@ -1169,7 +1169,7 @@ export class ReportService {
     market AS (
             SELECT
                 [date],
-                SUM(totalVal) AS marketTotalVal
+                round(SUM(totalVal), 0) AS marketTotalVal
             FROM [marketTrade].[dbo].[tickerTradeVND]
             WHERE [date] >= (select top 1 date from date order by date asc) and [date] <= (select top 1 date from date order by date desc)
                 AND [type] IN ('STOCK', 'ETF')
@@ -2578,3 +2578,4 @@ select * from temp where date = (select max(date) from temp)
     }
   }
 }
+
