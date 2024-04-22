@@ -71,7 +71,7 @@ export class WatchlistService {
     return `
     with temp as (
       select * from (select value, code, ratioCode from RATIO.dbo.ratio where code in (${codes.map(item => `'${item}'`).join(',')})
-      and ratioCode in ('PRICE_LOWEST_CR_52W', 'PRICE_HIGHEST_CR_52W') and date = (select max(date) from RATIO.dbo.ratio)) as source pivot ( sum(value) for ratioCode in ([PRICE_LOWEST_CR_52W], [PRICE_HIGHEST_CR_52W]) ) as chuyen
+      and ratioCode in ('PRICE_LOWEST_CR_52W', 'PRICE_HIGHEST_CR_52W') and date = (select max(date) from RATIO.dbo.ratio where ratioCode = 'PRICE_HIGHEST_CR_52W')) as source pivot ( sum(value) for ratioCode in ([PRICE_LOWEST_CR_52W], [PRICE_HIGHEST_CR_52W]) ) as chuyen
       )
       select t.code, t.closePrice, i.floor, i.LV2, t.totalVol, t.totalVal, t.perChange,
              f.buyVol, f.buyVal,
@@ -105,7 +105,7 @@ export class WatchlistService {
       if (codes.length === 0) return []
 
       const query = this.queryDataWatchList(codes)
-      
+
       const data = await this.watchListRepo.query(query)
       return WatchListDataResponse.mapToList(data)
     } catch (e) {
