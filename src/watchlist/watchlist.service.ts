@@ -100,7 +100,7 @@ export class WatchlistService {
     with min_max as (
       select code, min(closePrice) as PRICE_LOWEST_CR_52W, max(closePrice) as PRICE_HIGHEST_CR_52W from marketTrade.dbo.tickerTradeVND where code in (${codes.map(item => `'${item}'`).join(',')}) and date >= '${day_52_week}' group by code
     )
-    select f.code, f.closePrice, f.floor, f.LV2, f.value as totalVal, f.volume as totalVol, f.beta,
+    select f.code, t.closePrice, f.floor, f.LV2, f.value as totalVal, f.volume as totalVol, f.beta,
     f.perChange1D as perChange, f.perChange5D as perChangeW, f.perChange1M as perChangeM,  f.perChange1Y as perChangeY,
     f.KNnetVal as buyVal, f.KNnetVol as buyVol,
     m.MB, m.Mua, m.Ban,
@@ -115,7 +115,8 @@ export class WatchlistService {
      left join financialReport.dbo.calBCTC y on y.code = f.code and y.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC where right(yearQuarter, 1) = 0)
      left join financialReport.dbo.calBCTCNH n on n.code = f.code and n.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTCNH)
      left join min_max l on l.code = f.code
-    where f.code in (${codes.map(item => `'${item}'`).join(',')})
+     inner join marketTrade.dbo.tickerTradeVND t on t.code = f.code and t.date = (select max(date) from marketTrade.dbo.tickerTradeVND where type = 'STOCK')
+     where f.code in (${codes.map(item => `'${item}'`).join(',')})
       and f.date = (select max(date) from VISUALIZED_DATA.dbo.filterResource) 
     `
   }
