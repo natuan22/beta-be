@@ -1,5 +1,22 @@
 import { ApiProperty } from "@nestjs/swagger"
 
+
+class ISignal {
+    @ApiProperty({
+        type: Number
+    })
+    positive: number
+
+    @ApiProperty({
+        type: Number
+    })
+    negative: number
+
+    @ApiProperty({
+        type: Number
+    })
+    neutral: number
+}
 export class WatchListDataResponse {
     @ApiProperty({
         type: String
@@ -38,6 +55,30 @@ export class WatchListDataResponse {
         description: '%D'
     })
     perChange: number
+
+    @ApiProperty({
+        type: Number,
+        description: '%W'
+    })
+    perChangeW: number
+
+    @ApiProperty({
+        type: Number,
+        description: '%M'
+    })
+    perChangeM: number
+
+    @ApiProperty({
+        type: Number,
+        description: '%YoY'
+    })
+    perChangeY: number
+
+    @ApiProperty({
+        type: Number,
+        description: '%YtD'
+    })
+    perChangeYtD: number
 
     @ApiProperty({
         type: Number,
@@ -145,6 +186,34 @@ export class WatchListDataResponse {
     })
     PRICE_LOWEST_CR_52W: number
 
+    @ApiProperty({
+        type: Number,
+        description: 'beta'
+    })
+    beta: number
+
+    trend: string
+    overview: string
+    tech: string
+
+    @ApiProperty({
+        type: ISignal,
+        description: 'Tín hiệu chỉ báo kỹ thuật'
+    })
+    technicalSignal: ISignal
+
+    @ApiProperty({
+        type: ISignal,
+        description: 'Tín hiệu đường xu hướng'
+    })
+    trendSignal: ISignal
+
+    @ApiProperty({
+        type: ISignal,
+        description: 'Tín hiệu kỹ thuật tổng hợp'
+    })
+    generalSignal: ISignal
+
     constructor(data?: WatchListDataResponse) {
         this.code = data?.code || ''
         this.closePrice = data?.closePrice || 0
@@ -153,6 +222,10 @@ export class WatchListDataResponse {
         this.totalVol = data?.totalVol || 0
         this.totalVal = data?.totalVal || 0
         this.perChange = data?.perChange || 0
+        this.perChangeW = data?.perChangeW || 0
+        this.perChangeM = data?.perChangeM || 0
+        this.perChangeY = data?.perChangeY || 0
+        this.perChangeYtD = data?.perChangeYtD || 0
         this.buyVol = data?.buyVol || 0
         this.buyVal = data?.buyVal || 0
         this.Mua = data?.Mua || 0
@@ -169,12 +242,32 @@ export class WatchListDataResponse {
         this.netProfitMarginQuarter = data?.netProfitMarginQuarter || 0
         this.grossProfitMarginYear = data?.grossProfitMarginYear || 0
         this.netProfitMarginYear = data?.netProfitMarginYear || 0
-        this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W / 1000 || 0
-        this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W / 1000 || 0
+        this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
+        this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
+        this.beta = data?.beta || 0
+        this.technicalSignal = this.genStar(data?.tech)
+        this.trendSignal = this.genStar(data?.trend)
+        this.generalSignal = this.genStar(data?.overview)
     }
 
 
     static mapToList(data?: WatchListDataResponse[]) {
         return data.map(item => new WatchListDataResponse(item))
+    }
+
+    private genStar(str?: string): ISignal {
+        if (!str) {
+            return {
+                negative: 0,
+                neutral: 0,
+                positive: 0,
+            }
+        }
+        const star = str.split('-')
+        return {
+            negative: +star[0],
+            neutral: +star[1],
+            positive: +star[2],
+        }
     }
 }
