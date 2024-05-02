@@ -200,19 +200,19 @@ export class WatchListDataResponse {
         type: ISignal,
         description: 'Tín hiệu chỉ báo kỹ thuật'
     })
-    technicalSignal: ISignal
+    technicalSignal: any
 
     @ApiProperty({
         type: ISignal,
         description: 'Tín hiệu đường xu hướng'
     })
-    trendSignal: ISignal
+    trendSignal: any
 
     @ApiProperty({
         type: ISignal,
         description: 'Tín hiệu kỹ thuật tổng hợp'
     })
-    generalSignal: ISignal
+    generalSignal: any
 
     constructor(data?: WatchListDataResponse) {
         this.code = data?.code || ''
@@ -245,9 +245,12 @@ export class WatchListDataResponse {
         this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
         this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.beta = data?.beta || 0
-        this.technicalSignal = this.genStar(data?.tech)
-        this.trendSignal = this.genStar(data?.trend)
-        this.generalSignal = this.genStar(data?.overview)
+        // this.technicalSignal = this.genStar(data?.tech)
+        // this.trendSignal = this.genStar(data?.trend)
+        // this.generalSignal = this.genStar(data?.overview)
+        this.technicalSignal = data?.tech 
+        this.trendSignal = data?.trend 
+        this.generalSignal = data?.overview
     }
 
 

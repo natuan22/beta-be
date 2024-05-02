@@ -10,6 +10,7 @@ import { JwtService } from '@nestjs/jwt';
 @Module({
   imports: [NestjsFormDataModule, MinioOptionModule],
   controllers: [ReportController],
-  providers: [ReportService, MssqlService, StockService, JwtService]
+  providers: [ReportService, MssqlService, StockService, JwtService],
+  exports: [ReportModule, ReportService]
 })
 export class ReportModule {}

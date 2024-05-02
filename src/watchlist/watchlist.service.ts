@@ -4,6 +4,7 @@ import * as moment from 'moment';
 import { Repository } from 'typeorm';
 import { DB_SERVER } from '../constants';
 import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
+import { ReportService } from '../report/report.service';
 import { CreateWatchlistDto } from './dto/create-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
 import { WatchListEntity } from './entities/watchlist.entity';
@@ -13,7 +14,8 @@ import { WatchListDataResponse } from './responses/watchListData.response';
 @Injectable()
 export class WatchlistService {
   constructor(
-    @InjectRepository(WatchListEntity, DB_SERVER) private readonly watchListRepo: Repository<WatchListEntity>
+    @InjectRepository(WatchListEntity, DB_SERVER) private readonly watchListRepo: Repository<WatchListEntity>,
+    private readonly reportService: ReportService
   ) { }
 
   async create(body: CreateWatchlistDto, user_id: number) {
@@ -173,8 +175,23 @@ export class WatchlistService {
       //         where date = (select max(date) from temp_2)
       // `
         
+      const data_2 = await Promise.all(
+        codes.map(item => this.reportService.technicalIndex(item))
+      )
+
+      const data_3 = data_2.map((item, index) => ({
+        code: codes[index],
+        tech: item.technicalSignal,
+        trend: item.trendSignal,
+        overview: item.generalSignal,
+      }))
+      
       const data = await this.watchListRepo.query(query)
-      return WatchListDataResponse.mapToList(data)
+
+      return WatchListDataResponse.mapToList(data.map(item => ({
+        ...item,
+        ...(data_3.find(data => data.code == item.code))
+      })))
     } catch (e) {
       throw new CatchException(e)
     }
