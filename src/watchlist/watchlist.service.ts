@@ -102,8 +102,7 @@ export class WatchlistService {
     with min_max as (
       select code, min(closePrice) as PRICE_LOWEST_CR_52W, max(closePrice) as PRICE_HIGHEST_CR_52W from marketTrade.dbo.tickerTradeVND where code in (${codes.map(item => `'${item}'`).join(',')}) and date >= '${day_52_week}' group by code
     )
-    select f.code, t.closePrice, f.floor, f.LV2, f.value as totalVal, f.volume as totalVol, f.beta,
-    f.perChange1D as perChange, f.perChange5D as perChangeW, f.perChange1M as perChangeM,  f.perChange1Y as perChangeY,
+    select f.code, t.closePrice, t.perChange, f.floor, f.LV2, f.value as totalVal, f.volume as totalVol, f.beta, f.perChange5D as perChangeW, f.perChange1M as perChangeM,  f.perChange1Y as perChangeY,
     f.KNnetVal as buyVal, f.KNnetVol as buyVol,
     m.MB, m.Mua, m.Ban,
     f.PE, f.EPS, f.PB, f.BVPS, f.marketCap,
