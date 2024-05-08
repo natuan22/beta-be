@@ -2207,7 +2207,7 @@ select * from temp where date = (select max(date) from temp)
 
       const query = `
       select Mua as buy, Ban as sell, MB as buy_sell, Ngay as date from [PHANTICH].[dbo].[MBChuDong] where MCK = '${code}'
-      and Ngay BETWEEN DATEADD(MONTH, -3, (SELECT
+      and Ngay BETWEEN DATEADD(MONTH, -1, (SELECT
         MAX(Ngay)
       FROM [PHANTICH].[dbo].[MBChuDong]
       WHERE MCK = '${code}')
