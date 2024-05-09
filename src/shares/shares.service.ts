@@ -58,7 +58,7 @@ export class SharesService {
 
   async header(stock: string, type: string) {
     const redisData = await this.redis.get(`${RedisKeys.headerStock}:${stock}:${type}`)
-    if (redisData) return redisData
+    // if (redisData) return redisData
 
     const date = (await this.mssqlService.query(`select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`))[0]?.date
     if (!date) return {}
@@ -115,19 +115,7 @@ export class SharesService {
       AND date IN ('${now}', '${week}', '${month}',
       '${year}')) AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
     pe
-    AS (SELECT
-      [ROAA_TR_AVG5Q] AS roaa,
-      [ROAE_TR_AVG5Q] AS roae,
-      code
-    FROM (
-    SELECT TOP 2
-      ratioCode,
-      value,
-      code
-    FROM RATIO.dbo.ratio
-    WHERE code = '${stock}'
-    AND ratioCode IN ('ROAA_TR_AVG5Q', 'ROAE_TR_AVG5Q')
-    ORDER BY date DESC) AS source PIVOT (SUM(value) FOR ratioCode IN ([ROAA_TR_AVG5Q], [ROAE_TR_AVG5Q])) AS chuyen),
+    AS (select top 1 code, ROE as roae, ROA as roaa from RATIO.dbo.ratioInYearQuarter where code = 'FPT' and right(yearQuarter, 1) <> 0 order by date desc),
     vh as (
       select top 1 code, marketCap as vh, PE as pe, PB as pb from RATIO.dbo.ratioInday where code = '${stock}' order by date desc
     )
@@ -149,6 +137,8 @@ export class SharesService {
     INNER JOIN vh v
       ON v.code = t.code
     `
+    console.log(query);
+    
 
     const data = await this.mssqlService.query<HeaderStockResponse[]>(query)
     const dataMapped = new HeaderStockResponse(data[0])
