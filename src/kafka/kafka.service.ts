@@ -689,8 +689,8 @@ export class KafkaService {
           new Date().getFullYear(),
           new Date().getMonth(),
           new Date().getDate(),
-          moment(item.timeInday, 'HH:mm:ss').hour(),
-          moment(item.timeInday, 'HH:mm:ss').minute(),
+          moment(item.time, 'HH:mm:ss').hour(),
+          moment(item.time, 'HH:mm:ss').minute(),
         ).valueOf()
       })
     }
