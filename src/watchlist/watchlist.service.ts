@@ -121,6 +121,14 @@ export class WatchlistService {
       and f.date = (select max(date) from VISUALIZED_DATA.dbo.filterResource) 
     `
   }
+  private isInTime() {
+    const hour = moment().hour()
+    const minute = moment().minute()
+    const today = moment().format('dddd')
+
+    if (hour == 8 && minute >= 30 && today != 'Saturday' && today != 'Sunday') return true
+    return false
+  }
 
   async watchListData(id: number, user_id: number) {
     try {
@@ -129,6 +137,8 @@ export class WatchlistService {
 
       const codes: string[] = JSON.parse(watch_list.code)
       if (codes.length === 0) return []
+
+      let isInTime = this.isInTime()
 
       const query = this.queryDataWatchList(codes)
 
@@ -173,7 +183,7 @@ export class WatchlistService {
       //         from temp_2 t
       //         where date = (select max(date) from temp_2)
       // `
-        
+
       const data_2 = await Promise.all(
         codes.map(item => this.reportService.technicalIndex(item))
       )
@@ -184,12 +194,23 @@ export class WatchlistService {
         trend: item.trendSignal,
         overview: item.generalSignal,
       }))
-      
+
       const data = await this.watchListRepo.query(query)
 
       return WatchListDataResponse.mapToList(data.map(item => ({
         ...item,
-        ...(data_3.find(data => data.code == item.code))
+        ...(data_3.find(data => data.code == item.code)),
+        ...(isInTime && {
+          perChange: 0,
+          perChangeW: 0,
+          perChangeM: 0,
+          perChangeY: 0,
+          perChangeYtD: 0,
+          totalVol: 0,
+          totalVal: 0,
+          buyVol: 0,
+          buyVal: 0
+        })
       })))
     } catch (e) {
       throw new CatchException(e)

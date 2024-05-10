@@ -108,12 +108,10 @@ export class SharesService {
     FROM (SELECT
       closePrice,
       date,
-      p.code
-    FROM temp p
-    INNER JOIN marketTrade.dbo.indexTradeVND i
-      ON p.floor = i.code
-      AND date IN ('${now}', '${week}', '${month}',
-      '${year}')) AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
+      code
+    FROM marketTrade.dbo.tickerTradeVND
+      WHERE date IN ('${now}', '${week}', '${month}',
+      '${year}') and code = '${stock}') AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
     pe
     AS (select top 1 code, ROE as roae, ROA as roaa from RATIO.dbo.ratioInYearQuarter where code = '${stock}' and right(yearQuarter, 1) <> 0 order by date desc),
     vh as (
@@ -1512,7 +1510,7 @@ export class SharesService {
     if (!LV2[0]?.LV2) return []
 
     const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`)
-    if (redisData) return redisData
+    // if (redisData) return redisData
 
     const temp = this.getChiTieuCSTC(LV2[0]?.LV2, stock);
     if (!temp) return []
