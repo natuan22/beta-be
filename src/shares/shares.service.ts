@@ -115,7 +115,7 @@ export class SharesService {
       AND date IN ('${now}', '${week}', '${month}',
       '${year}')) AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
     pe
-    AS (select top 1 code, ROE as roae, ROA as roaa from RATIO.dbo.ratioInYearQuarter where code = 'FPT' and right(yearQuarter, 1) <> 0 order by date desc),
+    AS (select top 1 code, ROE as roae, ROA as roaa from RATIO.dbo.ratioInYearQuarter where code = '${stock}' and right(yearQuarter, 1) <> 0 order by date desc),
     vh as (
       select top 1 code, marketCap as vh, PE as pe, PB as pb from RATIO.dbo.ratioInday where code = '${stock}' order by date desc
     )
@@ -137,7 +137,6 @@ export class SharesService {
     INNER JOIN vh v
       ON v.code = t.code
     `
-
     const data = await this.mssqlService.query<HeaderStockResponse[]>(query)
     const dataMapped = new HeaderStockResponse(data[0])
     await this.redis.set(`${RedisKeys.headerStock}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.Minute })
