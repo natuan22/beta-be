@@ -490,7 +490,7 @@ export class ReportService {
         MAX(date)
       FROM temp)
       `
-
+        
       const [data, data_2] = await Promise.all([this.mssqlService.query<any[]>(query), this.mssqlService.query<any[]>(query_2)])
 
       const reduceData = data.reduce((result, cur) => {

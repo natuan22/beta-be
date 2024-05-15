@@ -112,8 +112,31 @@ export class SharesService {
     FROM marketTrade.dbo.tickerTradeVND
       WHERE date IN ('${now}', '${week}', '${month}',
       '${year}') and code = '${stock}') AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
-    pe
-    AS (select top 1 code, ROE as roae, ROA as roaa from RATIO.dbo.ratioInYearQuarter where code = '${stock}' and right(yearQuarter, 1) <> 0 order by date desc),
+    roae as (
+      select code,
+             ROE as roae,
+             ROA as roaa,
+             yearQuarter
+from RATIO.dbo.ratioInYearQuarter
+where code = '${stock}' and right(yearQuarter, 1) <> 0
+    ),
+    sum_roaa as (
+      select roaa +
+      lead(roaa) over (partition by code order by yearQuarter desc)
+      + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+       + lead(roaa, 3) over (partition by code order by yearQuarter desc)
+      as roaa,
+        roae +
+            lead(roae) over (partition by code order by yearQuarter desc)
+            + lead(roae, 2) over (partition by code order by yearQuarter desc)
+            + lead(roae, 3) over (partition by code order by yearQuarter desc)
+      as roae, code, yearQuarter
+      from roae
+    ),
+      pe
+    AS (
+      select top 1 code, roaa, roae from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa)
+    ),
     vh as (
       select top 1 code, marketCap as vh, PE as pe, PB as pb from RATIO.dbo.ratioInday where code = '${stock}' order by date desc
     )
@@ -386,21 +409,29 @@ export class SharesService {
     const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}:${order}`)
     if (redisData) return redisData
 
-    const query = `
-    SELECT TOP 4
-      EPS as eps,
-      BVPS as bvps,
-      PE as pe,
-      ROE as roe,
-      ROA as roa,
-      yearQuarter as date
-    FROM financialReport.dbo.calBCTC
-    WHERE code = '${stock}'
-    ORDER BY yearQuarter DESC
-    `
-
     const query_2 = `
-    WITH temp
+    WITH roaa as (
+      select code,
+               ROE as roae,
+               ROA as roaa,
+               yearQuarter
+  from RATIO.dbo.ratioInYearQuarter
+  where code = '${stock}' and right(yearQuarter, 1) <> 0
+  ),
+      sum_roaa as (
+          select roaa +
+         lead(roaa) over (partition by code order by yearQuarter desc)
+         + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+          + lead(roaa, 3) over (partition by code order by yearQuarter desc)
+  as roaa,
+      roae +
+         lead(roae) over (partition by code order by yearQuarter desc)
+         + lead(roae, 2) over (partition by code order by yearQuarter desc)
+          + lead(roae, 3) over (partition by code order by yearQuarter desc)
+  as roae, code, yearQuarter
+  from roaa
+      ), 
+    temp
     AS (SELECT
       EPS AS value,
       'EPS' AS name,
@@ -423,17 +454,17 @@ export class SharesService {
     WHERE code = '${stock}'
     UNION ALL
     SELECT
-      ROE AS value,
+      roae AS value,
       'ROE' AS name,
       yearQuarter as date
-    FROM financialReport.dbo.calBCTC
+    FROM sum_roaa
     WHERE code = '${stock}'
     UNION ALL
     SELECT
-      ROA AS value,
+      roaa AS value,
       'ROA' AS name,
       yearQuarter as date
-    FROM financialReport.dbo.calBCTC
+    FROM sum_roaa
     WHERE code = '${stock}'),
     top_20 as (SELECT TOP 20
       *
@@ -1450,8 +1481,8 @@ export class SharesService {
         { name: 'EPS', value: 'EPS' },
         { name: 'BVPS', value: 'BVPS' },
         { name: 'Hieu qua hoat dong', value: 0 },
-        { name: 'ROE', value: 'ROE' },
-        { name: 'ROA', value: 'ROA' },
+        { name: 'ROE', value: 'roae' },
+        { name: 'ROA', value: 'roaa' },
         { name: 'NIM', value: 'NIM' },
         { name: 'YOEA', value: 'YOEA' },
         { name: 'Co cau tai san', value: 0 },
@@ -1469,9 +1500,14 @@ export class SharesService {
         { name: 'NDR', value: 'NDR' },
         { name: 'LLP_NPL', value: 'LLP_NPL' },
         { name: 'NPL_TR', value: 'NPL_TR' },
-      ].map((item, index) => `
+      ].map((item, index) => item.name != 'ROA' && item.name != 'ROE' ? `
       select '${item.name}' as name, ${item.value} as value, cast(year as varchar) + cast(quarter as varchar) as date, ${index} as row from financialReport.dbo.calBCTCNH where code = '${stock}'
-      `).join(`union all`)
+      `
+      :
+      `
+      select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
+      `
+      ).join(`union all`)
     } else {
       return [
         { name: 'Chi so danh gia', value: 0 },
@@ -1497,11 +1533,15 @@ export class SharesService {
         { name: 'Kha nang sinh loi', value: 0 },
         { name: 'Ty suat loi nhuan gop bien', value: 'GPM' },
         { name: 'Ty suat loi nhuan rong', value: 'NPM' },
-        { name: 'ROE', value: 'ROE' },
-        { name: 'ROA', value: 'ROA' },
-      ].map((item, index) => `
+        { name: 'ROE', value: 'roae' },
+        { name: 'ROA', value: 'roaa' },
+      ].map((item, index) => item.name != 'ROE' && item.name != 'ROA' ? `
       select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from financialReport.dbo.calBCTC where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `).join(`union all`)
+      `: 
+      `
+      select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
+      `
+      ).join(`union all`)
     }
   }
 
@@ -1510,7 +1550,7 @@ export class SharesService {
     if (!LV2[0]?.LV2) return []
 
     const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`)
-    // if (redisData) return redisData
+    if (redisData) return redisData
 
     const temp = this.getChiTieuCSTC(LV2[0]?.LV2, stock);
     if (!temp) return []
@@ -1529,7 +1569,25 @@ export class SharesService {
     }
 
     const query = `
-    with temp as (${temp}),
+    with roaa as (select code,
+          ROE as roae,
+          ROA as roaa,
+          yearQuarter
+    from RATIO.dbo.ratioInYearQuarter
+    where code = '${stock}' and right(yearQuarter, 1) <> 0),
+    summ as (
+    select roaa +
+    lead(roaa) over (partition by code order by yearQuarter desc)
+    + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+    + lead(roaa, 3) over (partition by code order by yearQuarter desc)
+    as roaa,
+    roae +
+    lead(roae) over (partition by code order by yearQuarter desc)
+    + lead(roae, 2) over (partition by code order by yearQuarter desc)
+    + lead(roae, 3) over (partition by code order by yearQuarter desc)
+    as roae, code, yearQuarter
+    from roaa),
+    temp as (${temp}),
     date as (${select})
     select * from date order by date asc, row asc
     `
