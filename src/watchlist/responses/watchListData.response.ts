@@ -17,6 +17,18 @@ class ISignal {
     })
     neutral: number
 }
+
+class INews {
+    @ApiProperty({
+        type: String
+    })
+    title: string
+
+    @ApiProperty({
+        type: String
+    })
+    date: string
+}
 export class WatchListDataResponse {
     @ApiProperty({
         type: String
@@ -214,6 +226,13 @@ export class WatchListDataResponse {
     })
     generalSignal: any
 
+    @ApiProperty({
+        type: INews,
+        isArray: true,
+        description: 'Tin tức'
+    })
+    news: INews[]
+
     constructor(data?: WatchListDataResponse) {
         this.code = data?.code || ''
         this.closePrice = data?.closePrice || 0
@@ -251,6 +270,7 @@ export class WatchListDataResponse {
         this.technicalSignal = data?.tech 
         this.trendSignal = data?.trend 
         this.generalSignal = data?.overview
+        this.news = data?.news
     }
 
 

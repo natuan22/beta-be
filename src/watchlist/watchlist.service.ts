@@ -5,6 +5,7 @@ import { Repository } from 'typeorm';
 import { DB_SERVER } from '../constants';
 import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
 import { ReportService } from '../report/report.service';
+import { UtilCommonTemplate } from '../utils/utils.common';
 import { CreateWatchlistDto } from './dto/create-watchlist.dto';
 import { UpdateWatchlistDto } from './dto/update-watchlist.dto';
 import { WatchListEntity } from './entities/watchlist.entity';
@@ -143,47 +144,7 @@ export class WatchlistService {
 
       const query = this.queryDataWatchList(codes)
 
-      // const query_2 = `
-      // with temp as (select code, closePrice,
-      //         date,
-      //         totalVal,
-      //         DATEADD(MONTH, -1, date) as month, 
-      //         DATEADD(WEEK, -1, date) as week, 
-      //         DATEADD(YEAR, -1, date) as year,
-      //         DATEFROMPARTS(YEAR(date) - 1, 12, 31) AS ytd
-      // from marketTrade.dbo.tickerTradeVND
-      // where code IN (${codes.map(item => `'${item}'`).join(',')})
-      // ),
-      // temp_2 as (SELECT
-      //     code,
-      //   closePrice,
-      //   date,
-      //   totalVal,
-      //   lead(closePrice) over (partition by code order by date desc) as day,
-      //   lead(date) over (partition by code order by date desc) as day_d,
-      //   (select top 1 closePrice from marketTrade.dbo.tickerTradeVND where date = (select max(date) from marketTrade.dbo.tickerTradeVND where date <= week and type = 'STOCK') and code = temp.code) as week,
-      //   (select max(date) from marketTrade.dbo.tickerTradeVND where date <= week and type = 'STOCK') as week_d,
-      //   (select top 1 closePrice from marketTrade.dbo.tickerTradeVND where date = (select max(date) from marketTrade.dbo.tickerTradeVND where date <= month and type = 'STOCK') and code = temp.code) as month,
-      //   (select max(date) from marketTrade.dbo.tickerTradeVND where date <= month and type = 'STOCK') as month_d,
-      //   (select top 1 closePrice from marketTrade.dbo.tickerTradeVND where date = (select max(date) from marketTrade.dbo.tickerTradeVND where date <= year and type = 'STOCK') and code = temp.code) as year,
-      //   (select max(date) from marketTrade.dbo.tickerTradeVND where date <= year and type = 'STOCK') as year_d,
-      //   (select top 1 closePrice from marketTrade.dbo.tickerTradeVND where date = (select max(date) from marketTrade.dbo.tickerTradeVND where date <= ytd and type = 'STOCK') and code = temp.code) as ytd,
-      //   (select max(date) from marketTrade.dbo.tickerTradeVND where date <= ytd and type = 'STOCK') as year_to_date_d
-      // FROM
-      //   temp)
-      // select
-      //     code,
-      //     date,
-      //     totalVal,
-      //     closePrice as price,
-      //         (closePrice - day) / day * 100 as day,
-      //         (closePrice - week) / week * 100 as week,
-      //         (closePrice - month) / month * 100 as month,
-      //         (closePrice - year) / year * 100 as year,
-      //         (closePrice - ytd) / ytd * 100 as ytd
-      //         from temp_2 t
-      //         where date = (select max(date) from temp_2)
-      // `
+      const news_query = `select TickerTitle as code, Title as title, Date as date from macroEconomic.dbo.TinTuc where TickerTitle in (${codes.map(item => `'${item}'`).join(',')}) order by Date desc`
 
       const data_2 = await Promise.all(
         codes.map(item => this.reportService.technicalIndex(item))
@@ -196,7 +157,7 @@ export class WatchlistService {
         overview: item.generalSignal,
       }))
 
-      const data = await this.watchListRepo.query(query)
+      const [data, data_news] = await Promise.all([this.watchListRepo.query(query), this.watchListRepo.query(news_query)]) 
 
       return WatchListDataResponse.mapToList(data.map(item => ({
         ...item,
@@ -211,7 +172,8 @@ export class WatchlistService {
           totalVal: 0,
           buyVol: 0,
           buyVal: 0
-        })
+        }),
+        news: data_news.filter(news => news.code == item.code).map(new_item => ({title: new_item.title, date: UtilCommonTemplate.toDate(new_item.date)}))
       })))
     } catch (e) {
       throw new CatchException(e)
