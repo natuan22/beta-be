@@ -144,7 +144,7 @@ export class WatchlistService {
 
       const query = this.queryDataWatchList(codes)
 
-      const news_query = `select TickerTitle as code, Title as title, Date as date from macroEconomic.dbo.TinTuc where TickerTitle in (${codes.map(item => `'${item}'`).join(',')}) order by Date desc`
+      const news_query = `select TickerTitle as code, Title as title, Date as date, Img as img, Href as href from macroEconomic.dbo.TinTuc where TickerTitle in (${codes.map(item => `'${item}'`).join(',')}) order by Date desc`
 
       const data_2 = await Promise.all(
         codes.map(item => this.reportService.technicalIndex(item))
@@ -173,7 +173,12 @@ export class WatchlistService {
           buyVol: 0,
           buyVal: 0
         }),
-        news: data_news.filter(news => news.code == item.code).map(new_item => ({title: new_item.title, date: UtilCommonTemplate.toDate(new_item.date)}))
+        news: data_news.filter(news => news.code == item.code).map(new_item => ({
+          title: new_item.title, 
+          href: new_item.href,
+          img: new_item.img,
+          date: UtilCommonTemplate.toDate(new_item.date)
+        }))
       })))
     } catch (e) {
       throw new CatchException(e)

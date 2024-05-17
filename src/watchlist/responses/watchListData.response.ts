@@ -28,6 +28,16 @@ class INews {
         type: String
     })
     date: string
+
+    @ApiProperty({
+        type: String
+    })
+    img: string
+
+    @ApiProperty({
+        type: String
+    })
+    href: string
 }
 export class WatchListDataResponse {
     @ApiProperty({
