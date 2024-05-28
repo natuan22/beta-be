@@ -52,8 +52,71 @@ export class FilterService {
       and i.status = 'listed'
       `
 
-      const data = await this.mssqlService.query<FilterResponse[]>(query)
-      return FilterResponse.mapToList(data)
+      //Query lấy totalVol trung bình
+      const query_2 = `
+      with last_date as (
+          select top 1 date from marketTrade.dbo.tickerTradeVND where type = 'STOCK' order by date desc
+      ),
+      day_5 as (select avg(totalVol) as avg_totalVol_5d, code
+                from marketTrade.dbo.tickerTradeVND
+                where type = 'STOCK'
+                  and date >= dateadd(day, -5, (select date from last_date))
+                group by code
+                ),
+          day_10 as (select avg(totalVol) as avg_totalVol_10d, code
+                from marketTrade.dbo.tickerTradeVND
+                where type = 'STOCK'
+                  and date >= dateadd(day, -10, (select date from last_date))
+                group by code
+                ),
+          day_20 as (select avg(totalVol) as avg_totalVol_20d, code
+                from marketTrade.dbo.tickerTradeVND
+                where type = 'STOCK'
+                  and date >= dateadd(day, -20, (select date from last_date))
+                group by code
+                ),
+          day_60 as (select avg(totalVol) as avg_totalVol_60d, code
+                from marketTrade.dbo.tickerTradeVND
+                where type = 'STOCK'
+                  and date >= dateadd(day, -60, (select date from last_date))
+                group by code
+                )
+      select d5.code, d5.avg_totalVol_5d, d10.avg_totalVol_10d, d20.avg_totalVol_20d, d60.avg_totalVol_60d from day_5 d5
+      inner join day_10 d10 on d10.code = d5.code
+      inner join day_20 d20 on d20.code = d5.code
+      inner join day_60 d60 on d60.code = d5.code
+      `
+
+      const query_3 = `
+      with yearQuarter4 as (
+          select avg(grossProfitMargin) as grossProfitMargin4Q,
+                avg(netProfitMargin) as netProfitMargin4Q,
+                avg(EBITDAMargin) as EBITDAMargin4Q,
+                code
+          from financialReport.dbo.calBCTC where yearQuarter in (select distinct top 4 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
+                                          group by code
+      )
+      select c.code,
+            grossProfitMargin,
+            y.grossProfitMargin4Q,
+            netProfitMargin,
+            y.netProfitMargin4Q,
+            EBITDAMargin,
+            y.EBITDAMargin4Q,
+            currentRatio,
+            quickRatio,
+            interestCoverageRatio,
+              DE,
+              totalDebtToTotalAssets,
+              ROE,
+              ROA,
+              ATR
+      from financialReport.dbo.calBCTC c inner join yearQuarter4 y on y.code = c.code
+      where yearQuarter = (select top 1 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
+      `
+
+      const [data, data_2, data_3] = await Promise.all([this.mssqlService.query<FilterResponse[]>(query), this.mssqlService.query(query_2), this.mssqlService.query(query_3)]) 
+      return FilterResponse.mapToList(data, data_2, data_3)
     } catch (e) {
       throw new CatchException(e)
     }

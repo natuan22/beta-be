@@ -104,6 +104,24 @@ export class FilterResponse {
     macd_dang_o_tren_duong_0: number
     macd_cat_xuong_duong_0: number
     macd_dang_o_duoi_duong_0: number
+    avg_totalVol_5d: number
+    avg_totalVol_10d: number
+    avg_totalVol_20d: number
+    avg_totalVol_60d: number
+    grossProfitMargin: number
+    grossProfitMargin4Q: number
+    netProfitMargin: number
+    netProfitMargin4Q: number
+    EBITDAMargin: number
+    EBITDAMargin4Q: number
+    currentRatio: number
+    quickRatio: number
+    interestCoverageRatio: number
+    DE: number
+    totalDebtToTotalAssets: number
+    ROE: number
+    ROA: number
+    ATR: number
 
     constructor(data?: FilterResponse) {
         this.code = data?.code || ''
@@ -178,9 +196,27 @@ export class FilterResponse {
         this.macd_dang_o_tren_duong_0 = data?.macd_dang_o_tren_duong_0 || 0
         this.macd_cat_xuong_duong_0 = data?.macd_cat_xuong_duong_0 || 0
         this.macd_dang_o_duoi_duong_0 = data?.macd_dang_o_duoi_duong_0 || 0
+        this.avg_totalVol_5d = data?.avg_totalVol_5d || 0
+        this.avg_totalVol_10d = data?.avg_totalVol_10d || 0
+        this.avg_totalVol_20d = data?.avg_totalVol_20d || 0
+        this.avg_totalVol_60d = data?.avg_totalVol_60d || 0
+        this.grossProfitMargin = data?.grossProfitMargin || 0
+        this.grossProfitMargin4Q = data?.grossProfitMargin4Q || 0
+        this.netProfitMargin = data?.netProfitMargin || 0
+        this.netProfitMargin4Q = data?.netProfitMargin4Q || 0
+        this.EBITDAMargin = data?.EBITDAMargin || 0
+        this.EBITDAMargin4Q = data?.EBITDAMargin4Q || 0
+        this.currentRatio = data?.currentRatio || 0
+        this.quickRatio = data?.quickRatio || 0
+        this.interestCoverageRatio = data?.interestCoverageRatio || 0
+        this.DE = data?.DE || 0
+        this.totalDebtToTotalAssets = data?.totalDebtToTotalAssets || 0
+        this.ROE = data?.ROE || 0
+        this.ROA = data?.ROA || 0
+        this.ATR = data?.ATR || 0
     }
 
-    static mapToList(data?: FilterResponse[]) {
+    static mapToList(data: FilterResponse[], data_1: any, data_2: any) {
         return data.map(item => new FilterResponse(
             {
                 ...item,
@@ -206,7 +242,9 @@ export class FilterResponse {
                     item.ma50_pre,
                 ),
                 ...this.calculateRSI(item.rsi, item.rsi_pre),
-                ...this.calculateMACD(item.macd, item.macd_pre, item.macd_signal, item.macd_signal_pre)
+                ...this.calculateMACD(item.macd, item.macd_pre, item.macd_signal, item.macd_signal_pre),
+                ...data_1.find(vol => vol.code == item.code),
+                ...data_2.find(margin => margin.code == item.code)
             }
         ))
     }
