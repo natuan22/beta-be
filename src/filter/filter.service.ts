@@ -18,7 +18,7 @@ export class FilterService {
               lead(closePrice) over (partition by code order by date desc) as closePrice_pre,
               min_1_week, max_1_week, min_1_month, max_1_month, min_3_month, max_3_month, min_6_month, max_6_month, min_1_year, max_1_year,
               perChange1D, perChange5D, perChange1M, perChange3M, perChange6M, perChange1Y, beta,
-              volume, TyLeKLMBCD, KNnetVal, KNnetVol,
+              volume as totalVol, TyLeKLMBCD, KNnetVal, KNnetVol,
               ma5, ma10, ma20, ma50, ma100, ma200, ema5, ema10, ema20, ema50, ema100, ema200,
               lead(ma5) over (partition by code order by date desc) as ma5_pre,
               lead(ma10) over (partition by code order by date desc) as ma10_pre,
@@ -46,9 +46,10 @@ export class FilterService {
               EPS, BVPS, PE, PB, PS, marketCap,
               date
       from VISUALIZED_DATA.dbo.filterResource where date in (select distinct top 2 date from VISUALIZED_DATA.dbo.filterResource order by date desc))
-      select t.*, i.LV4 from temp t
+      select t.*, m.totalVal, i.LV4 from temp t
       inner join marketInfor.dbo.info i on i.code = t.code
-      where date = (select max(date) from temp)
+      inner join marketTrade.dbo.tickerTradeVND m on m.code = t.code and m.date = t.date
+      where t.date = (select max(date) from temp)
       and i.status = 'listed'
       `
 

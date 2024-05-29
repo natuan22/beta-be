@@ -21,7 +21,8 @@ export class FilterResponse {
     perChange6M: number
     perChange1Y: number
     beta: number
-    volume: number
+    totalVol: number
+    totalVal: number
     TyLeKLMBCD: number
     KNnetVal: number
     KNnetVol: number
@@ -145,12 +146,13 @@ export class FilterResponse {
         this.perChange6M = data?.perChange6M || 0
         this.perChange1Y = data?.perChange1Y || 0
         this.beta = data?.beta || 0
-        this.volume = data?.volume || 0
+        this.totalVol = data?.totalVol || 0
+        this.totalVal = data?.totalVal || 0
         this.TyLeKLMBCD = data?.TyLeKLMBCD || 0
         this.KNnetVal = data?.KNnetVal || 0
         this.KNnetVol = data?.KNnetVol || 0
-        this.doanh_thu_4_quy = data?.doanh_thu_4_quy || 0
-        this.loi_nhuan_4_quy = data?.loi_nhuan_4_quy || 0
+        this.doanh_thu_4_quy = data?.doanh_thu_4_quy / 1000000000 || 0
+        this.loi_nhuan_4_quy = data?.loi_nhuan_4_quy / 1000000000 || 0
         this.tang_truong_doanh_thu_4_quy = data?.tang_truong_doanh_thu_4_quy || 0
         this.tang_truong_loi_nhuan_4_quy = data?.tang_truong_loi_nhuan_4_quy || 0
         this.qoq_doanh_thu = data?.qoq_doanh_thu || 0
