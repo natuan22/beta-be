@@ -20,6 +20,7 @@ export class FilterResponse {
     perChange3M: number
     perChange6M: number
     perChange1Y: number
+    perChangeYTD: number
     beta: number
     totalVol: number
     totalVal: number
@@ -145,6 +146,7 @@ export class FilterResponse {
         this.perChange3M = data?.perChange3M || 0
         this.perChange6M = data?.perChange6M || 0
         this.perChange1Y = data?.perChange1Y || 0
+        this.perChangeYTD = data?.perChangeYTD || 0
         this.beta = data?.beta || 0
         this.totalVol = data?.totalVol || 0
         this.totalVal = data?.totalVal || 0
