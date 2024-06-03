@@ -25,7 +25,6 @@ export class WatchListEntity extends BaseModel {
 
     @Column({
         type: 'nvarchar',
-        length: '255'
     })
     code: string
 }
