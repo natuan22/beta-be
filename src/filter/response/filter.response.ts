@@ -149,6 +149,11 @@ export class FilterResponse {
     tech: string
     trend: string
     overview: string
+    VongQuayTaiSanNganHan: number
+    VongQuayCacKhoanPhaiThu: number
+    VongQuayHangTonKho: number
+    NoTraLaiDivVonChuSoHuu: number
+    NoTraLaiDivTongTaiSan: number
 
     constructor(data?: FilterResponse) {
         this.code = data?.code || ''
@@ -179,7 +184,7 @@ export class FilterResponse {
         this.perChangeYTD = data?.perChangeYTD || 0
         this.beta = data?.beta || 0
         this.totalVol = data?.totalVol || 0
-        this.totalVal = data?.totalVal || 0
+        this.totalVal = data?.totalVal / 1000000000 || 0
         this.TyLeKLMBCD = data?.TyLeKLMBCD || 0
         this.KNnetVal = data?.KNnetVal || 0
         this.KNnetVol = data?.KNnetVol || 0
@@ -257,6 +262,11 @@ export class FilterResponse {
         this.technicalSignal = this.genStar(data?.tech)
         this.trendSignal = this.genStar(data?.trend)
         this.generalSignal = this.genStar(data?.overview)
+        this.VongQuayTaiSanNganHan = data?.VongQuayTaiSanNganHan || 0
+        this.VongQuayCacKhoanPhaiThu = data?.VongQuayCacKhoanPhaiThu || 0
+        this.VongQuayHangTonKho = data?.VongQuayHangTonKho || 0
+        this.NoTraLaiDivVonChuSoHuu = data?.NoTraLaiDivVonChuSoHuu || 0
+        this.NoTraLaiDivTongTaiSan = data?.NoTraLaiDivTongTaiSan || 0
     }
 
     static mapToList(data: FilterResponse[], data_1: any, data_2: any) {
@@ -437,5 +447,5 @@ export class FilterResponse {
         }
     }
 
-    
+
 }

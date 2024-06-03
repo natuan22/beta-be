@@ -62,8 +62,7 @@ export class FilterService {
       )
       select t.*, m.totalVal, i.LV4,
       r.netVal as buyVal, r.netVol as buyVol,
-      b.MB, b.Mua, b.Ban,
-      c.ROE, c.ROA, c.grossProfitMargin as grossProfitMarginQuarter, c.netProfitMargin as netProfitMarginQuarter, y.grossProfitMargin as grossProfitMarginYear, y.netProfitMargin as netProfitMarginYear,
+      b.MB, b.Mua, b.Ban,      
       n.ROE as ROENH, n.ROA as ROANH,
       l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
       from temp t
@@ -71,7 +70,6 @@ export class FilterService {
       inner join marketTrade.dbo.tickerTradeVND m on m.code = t.code and m.date = t.date
       inner join PHANTICH.dbo.MBChuDong b on b.MCK = t.code and b.Ngay = (select max(Ngay) from PHANTICH.dbo.MBChuDong)
       inner join marketTrade.dbo.[foreign] r on r.code = t.code and r.date = (select max(date) from marketTrade.dbo.[foreign] where type = 'STOCK')
-      left join financialReport.dbo.calBCTC c on c.code = t.code and c.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC)
       left join financialReport.dbo.calBCTC y on y.code = t.code and y.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC where right(yearQuarter, 1) = 0)
       left join financialReport.dbo.calBCTCNH n on n.code = t.code and n.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTCNH)
       left join min_max l on l.code = t.code
@@ -116,20 +114,20 @@ export class FilterService {
 
       const query_3 = `
       with yearQuarter4 as (
-          select avg(grossProfitMargin) as grossProfitMargin4Q,
-                avg(netProfitMargin) as netProfitMargin4Q,
-                avg(EBITDAMargin) as EBITDAMargin4Q,
+          select avg(grossProfitMargin) as grossProfitMarginQuarter,
+                avg(netProfitMargin) as netProfitMarginQuarter,
+                avg(EBITDAMargin) as EBITDAMarginQuarter,
                 code
           from financialReport.dbo.calBCTC where yearQuarter in (select distinct top 4 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
                                           group by code
       )
       select c.code,
-            grossProfitMargin,
-            y.grossProfitMargin4Q,
-            netProfitMargin,
-            y.netProfitMargin4Q,
+            grossProfitMargin as grossProfitMarginYear,
+            y.grossProfitMarginQuarter,
+            netProfitMargin as netProfitMarginYear,
+            y.netProfitMarginQuarter,
             EBITDAMargin,
-            y.EBITDAMargin4Q,
+            y.EBITDAMarginQuarter,
             currentRatio,
             quickRatio,
             interestCoverageRatio,
@@ -137,7 +135,8 @@ export class FilterService {
               totalDebtToTotalAssets,
               ROE,
               ROA,
-              ATR
+              ATR,
+              c.VongQuayTaiSanNganHan, c.VongQuayCacKhoanPhaiThu, c.VongQuayHangTonKho, c.NoTraLaiDivVonChuSoHuu, c.NoTraLaiDivTongTaiSan
       from financialReport.dbo.calBCTC c inner join yearQuarter4 y on y.code = c.code
       where yearQuarter = (select top 1 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
       `
