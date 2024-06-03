@@ -144,7 +144,7 @@ export class FilterService {
 
       const [data, data_2, data_3] = await Promise.all([this.mssqlService.query<FilterResponse[]>(query), this.mssqlService.query(query_2), this.mssqlService.query(query_3)]) 
       const dataMapped = FilterResponse.mapToList(data, data_2, data_3)
-      await this.redis.set('filter2', dataMapped, {ttl: 1000})
+      await this.redis.set('filter2', dataMapped, {ttl: 60})
       return dataMapped
     } catch (e) {
       throw new CatchException(e)
