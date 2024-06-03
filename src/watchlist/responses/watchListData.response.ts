@@ -255,7 +255,7 @@ export class WatchListDataResponse {
         this.perChangeM = data?.perChangeM || 0
         this.perChangeY = data?.perChangeY || 0
         this.perChangeYtD = data?.perChangeYtD || 0
-        this.buyVol = data?.buyVol / 1000000000 || 0
+        this.buyVol = data?.buyVol || 0
         this.buyVal = data?.buyVal / 1000000000 || 0
         this.Mua = data?.Mua || 0
         this.Ban = data?.Ban || 0

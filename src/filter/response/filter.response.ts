@@ -155,7 +155,7 @@ export class FilterResponse {
         this.floor = data?.floor || ''
         this.TyleNDTNNdangnamgiu = data?.TyleNDTNNdangnamgiu ? data?.TyleNDTNNdangnamgiu / 0.01 : 0
         this.closePrice = data?.closePrice || 0
-        this.buyVol = data?.buyVol / 1000000000 || 0
+        this.buyVol = data?.buyVol || 0
         this.buyVal = data?.buyVal / 1000000000 || 0
         this.Mua = data?.Mua || 0
         this.Ban = data?.Ban || 0
