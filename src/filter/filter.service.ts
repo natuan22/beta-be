@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { CACHE_MANAGER, Inject, Injectable } from '@nestjs/common';
+import { Cache } from 'cache-manager';
+import * as moment from 'moment';
 import { CatchException } from '../exceptions/common.exception';
 import { MssqlService } from '../mssql/mssql.service';
 import { FilterResponse } from './response/filter.response';
@@ -6,11 +8,17 @@ import { FilterResponse } from './response/filter.response';
 @Injectable()
 export class FilterService {
   constructor(
-    private readonly mssqlService: MssqlService
+    private readonly mssqlService: MssqlService,
+    @Inject(CACHE_MANAGER)
+    private readonly redis: Cache
   ) { }
 
   async get() {
     try {
+      const redisData = await this.redis.get('filter2')
+      if(redisData) return redisData
+
+      const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
       with temp as (select code, floor,
               TyleNDTNNdangnamgiu,
@@ -44,11 +52,29 @@ export class FilterService {
               qoq_doanh_thu, qoq_loi_nhuan,
               yoy_doanh_thu, yoy_loi_nhuan,
               EPS, BVPS, PE, PB, PS, marketCap,
+              TinHieuChiBaoKyThuat as tech,
+              TinHieuDuongXuHuong as trend,
+              TinHieuTongHop as overview,
               date
-      from VISUALIZED_DATA.dbo.filterResource where date in (select distinct top 2 date from VISUALIZED_DATA.dbo.filterResource order by date desc))
-      select t.*, m.totalVal, i.LV4 from temp t
+      from VISUALIZED_DATA.dbo.filterResource where date in (select distinct top 2 date from VISUALIZED_DATA.dbo.filterResource order by date desc)),
+      min_max as (
+        select code, min(closePrice) as PRICE_LOWEST_CR_52W, max(closePrice) as PRICE_HIGHEST_CR_52W from marketTrade.dbo.tickerTradeVND where date >= '${day_52_week}' group by code
+      )
+      select t.*, m.totalVal, i.LV4,
+      r.netVal as buyVal, r.netVol as buyVol,
+      b.MB, b.Mua, b.Ban,
+      c.ROE, c.ROA, c.grossProfitMargin as grossProfitMarginQuarter, c.netProfitMargin as netProfitMarginQuarter, y.grossProfitMargin as grossProfitMarginYear, y.netProfitMargin as netProfitMarginYear,
+      n.ROE as ROENH, n.ROA as ROANH,
+      l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
+      from temp t
       inner join marketInfor.dbo.info i on i.code = t.code
       inner join marketTrade.dbo.tickerTradeVND m on m.code = t.code and m.date = t.date
+      inner join PHANTICH.dbo.MBChuDong b on b.MCK = t.code and b.Ngay = (select max(Ngay) from PHANTICH.dbo.MBChuDong)
+      inner join marketTrade.dbo.[foreign] r on r.code = t.code and r.date = (select max(date) from marketTrade.dbo.[foreign] where type = 'STOCK')
+      left join financialReport.dbo.calBCTC c on c.code = t.code and c.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC)
+      left join financialReport.dbo.calBCTC y on y.code = t.code and y.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC where right(yearQuarter, 1) = 0)
+      left join financialReport.dbo.calBCTCNH n on n.code = t.code and n.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTCNH)
+      left join min_max l on l.code = t.code
       where t.date = (select max(date) from temp)
       and i.status = 'listed'
       `
@@ -117,7 +143,9 @@ export class FilterService {
       `
 
       const [data, data_2, data_3] = await Promise.all([this.mssqlService.query<FilterResponse[]>(query), this.mssqlService.query(query_2), this.mssqlService.query(query_3)]) 
-      return FilterResponse.mapToList(data, data_2, data_3)
+      const dataMapped = FilterResponse.mapToList(data, data_2, data_3)
+      await this.redis.set('filter2', dataMapped, {ttl: 1000})
+      return dataMapped
     } catch (e) {
       throw new CatchException(e)
     }

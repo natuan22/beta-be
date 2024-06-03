@@ -1,3 +1,11 @@
+class ISignal {
+    positive: number
+
+    negative: number
+
+    neutral: number
+}
+
 export class FilterResponse {
     code: string
     floor: string
@@ -124,12 +132,34 @@ export class FilterResponse {
     ROE: number
     ROA: number
     ATR: number
+    buyVol: number
+    buyVal: number
+    Mua: number
+    Ban: number
+    MB: number
+    grossProfitMarginQuarter: number
+    netProfitMarginQuarter: number
+    grossProfitMarginYear: number
+    netProfitMarginYear: number
+    PRICE_HIGHEST_CR_52W: number
+    PRICE_LOWEST_CR_52W: number
+    technicalSignal: ISignal
+    trendSignal: ISignal
+    generalSignal: ISignal
+    tech: string
+    trend: string
+    overview: string
 
     constructor(data?: FilterResponse) {
         this.code = data?.code || ''
         this.floor = data?.floor || ''
         this.TyleNDTNNdangnamgiu = data?.TyleNDTNNdangnamgiu ? data?.TyleNDTNNdangnamgiu / 0.01 : 0
         this.closePrice = data?.closePrice || 0
+        this.buyVol = data?.buyVol / 1000000000 || 0
+        this.buyVal = data?.buyVal / 1000000000 || 0
+        this.Mua = data?.Mua || 0
+        this.Ban = data?.Ban || 0
+        this.MB = data?.MB || 0
         this.min_1_week = data?.min_1_week || 0
         this.max_1_week = data?.max_1_week || 0
         this.min_1_month = data?.min_1_month || 0
@@ -161,6 +191,12 @@ export class FilterResponse {
         this.qoq_loi_nhuan = data?.qoq_loi_nhuan || 0
         this.yoy_doanh_thu = data?.yoy_doanh_thu || 0
         this.yoy_loi_nhuan = data?.yoy_loi_nhuan || 0
+        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter * 100 || 0
+        this.netProfitMarginQuarter = data?.netProfitMarginQuarter * 100 || 0
+        this.grossProfitMarginYear = data?.grossProfitMarginYear * 100 || 0
+        this.netProfitMarginYear = data?.netProfitMarginYear * 100 || 0
+        this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
+        this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.EPS = data?.EPS || 0
         this.BVPS = data?.BVPS || 0
         this.PE = data?.PE || 0
@@ -218,6 +254,9 @@ export class FilterResponse {
         this.ROE = data?.ROE || 0
         this.ROA = data?.ROA || 0
         this.ATR = data?.ATR || 0
+        this.technicalSignal = this.genStar(data?.tech)
+        this.trendSignal = this.genStar(data?.trend)
+        this.generalSignal = this.genStar(data?.overview)
     }
 
     static mapToList(data: FilterResponse[], data_1: any, data_2: any) {
@@ -381,4 +420,22 @@ export class FilterResponse {
             macd_dang_o_duoi_duong_0: macd < 0 ? 1 : 0,
         }
     }
+
+    private genStar(str?: string): ISignal {
+        if (!str) {
+            return {
+                negative: 0,
+                neutral: 0,
+                positive: 0,
+            }
+        }
+        const star = str.split('-')
+        return {
+            negative: +star[0],
+            neutral: +star[1],
+            positive: +star[2],
+        }
+    }
+
+    
 }

@@ -255,8 +255,8 @@ export class WatchListDataResponse {
         this.perChangeM = data?.perChangeM || 0
         this.perChangeY = data?.perChangeY || 0
         this.perChangeYtD = data?.perChangeYtD || 0
-        this.buyVol = data?.buyVol || 0
-        this.buyVal = data?.buyVal || 0
+        this.buyVol = data?.buyVol / 1000000000 || 0
+        this.buyVal = data?.buyVal / 1000000000 || 0
         this.Mua = data?.Mua || 0
         this.Ban = data?.Ban || 0
         this.MB = data?.MB || 0
@@ -267,10 +267,10 @@ export class WatchListDataResponse {
         this.BVPS = data?.BVPS || 0
         this.ROE = data?.ROE || data?.ROENH || 0
         this.ROA = data?.ROA || data?.ROENH || 0
-        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter || 0
-        this.netProfitMarginQuarter = data?.netProfitMarginQuarter || 0
-        this.grossProfitMarginYear = data?.grossProfitMarginYear || 0
-        this.netProfitMarginYear = data?.netProfitMarginYear || 0
+        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter * 100 || 0
+        this.netProfitMarginQuarter = data?.netProfitMarginQuarter * 100 || 0
+        this.grossProfitMarginYear = data?.grossProfitMarginYear * 100 || 0
+        this.netProfitMarginYear = data?.netProfitMarginYear * 100 || 0
         this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
         this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.beta = data?.beta || 0
