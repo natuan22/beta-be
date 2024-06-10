@@ -32,6 +32,7 @@ import { StockModule } from './stock/stock.module';
 import { UserEntity } from './user/entities/user.entity';
 import { UserModule } from './user/user.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
+import { FilterModule } from './filter/filter.module';
 
 @Module({
   imports: [
@@ -101,7 +102,8 @@ import { WatchlistModule } from './watchlist/watchlist.module';
     SharesModule,
     InvestmentModule,
     HttpConfigModule,
-    WatchlistModule
+    WatchlistModule,
+    FilterModule
   ],
 })
 export class AppModule implements NestModule {
