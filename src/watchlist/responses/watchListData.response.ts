@@ -263,10 +263,10 @@ export class WatchListDataResponse {
         this.BVPS = data?.BVPS || 0
         this.ROE = data?.ROE || 0
         this.ROA = data?.ROA || 0
-        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter || 0
-        this.netProfitMarginQuarter = data?.netProfitMarginQuarter || 0
-        this.grossProfitMarginYear = data?.grossProfitMarginYear || 0
-        this.netProfitMarginYear = data?.netProfitMarginYear || 0
+        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter * 100 || 0
+        this.netProfitMarginQuarter = data?.netProfitMarginQuarter * 100 || 0
+        this.grossProfitMarginYear = data?.grossProfitMarginYear * 100 || 0
+        this.netProfitMarginYear = data?.netProfitMarginYear * 100 || 0
         this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
         this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.beta = data?.beta || 0
