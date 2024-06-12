@@ -117,8 +117,8 @@ export class SharesService {
              ROE as roae,
              ROA as roaa,
              yearQuarter
-from RATIO.dbo.ratioInYearQuarter
-where code = '${stock}' and right(yearQuarter, 1) <> 0
+    from RATIO.dbo.ratioInYearQuarter
+    where code = '${stock}' and right(yearQuarter, 1) <> 0
     ),
     sum_roaa as (
       select roaa +

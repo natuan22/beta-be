@@ -16,7 +16,7 @@ export class FilterService {
   async get() {
     try {
       const redisData = await this.redis.get('filter2')
-      if(redisData) return redisData
+      if (redisData) return redisData
 
       const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
@@ -62,16 +62,13 @@ export class FilterService {
       )
       select t.*, m.totalVal, i.LV4,
       r.netVal as buyVal, r.netVol as buyVol,
-      b.MB, b.Mua, b.Ban,      
-      n.ROE as ROENH, n.ROA as ROANH,
+      b.MB, b.Mua, b.Ban,  
       l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
       from temp t
       inner join marketInfor.dbo.info i on i.code = t.code
       inner join marketTrade.dbo.tickerTradeVND m on m.code = t.code and m.date = t.date
       inner join PHANTICH.dbo.MBChuDong b on b.MCK = t.code and b.Ngay = (select max(Ngay) from PHANTICH.dbo.MBChuDong)
       inner join marketTrade.dbo.[foreign] r on r.code = t.code and r.date = (select max(date) from marketTrade.dbo.[foreign] where type = 'STOCK')
-      left join financialReport.dbo.calBCTC y on y.code = t.code and y.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTC where right(yearQuarter, 1) = 0)
-      left join financialReport.dbo.calBCTCNH n on n.code = t.code and n.yearQuarter = (select max(yearQuarter) from financialReport.dbo.calBCTCNH)
       left join min_max l on l.code = t.code
       where t.date = (select max(date) from temp)
       and i.status = 'listed'
@@ -133,22 +130,56 @@ export class FilterService {
             interestCoverageRatio,
               DE,
               totalDebtToTotalAssets,
-              ROE,
-              ROA,
               ATR,
               c.VongQuayTaiSanNganHan, c.VongQuayCacKhoanPhaiThu, c.VongQuayHangTonKho, c.NoTraLaiDivVonChuSoHuu, c.NoTraLaiDivTongTaiSan
       from financialReport.dbo.calBCTC c inner join yearQuarter4 y on y.code = c.code
       where yearQuarter = (select top 1 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
       `
 
-      const [data, data_2, data_3] = await Promise.all([this.mssqlService.query<FilterResponse[]>(query), this.mssqlService.query(query_2), this.mssqlService.query(query_3)]) 
-      const dataMapped = FilterResponse.mapToList(data, data_2, data_3)
-      await this.redis.set('filter2', dataMapped, {ttl: 60})
+      //roe, roa
+      const query_4 = `
+      with roae as (
+        select code,
+               ROE as roae,
+               ROA as roaa,
+               yearQuarter
+      from RATIO.dbo.ratioInYearQuarter
+      where right(yearQuarter, 1) <> 0
+      ),
+      sum_roaa as (
+        select roaa +
+        lead(roaa) over (partition by code order by yearQuarter desc)
+        + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+         + lead(roaa, 3) over (partition by code order by yearQuarter desc)
+        as roaa,
+          roae +
+              lead(roae) over (partition by code order by yearQuarter desc)
+              + lead(roae, 2) over (partition by code order by yearQuarter desc)
+              + lead(roae, 3) over (partition by code order by yearQuarter desc)
+        as roae, code, yearQuarter
+        from roae
+      ),
+        roaa
+      AS (
+        select code, roaa as ROA, roae as ROE from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa)
+      )
+        select * from roaa
+      `;
+
+      const [data, data_2, data_3, data_4] = await Promise.all(
+        [
+          this.mssqlService.query<FilterResponse[]>(query),
+        this.mssqlService.query(query_2),
+        this.mssqlService.query(query_3),
+        this.mssqlService.query(query_4)
+        ])
+      const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4)
+      await this.redis.set('filter2', dataMapped, { ttl: 60 })
       return dataMapped
     } catch (e) {
       throw new CatchException(e)
     }
   }
 
-  
+
 }

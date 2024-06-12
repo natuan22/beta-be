@@ -269,7 +269,7 @@ export class FilterResponse {
         this.NoTraLaiDivTongTaiSan = data?.NoTraLaiDivTongTaiSan || 0
     }
 
-    static mapToList(data: FilterResponse[], data_1: any, data_2: any) {
+    static mapToList(data: FilterResponse[], data_1: any, data_2: any, data_4: any) {
         return data.map(item => new FilterResponse(
             {
                 ...item,
@@ -297,7 +297,8 @@ export class FilterResponse {
                 ...this.calculateRSI(item.rsi, item.rsi_pre),
                 ...this.calculateMACD(item.macd, item.macd_pre, item.macd_signal, item.macd_signal_pre),
                 ...data_1.find(vol => vol.code == item.code),
-                ...data_2.find(margin => margin.code == item.code)
+                ...data_2.find(margin => margin.code == item.code),
+                ...data_4.find(roa => roa.code == item.code)
             }
         ))
     }

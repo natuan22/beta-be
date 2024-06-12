@@ -192,10 +192,6 @@ export class WatchListDataResponse {
     })
     netProfitMarginYear: number
 
-    ROENH: number
-
-    ROANH: number
-
     @ApiProperty({
         type: Number,
         description: 'Giá cao nhất 52 tuần'
@@ -265,8 +261,8 @@ export class WatchListDataResponse {
         this.PB = data?.PB || 0
         this.marketCap = data?.marketCap || 0
         this.BVPS = data?.BVPS || 0
-        this.ROE = data?.ROE || data?.ROENH || 0
-        this.ROA = data?.ROA || data?.ROENH || 0
+        this.ROE = data?.ROE || 0
+        this.ROA = data?.ROA || 0
         this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter || 0
         this.netProfitMarginQuarter = data?.netProfitMarginQuarter || 0
         this.grossProfitMarginYear = data?.grossProfitMarginYear || 0
@@ -274,12 +270,9 @@ export class WatchListDataResponse {
         this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
         this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.beta = data?.beta || 0
-        // this.technicalSignal = this.genStar(data?.tech)
-        // this.trendSignal = this.genStar(data?.trend)
-        // this.generalSignal = this.genStar(data?.overview)
-        this.technicalSignal = data?.tech 
-        this.trendSignal = data?.trend 
-        this.generalSignal = data?.overview
+        this.technicalSignal = this.genStar(data?.tech)
+        this.trendSignal = this.genStar(data?.trend)
+        this.generalSignal = this.genStar(data?.overview)
         this.news = data?.news
     }
 
