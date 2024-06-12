@@ -256,8 +256,8 @@ export class FilterResponse {
         this.interestCoverageRatio = data?.interestCoverageRatio || 0
         this.DE = data?.DE || 0
         this.totalDebtToTotalAssets = data?.totalDebtToTotalAssets || 0
-        this.ROE = data?.ROE * 100 || 0
-        this.ROA = data?.ROA * 100 || 0
+        this.ROE = data?.ROE || 0
+        this.ROA = data?.ROA || 0
         this.ATR = data?.ATR || 0
         this.technicalSignal = this.genStar(data?.tech)
         this.trendSignal = this.genStar(data?.trend)
