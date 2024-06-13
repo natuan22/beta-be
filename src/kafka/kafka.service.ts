@@ -685,7 +685,9 @@ export class KafkaService {
   handleChartNen(payload: ChartNenInterface[]) {
     payload.map(item => {
       this.send(`${SocketEmit.CoPhieu}-${item.code}`, {
-        ...item, time: Date.UTC(
+        ...item, 
+        totalVal: item.totalVal / 1000000000,
+        time: Date.UTC(
           new Date().getFullYear(),
           new Date().getMonth(),
           new Date().getDate(),
