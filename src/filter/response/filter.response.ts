@@ -196,10 +196,10 @@ export class FilterResponse {
         this.qoq_loi_nhuan = data?.qoq_loi_nhuan || 0
         this.yoy_doanh_thu = data?.yoy_doanh_thu || 0
         this.yoy_loi_nhuan = data?.yoy_loi_nhuan || 0
-        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter * 100 || 0
-        this.netProfitMarginQuarter = data?.netProfitMarginQuarter * 100 || 0
-        this.grossProfitMarginYear = data?.grossProfitMarginYear * 100 || 0
-        this.netProfitMarginYear = data?.netProfitMarginYear * 100 || 0
+        this.grossProfitMarginQuarter = data?.grossProfitMarginQuarter || 0
+        this.netProfitMarginQuarter = data?.netProfitMarginQuarter || 0
+        this.grossProfitMarginYear = data?.grossProfitMarginYear || 0
+        this.netProfitMarginYear = data?.netProfitMarginYear || 0
         this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0
         this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0
         this.EPS = data?.EPS || 0
