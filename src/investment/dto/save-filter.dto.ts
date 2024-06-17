@@ -19,7 +19,7 @@ export class ValueSaveFilter {
 }
 
 export class SaveFilterDto {
-    @IsString()
+    @IsNotEmpty()
     @ApiProperty({
         type: String,
         description: 'Tên bộ lọc'
