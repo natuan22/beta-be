@@ -505,10 +505,15 @@ export class InvestmentService {
   }
 
   async test(stock: string, from: string, to: string){
-    const [data, date] = await Promise.all([this.mssqlService.query(`select closePrice, date from marketTrade.dbo.historyTicker where code = '${stock}' order by date asc`) as any, this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`)])
+    const [data, date, dateTo] = await Promise.all([
+      this.mssqlService.query(`select closePrice, date from marketTrade.dbo.historyTicker where code = '${stock}' order by date asc`) as any, 
+      this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
+      this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
+    ])
     const price = data.map(item => item.closePrice)
     const dateFormat = data.map(item => ({...item, date: UtilCommonTemplate.toDateV2(item.date)}))
-    const indexDate = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
+    const indexDateFrom = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
+    const indexDateTo = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date))
     
     const arr = []
 
@@ -523,15 +528,15 @@ export class InvestmentService {
       let total = 1
       let min = 0, max = 0
 
-      const dataWithMa = [...newData].reverse().slice(indexDate)
+      const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
       
       dataWithMa.map((item, index) => {
-        if((item.closePrice > item.ma) && !isBuy){
+        if(dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma) && !isBuy){
           isBuy = true
           indexBuy = index 
           count += 1
         }
-        if((item.closePrice < item.ma) && isBuy){
+        if((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma) && isBuy) || (index == (dataWithMa.length - 1) && isBuy)){
           isBuy = false
           const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
 
@@ -544,7 +549,7 @@ export class InvestmentService {
       arr.push({
         name: `MA_${i}`,
         total: total - 1,
-        count: !isBuy ? count : count - 1,
+        count: count,
         min,
         max
       })
