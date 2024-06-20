@@ -9,6 +9,7 @@ import { TimeToLive } from '../enums/common.enum';
 import { RedisKeys } from '../enums/redis-keys.enum';
 import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
 import { MssqlService } from '../mssql/mssql.service';
+import { ReportService } from '../report/report.service';
 import { UtilCommonTemplate } from '../utils/utils.common';
 import { EmulatorInvestmentDto } from './dto/emulator.dto';
 import { InvestmentFilterDto } from './dto/investment-filter.dto';
@@ -26,7 +27,7 @@ export class InvestmentService {
     private readonly mssqlService: MssqlService,
     @Inject(CACHE_MANAGER)
     private readonly redis: Cache,
-    @InjectRepository(FilterUserEntity, DB_SERVER) private readonly filterUserRepo: Repository<FilterUserEntity>
+    @InjectRepository(FilterUserEntity, DB_SERVER) private readonly filterUserRepo: Repository<FilterUserEntity>,
   ) { }
 
 
@@ -501,5 +502,59 @@ export class InvestmentService {
     results.push(previousEndDate.format('YYYY-MM-DD'));
 
     return this.getMonth(count - 1, previousEndDate, results);
+  }
+
+  async test(stock: string, from: string, to: string){
+    const [data, date] = await Promise.all([this.mssqlService.query(`select closePrice, date from marketTrade.dbo.historyTicker where code = '${stock}' order by date asc`) as any, this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`)])
+    const price = data.map(item => item.closePrice)
+    const dateFormat = data.map(item => ({...item, date: UtilCommonTemplate.toDateV2(item.date)}))
+    const indexDate = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
+    
+    const arr = []
+
+    for(let i = 5; i <= 100; i++){
+      const ma = calTech.sma({values: price, period: i})
+      const maReverse = [...ma].reverse()
+      const newData = [...dateFormat].reverse().map((item, index) => ({...item, ma: maReverse[index] || 0}))
+
+      let isBuy = false
+      let indexBuy = 0
+      let count = 0
+      let total = 1
+      let min = 0, max = 0
+
+      const dataWithMa = [...newData].reverse().slice(indexDate)
+      
+      dataWithMa.map((item, index) => {
+        if((item.closePrice > item.ma) && !isBuy){
+          isBuy = true
+          indexBuy = index 
+          count += 1
+        }
+        if((item.closePrice < item.ma) && isBuy){
+          isBuy = false
+          const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
+
+          total = total * (1 + percent / 100)
+          min = (percent / 100) < min ? (percent / 100) : min
+          max = (percent / 100) > max ? (percent / 100) : max
+        }
+      })
+
+      arr.push({
+        name: `MA_${i}`,
+        total: total - 1,
+        count: !isBuy ? count : count - 1,
+        min,
+        max
+      })
+    }
+    const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
+    
+    return {
+      max: max,
+      data: arr
+    }
+    
   }
 }

@@ -102,4 +102,14 @@ export class InvestmentController {
       throw new CatchException(e)
     }
   }
+
+  @Get('test')
+  async test(@Query() q: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.test(q.stock.toUpperCase(), q.from, q.to)
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
 }
