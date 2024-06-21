@@ -112,4 +112,14 @@ export class InvestmentController {
       throw new CatchException(e)
     }
   }
+
+  @Get('all-stock')
+  async allStock(@Query() q: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.allStock()
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
 }

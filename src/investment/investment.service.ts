@@ -527,6 +527,8 @@ export class InvestmentService {
       let count = 0
       let total = 1
       let min = 0, max = 0
+      const detail = []
+      
 
       const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
       
@@ -543,6 +545,14 @@ export class InvestmentService {
           total = total * (1 + percent / 100)
           min = (percent / 100) < min ? (percent / 100) : min
           max = (percent / 100) > max ? (percent / 100) : max
+
+          detail.push({
+            date_buy: dataWithMa[indexBuy].date,
+            date_sell: item.date,
+            price_buy: dataWithMa[indexBuy].closePrice,
+            price_sell: item.closePrice,
+            profit: percent
+          })
         }
       })
 
@@ -551,7 +561,8 @@ export class InvestmentService {
         total: total - 1,
         count: count,
         min,
-        max
+        max,
+        detail
       })
     }
     const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
@@ -561,5 +572,14 @@ export class InvestmentService {
       data: arr
     }
     
+  }
+
+  async allStock(){
+    try {
+      const data: any = await this.mssqlService.query(`select code from marketInfor.dbo.info where status = 'listed' and type = 'STOCK'`)
+      return data.map(item => item.code)
+    } catch (e) {
+      throw new CatchException(e)
+    }
   }
 }
