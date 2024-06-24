@@ -504,12 +504,37 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string, from: string, to: string){
+  async test(stock: string | string[], from: string, to: string){
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item}'`).join(',')})` 
+    
     const [data, date, dateTo] = await Promise.all([
-      this.mssqlService.query(`select closePrice, date from marketTrade.dbo.historyTicker where code = '${stock}' order by date asc`) as any, 
+      this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any, 
       this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
       this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
     ])
+    
+    if(Array.isArray(stock)){
+      const arr = []
+
+      stock.map((item: any) => {
+        const result = this.calculateMAIndex(data.filter(res => res.code == item), date, dateTo)
+        arr.push({
+          code: item,
+          name: result.max.name,
+          total: result.max.total,
+          closePrice: result.data[result.data.length - 1].closePrice,
+          signal: result.max.signal
+        })
+      })
+
+      return arr
+    }
+    
+    const result = this.calculateMAIndex(data, date, dateTo)
+    return result
+  }
+
+  private calculateMAIndex(data: any, date: any, dateTo: any){
     const price = data.map(item => item.closePrice)
     const dateFormat = data.map(item => ({...item, date: UtilCommonTemplate.toDateV2(item.date)}))
     const indexDateFrom = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
@@ -528,7 +553,7 @@ export class InvestmentService {
       let total = 1
       let min = 0, max = 0
       const detail = []
-      
+      let lastSignal = -1 //Khong mua k ban
 
       const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
       
@@ -554,7 +579,11 @@ export class InvestmentService {
             profit: percent
           })
         }
+        if(index == dataWithMa.length - 1){
+          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : (((item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : -1)
+        }
       })
+
 
       arr.push({
         name: `MA_${i}`,
@@ -562,7 +591,9 @@ export class InvestmentService {
         count: count,
         min,
         max,
-        detail
+        detail,
+        closePrice: price[price.length - 1],
+        signal: lastSignal
       })
     }
     const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
@@ -571,7 +602,6 @@ export class InvestmentService {
       max: max,
       data: arr
     }
-    
   }
 
   async allStock(){
@@ -581,5 +611,10 @@ export class InvestmentService {
     } catch (e) {
       throw new CatchException(e)
     }
+  }
+
+  async testAllStock(code: string[], from: string, to: string){
+    const data = await this.test(code, from, to)
+    return data
   }
 }
