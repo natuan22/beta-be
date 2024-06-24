@@ -580,7 +580,7 @@ export class InvestmentService {
           })
         }
         if(index == dataWithMa.length - 1){
-          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : (((item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : -1)
+          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : -1)
         }
       })
 
