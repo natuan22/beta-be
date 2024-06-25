@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment';
 import * as calTech from 'technicalindicators';
+import { StepInstance } from 'twilio/lib/rest/studio/v1/flow/engagement/step';
 import { Repository } from 'typeorm';
 import { DB_SERVER } from '../constants';
 import { TimeToLive } from '../enums/common.enum';
@@ -504,26 +505,30 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string | string[], from: string, to: string){
-    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item}'`).join(',')})` 
-    
-    const [data, date, dateTo] = await Promise.all([
+  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1){
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item.code}'`).join(',')})` 
+
+    const [data, lastPrice, date, dateTo] = await Promise.all([
       this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any, 
+      this.mssqlService.query(`select top ${stock?.length - 1 || 1} closePrice, date, code from tradeIntraday.dbo.tickerTradeVNDIntraday where code ${listStock} order by date desc, time desc`) as any, 
       this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
       this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
     ])
-    
+
     if(Array.isArray(stock)){
       const arr = []
 
       stock.map((item: any) => {
-        const result = this.calculateMAIndex(data.filter(res => res.code == item), date, dateTo)
+        const price = data.filter(res => res.code == item.code)
+        price[price.length - 1] = lastPrice.find(price => price.code == item.code)
+        const result = !haveMa ? this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo) : this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo, item.ma)
         arr.push({
-          code: item,
+          code: item.code,
           name: result.max.name,
           total: result.max.total,
           closePrice: result.data[result.data.length - 1].closePrice,
-          signal: result.max.signal
+          signal: result.max.signal,
+          ma: result.max.ma
         })
       })
 
@@ -534,7 +539,7 @@ export class InvestmentService {
     return result
   }
 
-  private calculateMAIndex(data: any, date: any, dateTo: any){
+  private calculateMAIndex(data: any, date: any, dateTo: any, maNumber?: number){
     const price = data.map(item => item.closePrice)
     const dateFormat = data.map(item => ({...item, date: UtilCommonTemplate.toDateV2(item.date)}))
     const indexDateFrom = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
@@ -542,7 +547,7 @@ export class InvestmentService {
     
     const arr = []
 
-    for(let i = 5; i <= 100; i++){
+    for(let i = (maNumber || 5); i <= (maNumber || 100); i++){
       const ma = calTech.sma({values: price, period: i})
       const maReverse = [...ma].reverse()
       const newData = [...dateFormat].reverse().map((item, index) => ({...item, ma: maReverse[index] || 0}))
@@ -553,23 +558,26 @@ export class InvestmentService {
       let total = 1
       let min = 0, max = 0
       const detail = []
-      let lastSignal = -1 //Khong mua k ban
+      let lastSignal = 0 // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
 
       const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
-      
+       
       dataWithMa.map((item, index) => {
         if(dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma) && !isBuy){
           isBuy = true
           indexBuy = index 
           count += 1
         }
+        if(index == dataWithMa.length - 1){
+          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : (isBuy ? 2 : 3))
+        }
         if((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma) && isBuy) || (index == (dataWithMa.length - 1) && isBuy)){
           isBuy = false
           const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
 
           total = total * (1 + percent / 100)
-          min = (percent / 100) < min ? (percent / 100) : min
-          max = (percent / 100) > max ? (percent / 100) : max
+          min = Math.min(min, (percent / 100))
+          max = Math.max(max, (percent / 100))
 
           detail.push({
             date_buy: dataWithMa[indexBuy].date,
@@ -579,11 +587,8 @@ export class InvestmentService {
             profit: percent
           })
         }
-        if(index == dataWithMa.length - 1){
-          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : -1)
-        }
+        
       })
-
 
       arr.push({
         name: `MA_${i}`,
@@ -593,7 +598,8 @@ export class InvestmentService {
         max,
         detail,
         closePrice: price[price.length - 1],
-        signal: lastSignal
+        signal: lastSignal,
+        ma: maReverse[0]
       })
     }
     const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
@@ -614,7 +620,61 @@ export class InvestmentService {
   }
 
   async testAllStock(code: string[], from: string, to: string){
-    const data = await this.test(code, from, to)
+    const data = await this.test(code.map(item => ({code: item})), from, to)
     return data
+  }
+
+  async createBetaWatchList(body: any){
+    const data: any = await this.redis.get('beta-watch-list') || []
+    if(data.find(item => item.code == body.code)) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Mã đã tồn tại')
+    
+    const newItem = {
+      code: body.code,
+      price_2024: body?.price_2024 || 0,
+      price_2025: body?.price_2025 || 0,
+      ma: body?.ma || 0
+    }
+
+    const price = await this.test(body.code, body.from, body.to)
+
+    await this.redis.set('beta-watch-list', [...data, newItem])
+    return price
+  }
+
+  async updateBetaWatchList(body: any){
+    const data: any = await this.redis.get('beta-watch-list')
+    if(!data) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Không có mã')
+
+    const index = data.findIndex(item => item.code == body.code)
+    if(index == -1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Mã không tồn tại')
+
+    const newItem = {
+      code: body?.code,
+      price_2024: body?.price_2024 || 0,
+      price_2025: body?.price_2025 || 0,
+      ma: body?.ma || 0
+    }
+
+    data[index] = newItem
+    
+    await this.redis.set('beta-watch-list', data)
+  }
+
+  async deleteBetaWatchList(code: string){
+    const data: any = await this.redis.get('beta-watch-list')
+    const index = data.findIndex(item => item.code == code)
+    if(index == -1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Mã không tồn tại')
+    
+    await this.redis.set('beta-watch-list', data.filter(item => item.code != code))
+  }
+
+  async getBetaWatchList(from: string, to: string){
+    const data: any = await this.redis.get('beta-watch-list')
+    if(from){
+      const result: any = await this.testAllStock(data.map(item => item.code), from, to)
+      return result.map((item, index) => ({...item, price_2024: data[index].price_2024 || 0, price_2025: data[index].price_2025 || 0}))
+    }
+      const result: any = await this.test(data.map(item => ({code: item.code, ma: item.ma})), moment().subtract(1, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), 1)
+      return result.map((item, index) => ({...item, price_2024: data[index].price_2024 || 0, price_2025: data[index].price_2025 || 0, name: `MA_${data[index].ma}`}))
   }
 }

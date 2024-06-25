@@ -119,8 +119,6 @@ export class InvestmentController {
       const data = await this.investmentService.testAllStock(q.stock, q.from, q.to)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
     } catch (e) {
-      console.log(e);
-      
       throw new CatchException(e)
     }
   }
@@ -129,6 +127,46 @@ export class InvestmentController {
   async allStock(@Query() q: any, @Res() res: Response){
     try {
       const data = await this.investmentService.allStock()
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  @Post('create-beta-watch-list')
+  async createBetaWatchList(@Body() q: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.createBetaWatchList(q)
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  @Post('update-beta-watch-list')
+  async updateBetaWatchList(@Body() q: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.updateBetaWatchList(q)
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  @Post('delete-beta-watch-list')
+  async deleteBetaWatchList(@Body() q: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.deleteBetaWatchList(q.code)
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (e) {
+      throw new CatchException(e)
+    }
+  }
+
+  @Get('beta-watch-list')
+  async getBeteWatchList(@Query() p: any, @Res() res: Response){
+    try {
+      const data = await this.investmentService.getBetaWatchList(p.from, p.to)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
     } catch (e) {
       throw new CatchException(e)
