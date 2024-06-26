@@ -630,9 +630,9 @@ export class InvestmentService {
     
     const newItem = {
       code: body.code,
-      price_2024: body?.price_2024 || 0,
-      price_2025: body?.price_2025 || 0,
-      ma: body?.ma || 0
+      price_2024: body?.price_2024 ? parseFloat(body?.price_2024) : 0,
+      price_2025: body?.price_2025 ? parseFloat(body?.price_2025) : 0,
+      ma: body?.ma ? parseInt(body?.ma ) : 0
     }
 
     const price = await this.test(body.code, body.from, body.to)
@@ -649,10 +649,10 @@ export class InvestmentService {
     if(index == -1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Mã không tồn tại')
 
     const newItem = {
-      code: body?.code,
-      price_2024: body?.price_2024 || 0,
-      price_2025: body?.price_2025 || 0,
-      ma: body?.ma || 0
+      code: body.code,
+      price_2024: body?.price_2024 ? parseFloat(body?.price_2024) : 0,
+      price_2025: body?.price_2025 ? parseFloat(body?.price_2025) : 0,
+      ma: body?.ma ? parseInt(body?.ma ) : 0
     }
 
     data[index] = newItem
