@@ -637,7 +637,7 @@ export class InvestmentService {
 
     const price = await this.test(body.code, body.from, body.to)
 
-    await this.redis.set('beta-watch-list', [...data, newItem])
+    await this.redis.set('beta-watch-list', [...data, newItem], {ttl: 0})
     return price
   }
 
@@ -657,7 +657,7 @@ export class InvestmentService {
 
     data[index] = newItem
     
-    await this.redis.set('beta-watch-list', data)
+    await this.redis.set('beta-watch-list', data, {ttl: 0})
   }
 
   async deleteBetaWatchList(code: string){
@@ -665,7 +665,7 @@ export class InvestmentService {
     const index = data.findIndex(item => item.code == code)
     if(index == -1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Mã không tồn tại')
     
-    await this.redis.set('beta-watch-list', data.filter(item => item.code != code))
+    await this.redis.set('beta-watch-list', data.filter(item => item.code != code), {ttl: 0})
   }
 
   async getBetaWatchList(from: string, to: string){
