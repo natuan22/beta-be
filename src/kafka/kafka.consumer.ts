@@ -200,4 +200,13 @@ export class KafkaConsumer {
       this.logger.error(error)
     }
   }
+
+  @MessagePattern(Topics.ChartNenCoPhieuNew)
+  async handleChartNenNew(@Payload() payload: ChartNenInterface[], @Ctx() context: KafkaContext){
+    try {
+      this.kafkaService.handleBetaWatchListSocket(payload)
+    } catch (error) {
+      this.logger.error(error)
+    }
+  }
 }

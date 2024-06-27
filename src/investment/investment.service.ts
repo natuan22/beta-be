@@ -505,22 +505,49 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1){
+  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number){
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item.code}'`).join(',')})` 
 
-    const [data, lastPrice, date, dateTo] = await Promise.all([
-      this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any, 
-      this.mssqlService.query(`select top ${stock?.length - 1 || 1} closePrice, date, code from tradeIntraday.dbo.tickerTradeVNDIntraday where code ${listStock} order by date desc, time desc`) as any, 
-      this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
-      this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
+    let data, date, dateTo, lastPrice
+
+    const [dataRedis, lastPriceDB, dateRedis, dateToRedis] = await Promise.all([
+      this.redis.get(`price:${listStock.trim()}`),
+      !realtimePrice ? this.mssqlService.query(`select top ${stock?.length - 1 || 1} closePrice, date, code from tradeIntraday.dbo.tickerTradeVNDIntraday where code ${listStock} order by date desc, time desc`) as any : 1, 
+      this.redis.get(`price:dateFromMa`),
+      this.redis.get(`price:dateToMa`),
     ])
+
+    if(dataRedis) {
+      data = dataRedis
+      date = dateRedis
+      dateTo = dateToRedis
+      lastPrice = lastPriceDB
+    }else{
+      const [dataDB, lastPriceDB, dateDB, dateToDB] = await Promise.all([
+        this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any, 
+        !realtimePrice ? this.mssqlService.query(`select top ${stock?.length - 1 || 1} closePrice, date, code from tradeIntraday.dbo.tickerTradeVNDIntraday where code ${listStock} order by date desc, time desc`) as any : 1, 
+        this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
+        this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
+      ])
+
+      data = dataDB
+      date = dateDB
+      dateTo = dateToDB
+      lastPrice = lastPriceDB
+
+      await Promise.all([
+        this.redis.set(`price:${listStock.trim()}`, data, {ttl: 180}),
+        this.redis.set(`price:dateFromMa`, date, {ttl: 180}),
+        this.redis.set(`price:dateToMa`, dateTo, {ttl: 180}),
+      ])
+    }
 
     if(Array.isArray(stock)){
       const arr = []
 
       stock.map((item: any) => {
         const price = data.filter(res => res.code == item.code)
-        price[price.length - 1] = lastPrice.find(price => price.code == item.code)
+        price[price.length - 1] = !realtimePrice ? lastPrice.find(price => price.code == item.code) : realtimePrice
         const result = !haveMa ? this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo) : this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo, item.ma)
         arr.push({
           code: item.code,
@@ -634,8 +661,13 @@ export class InvestmentService {
       price_2025: body?.price_2025 ? parseFloat(body?.price_2025) : 0,
       ma: body?.ma ? parseInt(body?.ma ) : 0
     }
+    let price
 
-    const price = await this.test(body.code, body.from, body.to)
+    if(!body?.is_beta_page) {
+      price = await this.test(body.code, body.from, body.to)
+    }else {
+      price = await this.test([{code: body.code, ma: body.ma}], moment().subtract(1, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), 1)
+    }
 
     await this.redis.set('beta-watch-list', [...data, newItem], {ttl: 0})
     return price
@@ -658,6 +690,11 @@ export class InvestmentService {
     data[index] = newItem
     
     await this.redis.set('beta-watch-list', data, {ttl: 0})
+
+    if(body?.is_beta_page){
+      const price = await this.test([{code: body.code, ma: body.ma}], moment().subtract(1, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), 1)
+      return price
+    }
   }
 
   async deleteBetaWatchList(code: string){

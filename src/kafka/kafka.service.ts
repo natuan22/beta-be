@@ -10,8 +10,15 @@ import { TimeToLive } from '../enums/common.enum';
 import { RedisKeys } from '../enums/redis-keys.enum';
 import { SocketEmit } from '../enums/socket-enum';
 import { CatchSocketException } from '../exceptions/socket.exception';
+import { InvestmentService } from '../investment/investment.service';
 import { SessionDatesInterface } from '../stock/interfaces/session-dates.interface';
-import { isDecrease, isEqual, isHigh, isIncrease, isLow } from '../stock/processes/industry-data-child';
+import {
+  isDecrease,
+  isEqual,
+  isHigh,
+  isIncrease,
+  isLow
+} from '../stock/processes/industry-data-child';
 import { IndustryResponse } from '../stock/responses/Industry.response';
 import { MarketBreadthResponse } from '../stock/responses/MarketBreadth.response';
 import { StockService } from '../stock/stock.service';
@@ -44,8 +51,9 @@ export class KafkaService {
     @Inject(CACHE_MANAGER)
     private readonly redis: Cache,
     @InjectDataSource(DB_SERVER) private readonly dbServer: DataSource,
-    private readonly stockService: StockService
-  ) { }
+    private readonly stockService: StockService,
+    private readonly investmentService: InvestmentService,
+  ) {}
 
   send<T>(event: string, message: T): void {
     try {
@@ -145,7 +153,7 @@ export class KafkaService {
     }: SessionDatesInterface = await this.getSessionDate(
       '[RATIO].[dbo].[ratioInday]',
       'date',
-      this.dbServer
+      this.dbServer,
     );
     const marketCapQuery = `
         SELECT
@@ -158,14 +166,12 @@ export class KafkaService {
         '${UtilCommonTemplate.toDate(previousDate)}', 
         '${UtilCommonTemplate.toDate(weekDate)}', 
         '${UtilCommonTemplate.toDate(monthDate)}', 
-        '${UtilCommonTemplate.toDate(
-      firstDateYear,
-    )}')
+        '${UtilCommonTemplate.toDate(firstDateYear)}')
         GROUP BY f.LV2, i.date
         ORDER BY i.date DESC
-        `
+        `;
 
-    const marketCap = await this.dbServer.query(marketCapQuery)
+    const marketCap = await this.dbServer.query(marketCapQuery);
     const groupByIndustry = marketCap.reduce((result, item) => {
       (result[item.industry] || (result[item.industry] = [])).push(item);
       return result;
@@ -176,22 +182,26 @@ export class KafkaService {
       ([industry, values]: any) => {
         return {
           industry,
-          day_change_percent: !values[1]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[1].total_market_cap) /
-              values[1].total_market_cap) *
-            100,
-          week_change_percent: !values[2]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[2].total_market_cap) /
-              values[2].total_market_cap) *
-            100,
-          month_change_percent: !values[3]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[3].total_market_cap) /
-              values[3].total_market_cap) *
-            100,
-          ytd: !values[4]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[4]?.total_market_cap) /
-              values[4].total_market_cap) *
-            100,
+          day_change_percent: !values[1]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[1].total_market_cap) /
+                values[1].total_market_cap) *
+              100,
+          week_change_percent: !values[2]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[2].total_market_cap) /
+                values[2].total_market_cap) *
+              100,
+          month_change_percent: !values[3]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[3].total_market_cap) /
+                values[3].total_market_cap) *
+              100,
+          ytd: !values[4]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[4]?.total_market_cap) /
+                values[4].total_market_cap) *
+              100,
         };
       },
     );
@@ -208,12 +218,12 @@ export class KafkaService {
           INNER JOIN marketInfor.dbo.info i
             ON t.code = i.code
           WHERE t.date = '${date}'
-          `
-    const dataToday = await this.dbServer.query(query(latestDate))
-    const dataYesterday = await this.dbServer.query(query(previousDate))
+          `;
+    const dataToday = await this.dbServer.query(query(latestDate));
+    const dataYesterday = await this.dbServer.query(query(previousDate));
 
     const result = dataToday.map((item) => {
-      const yesterdayItem = dataYesterday.find(i => i.ticker === item.ticker);
+      const yesterdayItem = dataYesterday.find((i) => i.ticker === item.ticker);
       if (!yesterdayItem) return;
       return {
         industry: item.industry,
@@ -226,9 +236,7 @@ export class KafkaService {
     });
 
     const final = result.reduce((stats, record) => {
-      const existingStats = stats.find(
-        (s) => s?.industry === record?.industry,
-      );
+      const existingStats = stats.find((s) => s?.industry === record?.industry);
       const industryChange = industryChanges.find(
         (i) => i?.industry == record?.industry,
       );
@@ -258,14 +266,17 @@ export class KafkaService {
                     from [PHANTICH].[dbo].[INDEX_AC_CC]
                     where Ticker in ('VNINDEX', 'HNXINDEX', 'UPINDEX')
                 `;
-    const buySellData = await this.dbServer.query(query_buy_sell)
+    const buySellData = await this.dbServer.query(query_buy_sell);
 
     const mappedData: IndustryResponse[] = [
       ...new IndustryResponse().mapToList(final),
     ].sort((a, b) => (a.industry > b.industry ? 1 : -1));
 
-    this.send(SocketEmit.PhanNganh, { data: mappedData, buySellData: buySellData?.[0] });
-    return { data: mappedData, buySellData: buySellData?.[0] }
+    this.send(SocketEmit.PhanNganh, {
+      data: mappedData,
+      buySellData: buySellData?.[0],
+    });
+    return { data: mappedData, buySellData: buySellData?.[0] };
   }
 
   async handleIndustryFloor() {
@@ -273,7 +284,7 @@ export class KafkaService {
       { floor: 'HSX', event: SocketEmit.PhanNganhHOSE },
       { floor: 'HNX', event: SocketEmit.PhanNganhHNX },
       { floor: 'UPCOM', event: SocketEmit.PhanNganhUPCOM },
-    ]
+    ];
     const {
       latestDate,
       previousDate,
@@ -283,7 +294,7 @@ export class KafkaService {
     }: SessionDatesInterface = await this.getSessionDate(
       '[RATIO].[dbo].[ratioInday]',
       'date',
-      this.dbServer
+      this.dbServer,
     );
 
     const marketCapQuery = `
@@ -298,13 +309,11 @@ export class KafkaService {
       '${UtilCommonTemplate.toDate(previousDate)}', 
       '${UtilCommonTemplate.toDate(weekDate)}', 
       '${UtilCommonTemplate.toDate(monthDate)}', 
-      '${UtilCommonTemplate.toDate(
-      firstDateYear,
-    )}')
+      '${UtilCommonTemplate.toDate(firstDateYear)}')
       GROUP BY f.LV2, i.date, f.floor
       ORDER BY i.date DESC
-      `
-    const marketCapPromise = this.dbServer.query(marketCapQuery)
+      `;
+    const marketCapPromise = this.dbServer.query(marketCapQuery);
 
     const query = (date): string => `
         SELECT
@@ -319,55 +328,69 @@ export class KafkaService {
         INNER JOIN marketInfor.dbo.info i
           ON t.code = i.code
         WHERE t.date = '${date}'
-        `
-      const dataTodayPromise = this.dbServer.query(query(latestDate))
-      const dataYesterdayPromise = this.dbServer.query(query(previousDate))
+        `;
+    const dataTodayPromise = this.dbServer.query(query(latestDate));
+    const dataYesterdayPromise = this.dbServer.query(query(previousDate));
 
-      const [marketCap, dataToday, dataYesterday] = await Promise.all([marketCapPromise, dataTodayPromise, dataYesterdayPromise])
+    const [marketCap, dataToday, dataYesterday] = await Promise.all([
+      marketCapPromise,
+      dataTodayPromise,
+      dataYesterdayPromise,
+    ]);
 
     for (const exchange of array) {
-      const groupByIndustry = marketCap.filter(item => item.floor == exchange.floor).reduce((result, item) => {
-        (result[item.industry] || (result[item.industry] = [])).push(item);
-        return result;
-      }, {});
+      const groupByIndustry = marketCap
+        .filter((item) => item.floor == exchange.floor)
+        .reduce((result, item) => {
+          (result[item.industry] || (result[item.industry] = [])).push(item);
+          return result;
+        }, {});
 
       //Calculate change percent per day, week, month
       const industryChanges = Object.entries(groupByIndustry).map(
         ([industry, values]: any) => {
           return {
             industry,
-            day_change_percent: !values[1]?.total_market_cap ? 0 :
-              ((values[0].total_market_cap - values[1].total_market_cap) /
-                values[1].total_market_cap) *
-              100,
-            week_change_percent: !values[2]?.total_market_cap ? 0 :
-              ((values[0].total_market_cap - values[2].total_market_cap) /
-                values[2].total_market_cap) *
-              100,
-            month_change_percent: !values[3]?.total_market_cap ? 0 :
-              ((values[0].total_market_cap - values[3].total_market_cap) /
-                values[3].total_market_cap) *
-              100,
-            ytd: !values[4]?.total_market_cap ? 0 :
-              ((values[0].total_market_cap - values[4]?.total_market_cap) /
-                values[4].total_market_cap) *
-              100,
+            day_change_percent: !values[1]?.total_market_cap
+              ? 0
+              : ((values[0].total_market_cap - values[1].total_market_cap) /
+                  values[1].total_market_cap) *
+                100,
+            week_change_percent: !values[2]?.total_market_cap
+              ? 0
+              : ((values[0].total_market_cap - values[2].total_market_cap) /
+                  values[2].total_market_cap) *
+                100,
+            month_change_percent: !values[3]?.total_market_cap
+              ? 0
+              : ((values[0].total_market_cap - values[3].total_market_cap) /
+                  values[3].total_market_cap) *
+                100,
+            ytd: !values[4]?.total_market_cap
+              ? 0
+              : ((values[0].total_market_cap - values[4]?.total_market_cap) /
+                  values[4].total_market_cap) *
+                100,
           };
         },
-      )
+      );
 
-      const result = dataToday.filter(item => item.floor == exchange.floor).map((item) => {
-        const yesterdayItem = dataYesterday.filter(item => item.floor == exchange.floor).find(i => i.ticker === item.ticker);
-        if (!yesterdayItem) return;
-        return {
-          industry: item.industry,
-          equal: isEqual(yesterdayItem, item),
-          increase: isIncrease(yesterdayItem, item),
-          decrease: isDecrease(yesterdayItem, item),
-          high: isHigh(yesterdayItem, item),
-          low: isLow(yesterdayItem, item),
-        };
-      });
+      const result = dataToday
+        .filter((item) => item.floor == exchange.floor)
+        .map((item) => {
+          const yesterdayItem = dataYesterday
+            .filter((item) => item.floor == exchange.floor)
+            .find((i) => i.ticker === item.ticker);
+          if (!yesterdayItem) return;
+          return {
+            industry: item.industry,
+            equal: isEqual(yesterdayItem, item),
+            increase: isIncrease(yesterdayItem, item),
+            decrease: isDecrease(yesterdayItem, item),
+            high: isHigh(yesterdayItem, item),
+            low: isLow(yesterdayItem, item),
+          };
+        });
 
       const final = result.reduce((stats, record) => {
         const existingStats = stats.find(
@@ -398,7 +421,6 @@ export class KafkaService {
         return stats;
       }, []);
 
-
       let ex = '';
       switch (exchange.floor) {
         case 'HSX':
@@ -416,13 +438,16 @@ export class KafkaService {
               where Ticker = '${ex}' order by
               [DateTime] desc
           `;
-      const buySellData = await this.dbServer.query(query_buy_sell)
+      const buySellData = await this.dbServer.query(query_buy_sell);
 
       const mappedData: IndustryResponse[] = [
         ...new IndustryResponse().mapToList(final),
       ].sort((a, b) => (a.industry > b.industry ? 1 : -1));
 
-      this.send(exchange.event, { data: mappedData, buySellData: buySellData?.[0] });
+      this.send(exchange.event, {
+        data: mappedData,
+        buySellData: buySellData?.[0],
+      });
     }
   }
 
@@ -561,10 +586,7 @@ export class KafkaService {
           );
           break;
         case 'HNXINDEX':
-          this.send(
-            SocketEmit.ChiSoHNX,
-            LineChartResponseV2.mapToList([item]),
-          );
+          this.send(SocketEmit.ChiSoHNX, LineChartResponseV2.mapToList([item]));
           break;
         case 'UPINDEX':
           this.send(
@@ -617,7 +639,6 @@ export class KafkaService {
       new MarketCashFlowResponse(calculatedData),
     );
   }
-
 
   async handleForeign(payload: ForeignKafkaInterface[]) {
     const tickerBuyHSX = await this.filterAndSortPayload(payload, 'HOSE', 1);
@@ -683,20 +704,36 @@ export class KafkaService {
   }
 
   handleChartNen(payload: ChartNenInterface[]) {
-    payload.map(item => {
-      this.send(`${SocketEmit.CoPhieu}-${item.code}`, {
-        ...item, 
-        totalVal: item.totalVal / 1000000000,
-        time: Date.UTC(
-          new Date().getFullYear(),
-          new Date().getMonth(),
-          new Date().getDate(),
-          moment(item.time, 'HH:mm:ss').hour(),
-          moment(item.time, 'HH:mm:ss').minute(),
-        ).valueOf()
-      })
+    this.send(`${SocketEmit.CoPhieu}-${payload[0].code}`, {
+      ...payload[0],
+      totalVal: payload[0]?.totalVal / 1000000000 || 0,
+      time: Date.UTC(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        new Date().getDate(),
+        moment(payload[0].time, 'HH:mm:ss').hour(),
+        moment(payload[0].time, 'HH:mm:ss').minute(),
+      ).valueOf(),
+    });
+  }
+
+  async handleBetaWatchListSocket(payload: ChartNenInterface[]) {
+    try {
+      const data: any[] = (await this.redis.get('beta-watch-list')) || [];
+      const item = data.find((item) => item.code == payload[0].code);
+      if (item) {
+        const res = await this.investmentService.test(
+          [{ code: item.code, ma: item.ma }],
+          moment().subtract(1, 'year').format('YYYY-MM-DD'),
+          moment().format('YYYY-MM-DD'),
+          1,
+          payload[0].closePrice,
+        );
+        this.send(`${SocketEmit.MA}`, res);
+      }
+    } catch (e) {
+      console.log(e);
     }
-    )
   }
 
   public async getSessionDate(
@@ -747,4 +784,6 @@ export class KafkaService {
     await this.redis.set(`${RedisKeys.SessionDate}:${table}:${column}`, result);
     return result;
   }
+
+  
 }

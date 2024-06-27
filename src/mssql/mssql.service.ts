@@ -24,7 +24,8 @@ export class MssqlService {
     try {
       return (await this.database.query(query)).recordset;
     } catch (error) {
-      throw new CatchException(error)
+      console.log(error);
+      
     }
   }
 

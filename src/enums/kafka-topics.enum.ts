@@ -14,6 +14,7 @@ export enum Topics {
   ChiSoTrongNuoc2 = 'kafka-domestic-index-topic',
   CoPhieuAnhHuong = 'kafka-co-phieu-anh-huong-topic',
   ChartNenCoPhieu = 'kafka-chart-nen-tung-co-phieu-topic',
+  ChartNenCoPhieuNew = 'kafka-chart-nen-tung-co-phieu-topic-new',
 }
 
 //send

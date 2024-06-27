@@ -10,6 +10,7 @@ import { InvestmentService } from './investment.service';
 @Module({
   imports: [TypeOrmModule.forFeature([FilterUserEntity], DB_SERVER)],
   controllers: [InvestmentController],
-  providers: [InvestmentService, MssqlService, JwtService]
+  providers: [InvestmentService, MssqlService, JwtService],
+  exports: [InvestmentModule, InvestmentService]
 })
 export class InvestmentModule {}

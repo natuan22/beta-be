@@ -1,15 +1,14 @@
+import { Logger, UseFilters } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
-  OnGatewayInit,
-  WebSocketGateway,
-  WebSocketServer,
+  OnGatewayInit, WebSocketGateway,
+  WebSocketServer
 } from '@nestjs/websockets';
-import { SocketService } from './socket.service';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseFilters } from '@nestjs/common';
-import { SocketErrorFilter } from '../filters/socket-error.filter';
 import { CatchSocketException } from '../exceptions/socket.exception';
+import { SocketErrorFilter } from '../filters/socket-error.filter';
+import { SocketService } from './socket.service';
 
 @WebSocketGateway({ cors: { origin: '*' }, namespace: 'socket', transports: ['websocket', 'polling'] })
 @UseFilters(SocketErrorFilter)
