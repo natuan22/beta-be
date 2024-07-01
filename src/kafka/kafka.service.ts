@@ -724,7 +724,7 @@ export class KafkaService {
       if (item) {
         const res = await this.investmentService.test(
           [{ code: item.code, ma: item.ma }],
-          moment().subtract(1, 'year').format('YYYY-MM-DD'),
+          moment().subtract(2, 'year').format('YYYY-MM-DD'),
           moment().format('YYYY-MM-DD'),
           1,
           payload[0].closePrice,
