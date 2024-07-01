@@ -5,10 +5,13 @@ import { CatchException } from '../exceptions/common.exception';
 import { StockDto } from '../shares/dto/stock.dto';
 import { GetUserIdFromToken } from '../utils/utils.decorators';
 import { BaseResponse } from '../utils/utils.response';
+import { CreateBetaListDto } from './dto/create-beta-list.dto';
+import { DeleteBetaListDto } from './dto/delete-beta-list.dto';
 import { EmulatorInvestmentDto } from './dto/emulator.dto';
 import { InvestmentFilterDto } from './dto/investment-filter.dto';
 import { IdParamDto } from './dto/paramId.dto';
 import { SaveFilterDto } from './dto/save-filter.dto';
+import { UpdateBetaListDto } from './dto/update-beta-list.dto';
 import { InvestmentService } from './investment.service';
 import { InvestmentFilterResponseSwagger } from './response/investmentFilter.response';
 import { KeyFilterResponse } from './response/keyFilter.response';
@@ -133,8 +136,9 @@ export class InvestmentController {
     }
   }
 
+  @ApiOperation({summary: 'Thêm cổ phiếu dô watchlist'})
   @Post('create-beta-watch-list')
-  async createBetaWatchList(@Body() q: any, @Res() res: Response){
+  async createBetaWatchList(@Body() q: CreateBetaListDto, @Res() res: Response){
     try {
       const data = await this.investmentService.createBetaWatchList(q)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
@@ -143,8 +147,9 @@ export class InvestmentController {
     }
   }
 
+  @ApiOperation({summary: 'Sửa cổ phiếu trong watchlist'})
   @Post('update-beta-watch-list')
-  async updateBetaWatchList(@Body() q: any, @Res() res: Response){
+  async updateBetaWatchList(@Body() q: UpdateBetaListDto, @Res() res: Response){
     try {
       const data = await this.investmentService.updateBetaWatchList(q)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
@@ -153,8 +158,9 @@ export class InvestmentController {
     }
   }
 
+  @ApiOperation({summary: 'Xoá cổ phiếu trong watchlist'})
   @Post('delete-beta-watch-list')
-  async deleteBetaWatchList(@Body() q: any, @Res() res: Response){
+  async deleteBetaWatchList(@Body() q: DeleteBetaListDto, @Res() res: Response){
     try {
       const data = await this.investmentService.deleteBetaWatchList(q.code)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
@@ -163,6 +169,8 @@ export class InvestmentController {
     }
   }
 
+
+  @ApiOperation({summary: 'Danh mục beta'})
   @Get('beta-watch-list')
   async getBeteWatchList(@Query() p: any, @Res() res: Response){
     try {
