@@ -508,8 +508,14 @@ export class InvestmentService {
   async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number){
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item.code}'`).join(',')})` 
 
-    const [data, lastPrice, date, dateTo] = await Promise.all([
-          this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any, 
+    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+      this.redis.get(`price:${listStock}`),
+      this.redis.get(`price:${from}`),
+      this.redis.get(`price:${to}`),
+    ])
+
+    let [data, lastPrice, date, dateTo] = await Promise.all([
+          !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [], 
           !realtimePrice ? this.mssqlService.query(`
           WITH LatestTrade AS (
             SELECT
@@ -533,9 +539,29 @@ export class InvestmentService {
         ORDER BY
             code;
           `) : 1 as any, 
-          this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`),
-          this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`)
+          !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
+          !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : []
       ])
+
+    if(realtimePrice && !dataRedis){
+      await this.redis.set(`price:${listStock}`, data, {ttl: 180})
+    }
+    if(!dateRedis){
+      await this.redis.set(`price:${from}`, date, {ttl: 180})
+    }
+    if(!dateToRedis){
+      await this.redis.set(`price:${to}`, dateTo, {ttl: 180})
+    }
+
+    if(dataRedis){
+      data = dataRedis
+    }
+    if(dateRedis){
+      date = dateRedis
+    }
+    if(dateToRedis){
+      dateTo = dateToRedis
+    }
 
     if(Array.isArray(stock)){
       const arr = []
@@ -551,7 +577,8 @@ export class InvestmentService {
           total: result.max.total,
           closePrice: result.data[result.data.length - 1].closePrice,
           signal: result.max.signal,
-          ma: result.max.ma
+          ma: result.max.ma,
+          closePricePrev: result.data[result.data.length - 1].closePricePrev
         })
       })
 
@@ -622,7 +649,8 @@ export class InvestmentService {
         detail,
         closePrice: price[price.length - 1],
         signal: lastSignal,
-        ma: maReverse[0]
+        ma: maReverse[0],
+        closePricePrev: price[price.length - 2]
       })
     }
     const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
