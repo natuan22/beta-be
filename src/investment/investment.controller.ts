@@ -1,9 +1,9 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CatchException } from '../exceptions/common.exception';
 import { StockDto } from '../shares/dto/stock.dto';
-import { GetUserIdFromToken } from '../utils/utils.decorators';
+import { GetRoleFromTokenV2, GetUserIdFromToken } from '../utils/utils.decorators';
 import { BaseResponse } from '../utils/utils.response';
 import { CreateBetaListDto } from './dto/create-beta-list.dto';
 import { DeleteBetaListDto } from './dto/delete-beta-list.dto';
@@ -107,9 +107,9 @@ export class InvestmentController {
   }
 
   @Get('test')
-  async test(@Query() q: any, @Res() res: Response){
+  async test(@GetRoleFromTokenV2() role: number, @Query() q: any, @Res() res: Response){
     try {
-      const data = await this.investmentService.test(q.stock.toUpperCase(), q.from, q.to)
+      const data = await this.investmentService.test(q.stock.toUpperCase(), q.from, q.to, 0, null, role)
       return res.status(HttpStatus.OK).send(new BaseResponse({data}))
     } catch (e) {
       throw new CatchException(e)

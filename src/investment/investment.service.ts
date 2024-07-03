@@ -505,7 +505,7 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number){
+  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number){
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item.code}'`).join(',')})` 
 
     const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
@@ -585,74 +585,135 @@ export class InvestmentService {
       return arr
     }
     
-    const result = this.calculateMAIndex(data, date, dateTo)
+    const result = this.calculateMAIndex(data, date, dateTo, undefined, role)
     return result
   }
 
-  private calculateMAIndex(data: any, date: any, dateTo: any, maNumber?: number){
+  private calculateMAIndex(data: any, date: any, dateTo: any, maNumber?: number, role?: number){
     const price = data.map(item => item.closePrice)
     const dateFormat = data.map(item => ({...item, date: UtilCommonTemplate.toDateV2(item.date)}))
     const indexDateFrom = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(date[0].date))
     const indexDateTo = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date))
     
     const arr = []
+    const maNoRole = [5, 10, 20, 50, 60, 100]
 
-    for(let i = (maNumber || 5); i <= (maNumber || 100); i++){
-      const ma = calTech.sma({values: price, period: i})
-      const maReverse = [...ma].reverse()
-      const newData = [...dateFormat].reverse().map((item, index) => ({...item, ma: maReverse[index] || 0}))
-
-      let isBuy = false
-      let indexBuy = 0
-      let count = 0
-      let total = 1
-      let min = 0, max = 0
-      const detail = []
-      let lastSignal = 0 // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
-
-      const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
-       
-      dataWithMa.map((item, index) => {
-        if(dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma) && !isBuy){
-          isBuy = true
-          indexBuy = index 
-          count += 1
-        }
-        if(index == dataWithMa.length - 1){
-          lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : (isBuy ? 2 : 3))
-        }
-        if((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma) && isBuy) || (index == (dataWithMa.length - 1) && isBuy)){
-          isBuy = false
-          const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
-
-          total = total * (1 + percent / 100)
-          min = Math.min(min, (percent / 100))
-          max = Math.max(max, (percent / 100))
-
-          detail.push({
-            date_buy: dataWithMa[indexBuy].date,
-            date_sell: item.date,
-            price_buy: dataWithMa[indexBuy].closePrice,
-            price_sell: item.closePrice,
-            profit: percent
-          })
-        }
-        
-      })
-
-      arr.push({
-        name: `MA_${i}`,
-        total: total - 1,
-        count: count,
-        min,
-        max,
-        detail,
-        closePrice: price[price.length - 1],
-        signal: lastSignal,
-        ma: maReverse[0],
-        closePricePrev: price[price.length - 2]
+    if(role){
+      for(let i = (maNumber || 5); i <= (maNumber || 100); i++){
+        const ma = calTech.sma({values: price, period: i})
+        const maReverse = [...ma].reverse()
+        const newData = [...dateFormat].reverse().map((item, index) => ({...item, ma: maReverse[index] || 0}))
+  
+        let isBuy = false
+        let indexBuy = 0
+        let count = 0
+        let total = 1
+        let min = 0, max = 0
+        const detail = []
+        let lastSignal = 0 // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
+  
+        const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
+         
+        dataWithMa.map((item, index) => {
+          if(dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma) && !isBuy){
+            isBuy = true
+            indexBuy = index 
+            count += 1
+          }
+          if(index == dataWithMa.length - 1){
+            lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : (isBuy ? 2 : 3))
+          }
+          if((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma) && isBuy) || (index == (dataWithMa.length - 1) && isBuy)){
+            isBuy = false
+            const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
+  
+            total = total * (1 + percent / 100)
+            min = Math.min(min, (percent / 100))
+            max = Math.max(max, (percent / 100))
+  
+            detail.push({
+              date_buy: dataWithMa[indexBuy].date,
+              date_sell: item.date,
+              price_buy: dataWithMa[indexBuy].closePrice,
+              price_sell: item.closePrice,
+              profit: percent
+            })
+          }
+          
+        })
+  
+        arr.push({
+          name: `MA_${i}`,
+          total: total - 1,
+          count: count,
+          min,
+          max,
+          detail,
+          closePrice: price[price.length - 1],
+          signal: lastSignal,
+          ma: maReverse[0],
+          closePricePrev: price[price.length - 2]
+        })
+      }
+    }else{
+      maNoRole.forEach((value) => {
+        const ma = calTech.sma({values: price, period: value})
+        const maReverse = [...ma].reverse()
+        const newData = [...dateFormat].reverse().map((item, index) => ({...item, ma: maReverse[index] || 0}))
+  
+        let isBuy = false
+        let indexBuy = 0
+        let count = 0
+        let total = 1
+        let min = 0, max = 0
+        const detail = []
+        let lastSignal = 0 // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
+  
+        const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1)
+         
+        dataWithMa.map((item, index) => {
+          if(dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma) && !isBuy){
+            isBuy = true
+            indexBuy = index 
+            count += 1
+          }
+          if(index == dataWithMa.length - 1){
+            lastSignal = (dataWithMa[index - 1]?.closePrice && (item.closePrice > item.ma) && (dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma)) ? 0 : ((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma)) ? 1 : (isBuy ? 2 : 3))
+          }
+          if((dataWithMa[index - 1]?.closePrice && (item.closePrice < item.ma) && (dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma) && isBuy) || (index == (dataWithMa.length - 1) && isBuy)){
+            isBuy = false
+            const percent = (item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice * 100
+  
+            total = total * (1 + percent / 100)
+            min = Math.min(min, (percent / 100))
+            max = Math.max(max, (percent / 100))
+  
+            detail.push({
+              date_buy: dataWithMa[indexBuy].date,
+              date_sell: item.date,
+              price_buy: dataWithMa[indexBuy].closePrice,
+              price_sell: item.closePrice,
+              profit: percent
+            })
+          }
+          
+        })
+  
+        arr.push({
+          name: `MA_${value}`,
+          total: total - 1,
+          count: count,
+          min,
+          max,
+          detail,
+          closePrice: price[price.length - 1],
+          signal: lastSignal,
+          ma: maReverse[0],
+          closePricePrev: price[price.length - 2]
+        })
       })
     }
+   
     const max = arr.reduce((acc, curr) => (!acc?.total ? arr[0] : curr.total > acc.total ? curr : acc), arr[0]);
     
     return {

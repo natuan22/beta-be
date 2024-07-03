@@ -30,6 +30,20 @@ export const GetToken = createParamDecorator<string>(async (data: unknown, ctx: 
     return bearer.split(' ')[1];
 });
 
+export const GetRoleFromTokenV2 = createParamDecorator<string>(async (data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    const bearer = request?.headers?.authorization;
+    const jwt = new JwtService();
+
+    if(!bearer) return null
+
+    const token = bearer.split(' ')[1];
+
+    const payload: any = jwt.decode(token);
+    if (!payload || !payload.role) return null
+    return payload.role;
+});
+
 export const GetDeviceId = createParamDecorator<string>(async (data: unknown, ctx: ExecutionContext) => {
    const req: MRequest = ctx.switchToHttp().getRequest();
    return req?.deviceId || "";
