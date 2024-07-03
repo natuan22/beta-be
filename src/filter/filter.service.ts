@@ -16,7 +16,7 @@ export class FilterService {
   async get() {
     try {
       const redisData = await this.redis.get('filter2')
-      if (redisData) return redisData
+      // if (redisData) return redisData
 
       const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
@@ -56,8 +56,13 @@ export class FilterService {
               tang_truong_doanh_thu_4_quy, tang_truong_loi_nhuan_4_quy,
               qoq_doanh_thu, qoq_loi_nhuan, yoy_doanh_thu, yoy_loi_nhuan,
               EPS, BVPS, PE, PB, PS, marketCap,
-              TinHieuChiBaoKyThuat AS tech, TinHieuDuongXuHuong AS trend, 
-              TinHieuTongHop AS overview, date
+              TinHieuChiBaoKyThuat AS tech, 
+              TinHieuDuongXuHuong AS trend, 
+              TinHieuTongHop AS overview,
+              LEAD(TinHieuChiBaoKyThuat) OVER (PARTITION BY code ORDER BY date DESC) AS tech_pre,
+              LEAD(TinHieuDuongXuHuong) OVER (PARTITION BY code ORDER BY date DESC) AS trend_pre,
+              LEAD(TinHieuTongHop) OVER (PARTITION BY code ORDER BY date DESC) AS overview_pre,
+              date
           FROM VISUALIZED_DATA.dbo.filterResource
           WHERE date IN (SELECT date FROM latest_dates)
       ),
