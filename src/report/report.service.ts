@@ -2311,19 +2311,19 @@ select * from temp where date = (select max(date) from temp)
         macd_date.push({ k: macd[index]?.MACD || 0, d: macd[index]?.signal || 0, date })
         macd_histogram_date.push({ value: macd[index]?.histogram || 0, date })
         volume_ma20_date.push({
-          closePrice: price_reverse[index],
-          highPrice: high_reverse[index],
-          lowPrice: low_reverse[index],
-          openPrice: open_reverse[index],
-          volume: volume_reverse[index],
-          volume_ma20: volume_ma20[index],
-          ma10: ma10[index],
-          ma20: ma20[index],
-          ma50: ma50[index],
-          ma100: ma100[index],
-          ma200: ma200[index],
-          sar: sar_reverse[index],
-          net: net_reverse[index],
+          closePrice: price_reverse[index] || 0,
+          highPrice: high_reverse[index] || 0,
+          lowPrice: low_reverse[index] || 0,
+          openPrice: open_reverse[index] || 0,
+          volume: volume_reverse[index] || 0,
+          volume_ma20: volume_ma20[index] || 0,
+          ma10: ma10[index] || 0,
+          ma20: ma20[index] || 0,
+          ma50: ma50[index] || 0,
+          ma100: ma100[index] || 0,
+          ma200: ma200[index] || 0,
+          sar: sar_reverse[index] || 0,
+          net: net_reverse[index] || 0,
           date: UtilCommonTemplate.changeDateUTC(item, 1)
         })
       }
