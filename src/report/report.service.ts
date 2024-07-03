@@ -2302,14 +2302,14 @@ select * from temp where date = (select max(date) from temp)
 
       day.map((item, index) => {
         const date = UtilCommonTemplate.toDate(item)
-        rsi_date.push({ value: rsi[index], date })
-        cci_date.push({ value: cci[index], date })
-        williams_date.push({ value: williams[index], date })
-        adx_date.push({ ...adx[index], date })
-        stochastic_date.push({ ...stochastic[index], date })
-        stochasticRsi_date.push({ k: stochasticRsi[index].k, d: stochasticRsi[index].d, date })
-        macd_date.push({ k: macd[index].MACD, d: macd[index].signal, date })
-        macd_histogram_date.push({ value: macd[index].histogram, date })
+        rsi_date.push({ value: rsi[index] || 0, date })
+        cci_date.push({ value: cci[index] || 0, date })
+        williams_date.push({ value: williams[index] || 0, date })
+        adx_date.push({ ...(adx[index] ? adx[index] : {adx: 0, pdi: 0, mdi: 0}) , date })
+        stochastic_date.push({ ...(stochastic[index] ? stochastic[index] : {k: 0, d: 0}), date })
+        stochasticRsi_date.push({ k: stochasticRsi[index]?.k || 0, d: stochasticRsi[index]?.d || 0, date })
+        macd_date.push({ k: macd[index]?.MACD || 0, d: macd[index]?.signal || 0, date })
+        macd_histogram_date.push({ value: macd[index]?.histogram || 0, date })
         volume_ma20_date.push({
           closePrice: price_reverse[index],
           highPrice: high_reverse[index],
