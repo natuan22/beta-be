@@ -596,7 +596,7 @@ export class InvestmentService {
     const indexDateTo = dateFormat.findIndex(item => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date))
     
     const arr = []
-    const maNoRole = [5, 10, 20, 50, 60, 100]
+    const maNoRole = !maNumber ? [5, 10, 20, 50, 60, 100] : [maNumber]
 
     if(role){
       for(let i = (maNumber || 5); i <= (maNumber || 100); i++){
