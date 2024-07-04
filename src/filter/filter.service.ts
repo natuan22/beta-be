@@ -16,7 +16,7 @@ export class FilterService {
   async get() {
     try {
       const redisData = await this.redis.get('filter2')
-      // if (redisData) return redisData
+      if (redisData) return redisData
 
       const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
