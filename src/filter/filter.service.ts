@@ -55,7 +55,8 @@ export class FilterService {
               BBL, BBU, doanh_thu_4_quy, loi_nhuan_4_quy,
               tang_truong_doanh_thu_4_quy, tang_truong_loi_nhuan_4_quy,
               qoq_doanh_thu, qoq_loi_nhuan, yoy_doanh_thu, yoy_loi_nhuan,
-              EPS, BVPS, PE, PB, PS, marketCap,
+              EPS, 
+              BVPS, PE, PB, PS, marketCap,
               TinHieuChiBaoKyThuat AS tech, 
               TinHieuDuongXuHuong AS trend, 
               TinHieuTongHop AS overview,
@@ -92,37 +93,74 @@ export class FilterService {
 
       //Query lấy totalVol trung bình
       const query_2 = `
-      with last_date as (
-          select top 1 date from marketTrade.dbo.tickerTradeVND where type = 'STOCK' order by date desc
+      with ranked_trades as (
+          select code, totalVol, date,
+                row_number() over (partition by code order by date desc) as rn
+          from marketTrade.dbo.tickerTradeVND
+          where type = 'STOCK'
       ),
-      day_5 as (select avg(totalVol) as avg_totalVol_5d, code
-                from marketTrade.dbo.tickerTradeVND
-                where type = 'STOCK'
-                  and date >= dateadd(day, -5, (select date from last_date))
-                group by code
-                ),
-          day_10 as (select avg(totalVol) as avg_totalVol_10d, code
-                from marketTrade.dbo.tickerTradeVND
-                where type = 'STOCK'
-                  and date >= dateadd(day, -10, (select date from last_date))
-                group by code
-                ),
-          day_20 as (select avg(totalVol) as avg_totalVol_20d, code
-                from marketTrade.dbo.tickerTradeVND
-                where type = 'STOCK'
-                  and date >= dateadd(day, -20, (select date from last_date))
-                group by code
-                ),
-          day_60 as (select avg(totalVol) as avg_totalVol_60d, code
-                from marketTrade.dbo.tickerTradeVND
-                where type = 'STOCK'
-                  and date >= dateadd(day, -60, (select date from last_date))
-                group by code
-                )
-      select d5.code, d5.avg_totalVol_5d, d10.avg_totalVol_10d, d20.avg_totalVol_20d, d60.avg_totalVol_60d from day_5 d5
-      inner join day_10 d10 on d10.code = d5.code
-      inner join day_20 d20 on d20.code = d5.code
-      inner join day_60 d60 on d60.code = d5.code
+      average_volumes as (
+          select code,
+                avg(case when rn <= 5 then totalVol end) as avg_totalVol_5d,
+                avg(case when rn <= 10 then totalVol end) as avg_totalVol_10d,
+                avg(case when rn <= 20 then totalVol end) as avg_totalVol_20d,
+                avg(case when rn <= 60 then totalVol end) as avg_totalVol_60d
+          from ranked_trades
+          group by code
+      )
+      select code,
+            avg_totalVol_5d,
+            avg_totalVol_10d,
+            avg_totalVol_20d,
+            avg_totalVol_60d
+      from average_volumes
+      order by code;
+      `
+
+      const query_5 = `
+      with ranked_trades as (
+          select code, omVol, date,
+                row_number() over (partition by code order by date desc) as rn
+          from marketTrade.dbo.tickerTradeVND
+          where type = 'STOCK'
+      ),
+      average_volumes as (
+          select code,
+                avg(case when rn > 1 and rn <= 6 then omVol end) as avg_totalVol_5d_excluding_last,
+                avg(case when rn > 1 and rn <= 11 then omVol end) as avg_totalVol_10d_excluding_last,
+                avg(case when rn > 1 and rn <= 21 then omVol end) as avg_totalVol_20d_excluding_last,
+                avg(case when rn > 1 and rn <= 61 then omVol end) as avg_totalVol_60d_excluding_last,
+                max(case when rn = 1 then omVol end) as last_totalVol
+          from ranked_trades
+          group by code
+      ),
+      percent_changes as (
+          select code,
+                avg_totalVol_5d_excluding_last,
+                avg_totalVol_10d_excluding_last,
+                avg_totalVol_20d_excluding_last,
+                avg_totalVol_60d_excluding_last,
+                last_totalVol,
+                case when avg_totalVol_5d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_5d_excluding_last) / avg_totalVol_5d_excluding_last * 100 end as pct_change_5d,
+                case when avg_totalVol_10d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_10d_excluding_last) / avg_totalVol_10d_excluding_last * 100 end as pct_change_10d,
+                case when avg_totalVol_20d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_20d_excluding_last) / avg_totalVol_20d_excluding_last * 100 end as pct_change_20d,
+                case when avg_totalVol_60d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_60d_excluding_last) / avg_totalVol_60d_excluding_last * 100 end as pct_change_60d
+          from average_volumes
+      )
+      select code,
+      pct_change_5d as perChangeOmVol_5d,
+            pct_change_10d as perChangeOmVol_10d,
+            pct_change_20d as perChangeOmVol_20d,
+            pct_change_60d as perChangeOmVol_60d
+      from percent_changes
+      order by code;
+      `
+
+      //tính % thay đổi eps
+      const query_6 = `
+      with temp as (select code, (EPS - lead(EPS) over (partition by code order by yearQuarter desc)) / lead(EPS) over (partition by code order by yearQuarter desc) * 100 as perEPS, yearQuarter
+            from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 and type = 'STOCK')
+      select * from temp where yearQuarter = (select max(yearQuarter) from temp)
       `
 
       const query_3 = `
@@ -183,14 +221,16 @@ export class FilterService {
       JOIN max_yearQuarter m ON s.yearQuarter = m.maxYQ;
       `;
 
-      const [data, data_2, data_3, data_4] = await Promise.all(
+      const [data, data_2, data_3, data_4, data_5, data_6] = await Promise.all(
         [
           this.mssqlService.query<FilterResponse[]>(query),
         this.mssqlService.query(query_2),
         this.mssqlService.query(query_3),
-        this.mssqlService.query(query_4)
+        this.mssqlService.query(query_4),
+        this.mssqlService.query(query_5),
+        this.mssqlService.query(query_6),
         ])
-      const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4)
+      const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4, data_5, data_6)
       await this.redis.set('filter2', dataMapped, { ttl: 500 })
       return dataMapped
     } catch (e) {

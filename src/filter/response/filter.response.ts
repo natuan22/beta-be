@@ -76,6 +76,8 @@ export class FilterResponse {
   yoy_doanh_thu: number;
   yoy_loi_nhuan: number;
   EPS: number;
+  EPS_pre: number;
+  perEPS: number;
   BVPS: number;
   PE: number;
   PB: number;
@@ -118,6 +120,15 @@ export class FilterResponse {
   avg_totalVol_10d: number;
   avg_totalVol_20d: number;
   avg_totalVol_60d: number;
+  omVol: number
+  avg_omVol_5d: number;
+  avg_omVol_10d: number;
+  avg_omVol_20d: number;
+  avg_omVol_60d: number;
+  perChangeOmVol_5d: number
+  perChangeOmVol_10d: number
+  perChangeOmVol_20d: number
+  perChangeOmVol_60d: number
   grossProfitMargin: number;
   grossProfitMargin4Q: number;
   netProfitMargin: number;
@@ -211,6 +222,7 @@ export class FilterResponse {
     this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0;
     this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0;
     this.EPS = data?.EPS || 0;
+    this.perEPS = data?.perEPS || 0;
     this.BVPS = data?.BVPS || 0;
     this.PE = data?.PE || 0;
     this.PB = data?.PB || 0;
@@ -268,6 +280,10 @@ export class FilterResponse {
     this.avg_totalVol_10d = data?.avg_totalVol_10d || 0;
     this.avg_totalVol_20d = data?.avg_totalVol_20d || 0;
     this.avg_totalVol_60d = data?.avg_totalVol_60d || 0;
+    this.perChangeOmVol_5d = data?.perChangeOmVol_5d || 0;
+    this.perChangeOmVol_10d = data?.perChangeOmVol_10d || 0;
+    this.perChangeOmVol_20d = data?.perChangeOmVol_20d || 0;
+    this.perChangeOmVol_60d = data?.perChangeOmVol_60d || 0;
     this.grossProfitMargin = data?.grossProfitMargin || 0;
     this.grossProfitMargin4Q = data?.grossProfitMargin4Q || 0;
     this.netProfitMargin = data?.netProfitMargin || 0;
@@ -301,6 +317,8 @@ export class FilterResponse {
     data_1: any,
     data_2: any,
     data_4: any,
+    data_5: any,
+    data_6
   ) {
     return data.map(
       (item) =>
@@ -342,6 +360,8 @@ export class FilterResponse {
           ...data_1.find((vol) => vol.code == item.code),
           ...data_2.find((margin) => margin.code == item.code),
           ...data_4.find((roa) => roa.code == item.code),
+          ...data_5.find((omVol) => omVol.code == item.code),
+          ...data_6.find((perEPS) => perEPS.code == item.code),
         }),
     );
   }
