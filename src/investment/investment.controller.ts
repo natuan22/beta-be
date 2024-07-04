@@ -1,7 +1,10 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CatchException } from '../exceptions/common.exception';
+import { AuthGuard } from '../guards/auth.guard';
+import { Role, Roles } from '../guards/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { GetRoleFromTokenV2, GetUserIdFromToken } from '../utils/utils.decorators';
 import { BaseResponse } from '../utils/utils.response';
@@ -136,6 +139,8 @@ export class InvestmentController {
     }
   }
 
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiOperation({summary: 'Thêm cổ phiếu dô watchlist'})
   @Post('create-beta-watch-list')
   async createBetaWatchList(@Body() q: CreateBetaListDto, @Res() res: Response){
@@ -147,6 +152,8 @@ export class InvestmentController {
     }
   }
 
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiOperation({summary: 'Sửa cổ phiếu trong watchlist'})
   @Post('update-beta-watch-list')
   async updateBetaWatchList(@Body() q: UpdateBetaListDto, @Res() res: Response){
@@ -158,6 +165,8 @@ export class InvestmentController {
     }
   }
 
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin)
   @ApiOperation({summary: 'Xoá cổ phiếu trong watchlist'})
   @Post('delete-beta-watch-list')
   async deleteBetaWatchList(@Body() q: DeleteBetaListDto, @Res() res: Response){
@@ -170,6 +179,8 @@ export class InvestmentController {
   }
 
 
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.WatchTradingTool)
   @ApiOperation({summary: 'Danh mục beta'})
   @Get('beta-watch-list')
   async getBeteWatchList(@Query() p: any, @Res() res: Response){
