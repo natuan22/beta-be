@@ -39,6 +39,5 @@ lerna-debug.log*
 !.vscode/extensions.json
 docker/build.sh
 
-Dockerfile
 docker-compose.yml
 .dockerignore
