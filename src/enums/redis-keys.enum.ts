@@ -227,5 +227,8 @@ export enum RedisKeys {
   flexiblePage = 'flexible-page-week',
 
   //Báo cáo phân tích kỹ thuật
-  reportTechnical = 'report-technical'
+  reportTechnical = 'report-technical',
+
+  //Trung tâm phân tích
+  analysisReport = 'analysis-report',
 }
