@@ -37,7 +37,6 @@ export class AnalysisService {
         ${q.type && +q.type === 1 ? `AND Date >= '2024-01-01'` : ''}
         ORDER BY Date desc
     `
-    console.log(query)
     const data = await this.mssqlService.query<AnalysisResponse[]>(query)
     const dataMapped = AnalysisResponse.mapToList(data)
     await this.redis.set(`${RedisKeys.analysisReport}:${q.type}`, dataMapped, {ttl: TimeToLive.OneHour})
