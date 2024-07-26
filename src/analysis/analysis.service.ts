@@ -39,6 +39,38 @@ export class AnalysisService {
     `
     const data = await this.mssqlService.query<AnalysisResponse[]>(query)
     const dataMapped = AnalysisResponse.mapToList(data)
+
+    const titlePriority = {
+      'Báo cáo tuần': 1,
+      'Bản tin thị trường cuối ngày': 2,
+      'Diễn biến thị trường phiên sáng': 3,
+      'Bản tin trước giờ giao dịch': 4
+    };
+
+    const getMainTitle = (title: any) => {
+      if (title.startsWith('Báo cáo tuần')) return 'Báo cáo tuần';
+      if (title.includes('Bản tin thị trường cuối ngày')) return 'Bản tin thị trường cuối ngày';
+      if (title.includes('Diễn biến thị trường phiên sáng')) return 'Diễn biến thị trường phiên sáng';
+      if (title.includes('Bản tin trước giờ giao dịch')) return 'Bản tin trước giờ giao dịch';
+      return title;
+    };
+
+    // Custom sorting function
+    dataMapped.sort((a, b) => {
+      // Sort by date in descending order
+      const dateA = new Date(a.date.split('/').reverse().join('-'));
+      const dateB = new Date(b.date.split('/').reverse().join('-'));
+
+      if (dateA > dateB) return -1;
+      if (dateA < dateB) return 1;
+
+      // Sort by title priority if dates are the same
+      const titleA = getMainTitle(a.title);
+      const titleB = getMainTitle(b.title);
+
+      return titlePriority[titleA] - titlePriority[titleB];
+    });
+    
     await this.redis.set(`${RedisKeys.analysisReport}:${q.type}`, dataMapped, {ttl: TimeToLive.OneHour})
     return dataMapped
   }
