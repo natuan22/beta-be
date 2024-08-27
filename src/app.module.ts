@@ -34,6 +34,7 @@ import { UserModule } from './user/user.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { FilterModule } from './filter/filter.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { HistoricalPEPBModule } from './historical-pe-pb-tcbs/historical-pe-pb.module';
 
 @Module({
   imports: [
@@ -105,7 +106,8 @@ import { AnalysisModule } from './analysis/analysis.module';
     HttpConfigModule,
     WatchlistModule,
     FilterModule,
-    AnalysisModule
+    AnalysisModule,
+    HistoricalPEPBModule
   ],
 })
 export class AppModule implements NestModule {
