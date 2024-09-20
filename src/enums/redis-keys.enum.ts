@@ -232,6 +232,7 @@ export enum RedisKeys {
   //Trung tâm phân tích
   analysisReport = 'analysis-report',
 
-  //Historical PE PB TCBS
+  //TCBS
   historicalPEPB = 'historical-pe-pb',
+  tradingInfo = 'trading-info',
 }
