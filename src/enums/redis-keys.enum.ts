@@ -234,5 +234,5 @@ export enum RedisKeys {
 
   //TCBS
   historicalPEPB = 'historical-pe-pb',
-  tradingInfo = 'trading-info',
+  // tradingInfo = 'trading-info',
 }
