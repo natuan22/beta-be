@@ -37,8 +37,8 @@ export class TCBSService {
   }
 
   async tradingInfo(code: string) {
-    // const redisData = await this.redis.get(`${RedisKeys.tradingInfo}:${code}`);
-    // if (redisData) return redisData;
+    const redisData = await this.redis.get(`${RedisKeys.tradingInfo}:${code}`);
+    if (redisData) return redisData;
 
     //wss://priceapi.bsc.com.vn/market/socket.io/?__sails_io_sdk_version=1.2.1&__sails_io_sdk_platform=browser&__sails_io_sdk_language=javascript&EIO=3&transport=websocket 
     try {
@@ -83,7 +83,7 @@ export class TCBSService {
         dataMB: dataMB
       };
 
-      // await this.redis.set(`${RedisKeys.tradingInfo}:${code}`, finalResponse, { ttl: TimeToLive.HaftMinute })
+      await this.redis.set(`${RedisKeys.tradingInfo}:${code}`, finalResponse, { ttl: TimeToLive.HaftMinute })
 
       return finalResponse
 
