@@ -61,7 +61,8 @@ export class TCBSService {
       const dataFormat = response.data.d.map((item) => {
         return {
           ...item,
-          formattedVal: item.formattedVol * item.formattedMatchPrice
+          formattedVal: item.formattedVol * item.formattedMatchPrice,
+          highlight: item.formattedVol * item.formattedMatchPrice > 1_000_000_000,
         }
       })
 
