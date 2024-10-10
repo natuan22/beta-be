@@ -200,6 +200,7 @@ export enum RedisKeys {
 
   //Công cụ đầu tư
   minMaxFilter = 'min-max-filter',
+  tickerTransLog = 'ticker-trans-log',
 
   //Tin sáng
   morningNewsInternational = 'morning-news-international',
@@ -234,5 +235,4 @@ export enum RedisKeys {
 
   //TCBS
   historicalPEPB = 'historical-pe-pb',
-  tradingInfo = 'trading-info',
 }
