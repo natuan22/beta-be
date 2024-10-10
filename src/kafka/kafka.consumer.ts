@@ -19,6 +19,7 @@ import { MarketLiquidityKafkaInterface } from './interfaces/market-liquidity-kak
 import { TickerChangeInterface } from './interfaces/ticker-change.interface';
 import { TickerContributeKafkaInterface } from './interfaces/ticker-contribute-kafka.interface';
 import { KafkaService } from './kafka.service';
+import { TickerTransInterface } from './interfaces/ticker-trans.interface';
 
 @Controller()
 export class KafkaConsumer {
@@ -205,6 +206,14 @@ export class KafkaConsumer {
   async handleChartNenNew(@Payload() payload: ChartNenInterface[], @Ctx() context: KafkaContext){
     try {
         this.kafkaService.handleBetaWatchListSocket(payload)
+    } catch (error) {
+      this.logger.error(error)
+    }
+  }
+  @MessagePattern(Topics.GiaoDichCoPhieu)
+  async handleGiaoDichCoPhieu(@Payload() payload: TickerTransInterface[], @Ctx() context: KafkaContext){
+    try {
+        this.kafkaService.handleGiaoDichCoPhieu(payload)
     } catch (error) {
       this.logger.error(error)
     }

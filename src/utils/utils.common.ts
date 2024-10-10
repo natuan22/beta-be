@@ -19,6 +19,13 @@ export class UtilCommonTemplate {
     return moment(value).utcOffset(420).format('HH:mm:ss');
   }
 
+  static toTimeUTC(value?: any): any | string {
+    if (!value) {
+      return moment().format('HH:mm:ss');
+    }
+    return moment.utc(value).format('HH:mm:ss');
+  }
+
   static toDateNumber(value?: any): number {
     if (!value) {
       return 0;

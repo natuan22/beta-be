@@ -18,6 +18,7 @@ import { UpdateBetaListDto } from './dto/update-beta-list.dto';
 import { InvestmentService } from './investment.service';
 import { InvestmentFilterResponseSwagger } from './response/investmentFilter.response';
 import { KeyFilterResponse } from './response/keyFilter.response';
+import { TickerTransLogResponse } from './response/tickerTransLog.response';
 
 @Controller('investment')
 @ApiTags('Investment - Công cụ đầu tư')
@@ -191,4 +192,20 @@ export class InvestmentController {
       throw new CatchException(e)
     }
   }
+
+  /**
+   * MB chủ động
+   */
+
+  @ApiOperation({summary: 'Lấy mua bán chủ động'})
+  @ApiOkResponse({status: HttpStatus.OK, type: TickerTransLogResponse})
+  @Get('ticker-translog')
+  async tickerTransLog(@Query() q: StockDto, @Res() res: Response) {
+    try { 
+      const data = await this.investmentService.tickerTransLog(q.stock.toUpperCase())
+      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    } catch (error) {
+      throw new CatchException(error)
+    }
+  }  
 }

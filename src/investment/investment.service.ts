@@ -21,6 +21,9 @@ import { FilterUserResponse } from './response/filterUser.response';
 import { InvestmentFilterResponse } from './response/investmentFilter.response';
 import { KeyFilterResponse } from './response/keyFilter.response';
 import { InvestmentSearchResponse } from './response/searchStockInvestment.response';
+import { DataBuySell, TickerTransLogResponse } from './response/tickerTransLog.response';
+import { UtilsRandomUserAgent } from '../tcbs/utils/utils.random-user-agent';
+import axios from 'axios';
 
 @Injectable()
 export class InvestmentService {
@@ -740,5 +743,81 @@ export class InvestmentService {
     }
       const result: any = await this.test(data.map(item => ({code: item.code, ma: item.ma})), moment().subtract(2, 'year').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), 1)
       return result.map((item, index) => ({...item, price_2024: data[index].price_2024 || 0, price_2025: data[index].price_2025 || 0, name: `MA_${data[index].ma}`}))
+  }
+
+  async tickerTransLog(code: string) {
+    const redisData = await this.redis.get(`${RedisKeys.tickerTransLog}:${code}`);
+    if (redisData) return redisData;
+    
+    try {
+      const response = await axios.get(
+        `https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`,
+        {
+          headers: {
+            "User-Agent": UtilsRandomUserAgent.getRandomUserAgent(),
+          },
+        }
+      );
+
+      const query = ` SELECT closePrice
+                      FROM marketTrade.dbo.tickerTradeVND t
+                      INNER JOIN (
+                          SELECT MAX(date) AS max_previous_date
+                          FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+                          WHERE date < (SELECT MAX(date) FROM tradeIntraday.dbo.tickerTradeVNDIntraday)
+                      ) latest ON t.date = latest.max_previous_date
+                      WHERE t.code = '${code}';
+      `
+      const data_2 = await this.mssqlService.query(query)
+        
+      const dataCal = response.data.d.map((item) => {
+        const value = item.formattedMatchPrice * item.formattedVol;
+        const type = value < 100_000_000 
+                              ? "small"
+                              : value < 1_000_000_000
+                              ? "medium"
+                              : "large";
+
+        const currentDate = new Date();
+        
+        const [hours, minutes, seconds] = item.formattedTime.split(":").map(Number);
+        
+        const time = new Date(
+          Date.UTC(
+            currentDate.getFullYear(),
+            currentDate.getMonth(),
+            currentDate.getDate(),
+            hours,
+            minutes,
+            seconds
+          )
+        ).toISOString(); // Chuyển thành định dạng ISO
+
+        return {
+          time,
+          action: item.lastColor === "S" ? "B" : item.lastColor === "B" ? "S" : item.lastColor,
+          type,
+          volume: +item.formattedVol,
+          value: value,
+          matchPrice: item.formattedMatchPrice / 1_000,
+          priceChangeReference: item.formattedChangeValue / 1_000,
+          perChangeReference: (item.formattedChangeValue / 1000 / data_2[0].closePrice) * 100,
+          highlight: value > 1_000_000_000,
+        }
+      })
+
+      const finalResponse = new TickerTransLogResponse({
+        ticker : code,
+        prevClosePrice: data_2[0].closePrice,
+        data: DataBuySell.mapToList(dataCal)
+      })
+
+      await this.redis.set(`${RedisKeys.tickerTransLog}:${code}`, finalResponse, { ttl: TimeToLive.HaftMinute })
+
+      return finalResponse
+
+    } catch (err) {
+      console.error(err);
+    }
   }
 }
