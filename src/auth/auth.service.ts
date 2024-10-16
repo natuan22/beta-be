@@ -56,7 +56,7 @@ export class AuthService {
       },
       {
         secret: secretKey,
-        expiresIn: TimeToLive.OneHour,
+        expiresIn: TimeToLive.OneDay,
       },
     );
   }

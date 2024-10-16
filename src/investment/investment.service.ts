@@ -754,7 +754,12 @@ export class InvestmentService {
         `https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`,
         {
           headers: {
+            "host": "priceapi.bsc.com.vn",
+            "origin": "https://trading.bsc.com.vn",
+            "referer": "https://trading.bsc.com.vn/",
             "User-Agent": UtilsRandomUserAgent.getRandomUserAgent(),
+            "x-devicetype": "WEB",
+            "x-lang": 'vi'
           },
         }
       );
