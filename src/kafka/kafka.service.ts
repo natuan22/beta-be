@@ -733,7 +733,7 @@ export class KafkaService {
         this.send(`${SocketEmit.MA}`, res);
       }
     } catch (e) {
-      console.log(e);
+      console.error(e);
     }
   }
 
