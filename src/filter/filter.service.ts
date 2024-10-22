@@ -4,6 +4,7 @@ import * as moment from 'moment';
 import { CatchException } from '../exceptions/common.exception';
 import { MssqlService } from '../mssql/mssql.service';
 import { FilterResponse } from './response/filter.response';
+import { TimeToLive } from '../enums/common.enum';
 
 @Injectable()
 export class FilterService {
@@ -20,206 +21,239 @@ export class FilterService {
 
       const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
-      WITH latest_dates AS (
-          SELECT DISTINCT TOP 2 date
-          FROM VISUALIZED_DATA.dbo.filterResource
-          ORDER BY date DESC
-      ),
-      temp AS (
-          SELECT 
-              code, floor, TyleNDTNNdangnamgiu, closePrice,
-              LEAD(closePrice) OVER (PARTITION BY code ORDER BY date DESC) AS closePrice_pre,
-              min_1_week, max_1_week, min_1_month, max_1_month, min_3_month, max_3_month, 
-              min_6_month, max_6_month, min_1_year, max_1_year,
-              perChange1D, perChange5D, perChange1M, perChange3M, perChange6M, 
-              perChange1Y, perChangeYTD, beta, volume AS totalVol, TyLeKLMBCD, 
-              KNnetVal, KNnetVol,
-              ma5, ma10, ma20, ma50, ma100, ma200, 
-              ema5, ema10, ema20, ema50, ema100, ema200,
-              LEAD(ma5) OVER (PARTITION BY code ORDER BY date DESC) AS ma5_pre,
-              LEAD(ma10) OVER (PARTITION BY code ORDER BY date DESC) AS ma10_pre,
-              LEAD(ma20) OVER (PARTITION BY code ORDER BY date DESC) AS ma20_pre,
-              LEAD(ma50) OVER (PARTITION BY code ORDER BY date DESC) AS ma50_pre,
-              LEAD(ma100) OVER (PARTITION BY code ORDER BY date DESC) AS ma100_pre,
-              LEAD(ma200) OVER (PARTITION BY code ORDER BY date DESC) AS ma200_pre,
-              LEAD(ema5) OVER (PARTITION BY code ORDER BY date DESC) AS ema5_pre,
-              LEAD(ema10) OVER (PARTITION BY code ORDER BY date DESC) AS ema10_pre,
-              LEAD(ema20) OVER (PARTITION BY code ORDER BY date DESC) AS ema20_pre,
-              LEAD(ema50) OVER (PARTITION BY code ORDER BY date DESC) AS ema50_pre,
-              LEAD(ema100) OVER (PARTITION BY code ORDER BY date DESC) AS ema100_pre,
-              LEAD(ema200) OVER (PARTITION BY code ORDER BY date DESC) AS ema200_pre,
-              rsi, LEAD(rsi) OVER (PARTITION BY code ORDER BY date DESC) AS rsi_pre,
-              macd, macd_signal,
-              LEAD(macd) OVER (PARTITION BY code ORDER BY date DESC) AS macd_pre,
-              LEAD(macd_signal) OVER (PARTITION BY code ORDER BY date DESC) AS macd_signal_pre,
-              BBL, BBU, doanh_thu_4_quy, loi_nhuan_4_quy,
-              tang_truong_doanh_thu_4_quy, tang_truong_loi_nhuan_4_quy,
-              qoq_doanh_thu, qoq_loi_nhuan, yoy_doanh_thu, yoy_loi_nhuan,
-              EPS, 
-              BVPS, PE, PB, PS, marketCap,
-              TinHieuChiBaoKyThuat AS tech, 
-              TinHieuDuongXuHuong AS trend, 
-              TinHieuTongHop AS overview,
-              LEAD(TinHieuChiBaoKyThuat) OVER (PARTITION BY code ORDER BY date DESC) AS tech_pre,
-              LEAD(TinHieuDuongXuHuong) OVER (PARTITION BY code ORDER BY date DESC) AS trend_pre,
-              LEAD(TinHieuTongHop) OVER (PARTITION BY code ORDER BY date DESC) AS overview_pre,
-              date
-          FROM VISUALIZED_DATA.dbo.filterResource
-          WHERE date IN (SELECT date FROM latest_dates)
-      ),
-      min_max AS (
-          SELECT 
-              code, 
-              MIN(closePrice) AS PRICE_LOWEST_CR_52W, 
-              MAX(closePrice) AS PRICE_HIGHEST_CR_52W 
-          FROM marketTrade.dbo.tickerTradeVND 
-          WHERE date >= '${day_52_week}'
-          GROUP BY code
-      )
-      SELECT 
-          t.*, m.totalVal, i.LV4,
-          r.netVal AS buyVal, r.netVol AS buyVol,
-          b.MB, b.Mua, b.Ban,
-          l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
-      FROM temp t
-      INNER JOIN marketInfor.dbo.info i ON i.code = t.code
-      INNER JOIN marketTrade.dbo.tickerTradeVND m ON m.code = t.code AND m.date = t.date
-      INNER JOIN PHANTICH.dbo.MBChuDong b ON b.MCK = t.code AND b.Ngay = (SELECT MAX(Ngay) FROM PHANTICH.dbo.MBChuDong)
-      INNER JOIN marketTrade.dbo.[foreign] r ON r.code = t.code AND r.date = (SELECT MAX(date) FROM marketTrade.dbo.[foreign] WHERE type = 'STOCK')
-      LEFT JOIN min_max l ON l.code = t.code
-      WHERE t.date = (SELECT MAX(date) FROM temp)
-      AND i.status = 'listed';
+        WITH latest_dates AS (
+            SELECT DISTINCT TOP 2 date
+            FROM VISUALIZED_DATA.dbo.filterResource
+            ORDER BY date DESC
+        ),
+        max_dates AS (
+            SELECT MAX(Ngay) AS max_ngay
+            FROM PHANTICH.dbo.MBChuDong
+        ),
+        max_foreign_date AS (
+            SELECT MAX(date) AS max_foreign_date
+            FROM marketTrade.dbo.[foreign]
+            WHERE type = 'STOCK'
+        ),
+        min_max AS (
+            SELECT code, MIN(closePrice) AS PRICE_LOWEST_CR_52W, MAX(closePrice) AS PRICE_HIGHEST_CR_52W
+            FROM marketTrade.dbo.tickerTradeVND
+            WHERE date >= '${day_52_week}'
+            GROUP BY code
+        ),
+        temp AS (
+            SELECT
+                f.code, f.floor, f.TyleNDTNNdangnamgiu, f.closePrice,
+                LEAD(f.closePrice) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS closePrice_pre,
+                f.min_1_week, f.max_1_week, f.min_1_month, f.max_1_month, f.min_3_month, f.max_3_month,
+                f.min_6_month, f.max_6_month, f.min_1_year, f.max_1_year,
+                f.perChange1D, f.perChange5D, f.perChange1M, f.perChange3M, f.perChange6M,
+                f.perChange1Y, f.perChangeYTD, f.beta, f.volume AS totalVol, f.TyLeKLMBCD,
+                f.KNnetVal, f.KNnetVol,
+                f.ma5, f.ma10, f.ma20, f.ma50, f.ma100, f.ma200,
+                f.ema5, f.ema10, f.ema20, f.ema50, f.ema100, f.ema200,
+                LEAD(f.ma5) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma5_pre,
+                LEAD(f.ma10) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma10_pre,
+                LEAD(f.ma20) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma20_pre,
+                LEAD(f.ma50) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma50_pre,
+                LEAD(f.ma100) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma100_pre,
+                LEAD(f.ma200) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma200_pre,
+                LEAD(f.ema5) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema5_pre,
+                LEAD(f.ema10) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema10_pre,
+                LEAD(f.ema20) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema20_pre,
+                LEAD(f.ema50) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema50_pre,
+                LEAD(f.ema100) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema100_pre,
+                LEAD(f.ema200) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema200_pre,
+                f.rsi, LEAD(f.rsi) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS rsi_pre,
+                f.macd, f.macd_signal,
+                LEAD(f.macd) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS macd_pre,
+                LEAD(f.macd_signal) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS macd_signal_pre,
+                f.BBL, f.BBU, f.doanh_thu_4_quy, f.loi_nhuan_4_quy,
+                f.tang_truong_doanh_thu_4_quy, f.tang_truong_loi_nhuan_4_quy,
+                f.qoq_doanh_thu, f.qoq_loi_nhuan, f.yoy_doanh_thu, f.yoy_loi_nhuan,
+                f.EPS,
+                f.BVPS, f.PE, f.PB, f.PS, f.marketCap,
+                f.TinHieuChiBaoKyThuat AS tech,
+                f.TinHieuDuongXuHuong AS trend,
+                f.TinHieuTongHop AS overview,
+                LEAD(f.TinHieuChiBaoKyThuat) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS tech_pre,
+                LEAD(f.TinHieuDuongXuHuong) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS trend_pre,
+                LEAD(f.TinHieuTongHop) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS overview_pre,
+                f.date
+            FROM VISUALIZED_DATA.dbo.filterResource f
+            WHERE f.date IN (SELECT date FROM latest_dates)
+        )
+        SELECT
+            t.*, m.totalVal, i.LV4,
+            r.netVal AS buyVal, r.netVol AS buyVol,
+            b.MB, b.Mua, b.Ban,
+            l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
+        FROM temp t
+        INNER JOIN marketInfor.dbo.info i ON i.code = t.code
+        INNER JOIN marketTrade.dbo.tickerTradeVND m ON m.code = t.code AND m.date = t.date
+        INNER JOIN PHANTICH.dbo.MBChuDong b ON b.MCK = t.code AND b.Ngay = (SELECT max_ngay FROM max_dates)
+        INNER JOIN marketTrade.dbo.[foreign] r ON r.code = t.code AND r.date = (SELECT max_foreign_date FROM max_foreign_date)
+        LEFT JOIN min_max l ON l.code = t.code
+        WHERE t.date = (SELECT MAX(date) FROM latest_dates)
+        AND i.status = 'listed';
       `
 
       //Query lấy totalVol trung bình
       const query_2 = `
-      with ranked_trades as (
-          select code, totalVol, date,
-                row_number() over (partition by code order by date desc) as rn
-          from marketTrade.dbo.tickerTradeVND
-          where type = 'STOCK'
-      ),
-      average_volumes as (
-          select code,
-                avg(case when rn <= 5 then totalVol end) as avg_totalVol_5d,
-                avg(case when rn <= 10 then totalVol end) as avg_totalVol_10d,
-                avg(case when rn <= 20 then totalVol end) as avg_totalVol_20d,
-                avg(case when rn <= 60 then totalVol end) as avg_totalVol_60d
-          from ranked_trades
-          group by code
-      )
-      select code,
-            avg_totalVol_5d,
-            avg_totalVol_10d,
-            avg_totalVol_20d,
-            avg_totalVol_60d
-      from average_volumes
-      order by code;
-      `
-
-      const query_5 = `
-      with ranked_trades as (
-          select code, omVol, date,
-                row_number() over (partition by code order by date desc) as rn
-          from marketTrade.dbo.tickerTradeVND
-          where type = 'STOCK'
-      ),
-      average_volumes as (
-          select code,
-                avg(case when rn > 1 and rn <= 6 then omVol end) as avg_totalVol_5d_excluding_last,
-                avg(case when rn > 1 and rn <= 11 then omVol end) as avg_totalVol_10d_excluding_last,
-                avg(case when rn > 1 and rn <= 21 then omVol end) as avg_totalVol_20d_excluding_last,
-                avg(case when rn > 1 and rn <= 61 then omVol end) as avg_totalVol_60d_excluding_last,
-                max(case when rn = 1 then omVol end) as last_totalVol
-          from ranked_trades
-          group by code
-      ),
-      percent_changes as (
-          select code,
-                avg_totalVol_5d_excluding_last,
-                avg_totalVol_10d_excluding_last,
-                avg_totalVol_20d_excluding_last,
-                avg_totalVol_60d_excluding_last,
-                last_totalVol,
-                case when avg_totalVol_5d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_5d_excluding_last) / avg_totalVol_5d_excluding_last * 100 end as pct_change_5d,
-                case when avg_totalVol_10d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_10d_excluding_last) / avg_totalVol_10d_excluding_last * 100 end as pct_change_10d,
-                case when avg_totalVol_20d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_20d_excluding_last) / avg_totalVol_20d_excluding_last * 100 end as pct_change_20d,
-                case when avg_totalVol_60d_excluding_last = 0 then 0 else (last_totalVol - avg_totalVol_60d_excluding_last) / avg_totalVol_60d_excluding_last * 100 end as pct_change_60d
-          from average_volumes
-      )
-      select code,
-      pct_change_5d as perChangeOmVol_5d,
-            pct_change_10d as perChangeOmVol_10d,
-            pct_change_20d as perChangeOmVol_20d,
-            pct_change_60d as perChangeOmVol_60d
-      from percent_changes
-      order by code;
-      `
-
-      //tính % thay đổi eps
-      const query_6 = `
-      with temp as (select code, (EPS - lead(EPS) over (partition by code order by yearQuarter desc)) / lead(EPS) over (partition by code order by yearQuarter desc) * 100 as perEPS, yearQuarter
-            from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 and type = 'STOCK')
-      select * from temp where yearQuarter = (select max(yearQuarter) from temp)
+        WITH ranked_trades AS (
+            SELECT code, totalVol, date,
+              row_number() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+            FROM marketTrade.dbo.tickerTradeVND
+            WHERE type = 'STOCK'
+        ),
+        average_volumes AS (
+            SELECT code,
+                  AVG(CASE WHEN rn <= 5 THEN totalVol END) AS avg_totalVol_5d,
+                  AVG(CASE WHEN rn <= 10 THEN totalVol END) AS avg_totalVol_10d,
+                  AVG(CASE WHEN rn <= 20 THEN totalVol END) AS avg_totalVol_20d,
+                  AVG(CASE WHEN rn <= 60 THEN totalVol END) AS avg_totalVol_60d
+            FROM ranked_trades
+            GROUP BY code
+        )
+        SELECT code, avg_totalVol_5d, avg_totalVol_10d, avg_totalVol_20d, avg_totalVol_60d
+        FROM average_volumes
+        ORDER BY code;
       `
 
       const query_3 = `
-      with yearQuarter4 as (
-          select avg(grossProfitMargin) as grossProfitMarginQuarter,
-                avg(netProfitMargin) as netProfitMarginQuarter,
-                avg(EBITDAMargin) as EBITDAMarginQuarter,
-                code
-          from financialReport.dbo.calBCTC where yearQuarter in (select distinct top 4 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
-                                          group by code
-      )
-      select c.code,
-            grossProfitMargin as grossProfitMarginYear,
-            y.grossProfitMarginQuarter,
-            netProfitMargin as netProfitMarginYear,
-            y.netProfitMarginQuarter,
-            EBITDAMargin,
-            y.EBITDAMarginQuarter,
-            currentRatio,
-            quickRatio,
-            interestCoverageRatio,
-              DE,
-              totalDebtToTotalAssets,
-              ATR,
-              c.VongQuayTaiSanNganHan, c.VongQuayCacKhoanPhaiThu, c.VongQuayHangTonKho, c.NoTraLaiDivVonChuSoHuu, c.NoTraLaiDivTongTaiSan
-      from financialReport.dbo.calBCTC c inner join yearQuarter4 y on y.code = c.code
-      where yearQuarter = (select top 1 yearQuarter from financialReport.dbo.calBCTC order by yearQuarter desc)
+        WITH yearQuarter4 AS (
+            -- Lấy 4 quý mới nhất sử dụng DISTINCT TOP 4
+            SELECT AVG(grossProfitMargin) AS grossProfitMarginQuarter,
+                  AVG(netProfitMargin) AS netProfitMarginQuarter,
+                  AVG(EBITDAMargin) AS EBITDAMarginQuarter,
+                  code
+            FROM financialReport.dbo.calBCTC
+            WHERE yearQuarter IN (
+                SELECT DISTINCT TOP 4 yearQuarter
+                FROM financialReport.dbo.calBCTC
+                ORDER BY yearQuarter DESC
+            )
+            GROUP BY code
+        )
+        SELECT c.code,
+              c.grossProfitMargin AS grossProfitMarginYear,
+              y.grossProfitMarginQuarter,
+              c.netProfitMargin AS netProfitMarginYear,
+              y.netProfitMarginQuarter,
+              c.EBITDAMargin,
+              y.EBITDAMarginQuarter,
+              c.currentRatio,
+              c.quickRatio,
+              c.interestCoverageRatio,
+              c.DE,
+              c.totalDebtToTotalAssets,
+              c.ATR,
+              c.VongQuayTaiSanNganHan, 
+              c.VongQuayCacKhoanPhaiThu, 
+              c.VongQuayHangTonKho, 
+              c.NoTraLaiDivVonChuSoHuu, 
+              c.NoTraLaiDivTongTaiSan
+        FROM financialReport.dbo.calBCTC c
+        INNER JOIN yearQuarter4 y ON y.code = c.code
+        -- Lấy năm/quý mới nhất
+        WHERE yearQuarter = (
+            SELECT TOP 1 yearQuarter
+            FROM financialReport.dbo.calBCTC
+            ORDER BY yearQuarter DESC
+        );
       `
 
       //roe, roa
       const query_4 = `
-      WITH roae AS (
-          SELECT code,
-                ROE AS roae,
-                ROA AS roaa,
-                yearQuarter
-          FROM RATIO.dbo.ratioInYearQuarter
-          WHERE RIGHT(yearQuarter, 1) <> '0'
-          AND yearQuarter >= '20224'
-      ),
-      sum_roaa AS (
-          SELECT
-              code,
-              yearQuarter,
-              roaa + LEAD(roaa, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                    LEAD(roaa, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                    LEAD(roaa, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roaa,
-              roae + LEAD(roae, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                    LEAD(roae, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                    LEAD(roae, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roae
-          FROM roae
-      ),
-      max_yearQuarter AS (
-          SELECT MAX(yearQuarter) AS maxYQ FROM sum_roaa
-      )
-      SELECT s.code, s.roaa AS ROA, s.roae AS ROE
-      FROM sum_roaa s
-      JOIN max_yearQuarter m ON s.yearQuarter = m.maxYQ;
-      `;
+        WITH roae AS (
+            -- Giữ nguyên việc lấy các giá trị ROE, ROA từ bảng ratioInYearQuarter
+            SELECT code,
+                  ROE AS roae,
+                  ROA AS roaa,
+                  yearQuarter
+            FROM RATIO.dbo.ratioInYearQuarter
+            WHERE RIGHT(yearQuarter, 1) <> '0'
+              AND yearQuarter >= '20224'
+        ),
+        sum_roaa AS (
+            -- Tính tổng giá trị của ROA và ROE cho 4 quý gần nhất bằng LEAD
+            SELECT
+                code,
+                yearQuarter,
+                roaa + LEAD(roaa, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
+                      LEAD(roaa, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
+                      LEAD(roaa, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roaa,
+                roae + LEAD(roae, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
+                      LEAD(roae, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
+                      LEAD(roae, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roae
+            FROM roae
+        ),
+        -- Sử dụng cách tìm giá trị lớn nhất của yearQuarter trong cùng một bước tính toán
+        max_yearQuarter AS (
+            SELECT MAX(yearQuarter) AS maxYQ FROM sum_roaa
+        )
+        -- Truy vấn chính để trả về kết quả
+        SELECT s.code, s.roaa AS ROA, s.roae AS ROE
+        FROM sum_roaa s
+        JOIN max_yearQuarter m ON s.yearQuarter = m.maxYQ;
+      `
+
+      const query_5 = `
+        WITH ranked_trades AS (
+            SELECT code, omVol, date,
+                  ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+            FROM marketTrade.dbo.tickerTradeVND
+            WHERE type = 'STOCK'
+        ),
+        average_volumes AS (
+            SELECT code,
+                  AVG(CASE WHEN rn > 1 AND rn <= 6 THEN omVol END) AS avg_totalVol_5d_excluding_last,
+                  AVG(CASE WHEN rn > 1 AND rn <= 11 THEN omVol END) AS avg_totalVol_10d_excluding_last,
+                  AVG(CASE WHEN rn > 1 AND rn <= 21 THEN omVol END) AS avg_totalVol_20d_excluding_last,
+                  AVG(CASE WHEN rn > 1 AND rn <= 61 THEN omVol END) AS avg_totalVol_60d_excluding_last,
+                  MAX(CASE WHEN rn = 1 THEN omVol END) AS last_totalVol
+            FROM ranked_trades
+            GROUP BY code
+        ),
+        percent_changes AS (
+            SELECT code,
+                  avg_totalVol_5d_excluding_last,
+                  avg_totalVol_10d_excluding_last,
+                  avg_totalVol_20d_excluding_last,
+                  avg_totalVol_60d_excluding_last,
+                  last_totalVol,
+                  CASE WHEN avg_totalVol_5d_excluding_last = 0 THEN 0 ELSE (last_totalVol - avg_totalVol_5d_excluding_last) / avg_totalVol_5d_excluding_last * 100 END AS pct_change_5d,
+                  CASE WHEN avg_totalVol_10d_excluding_last = 0 THEN 0 ELSE (last_totalVol - avg_totalVol_10d_excluding_last) / avg_totalVol_10d_excluding_last * 100 END AS pct_change_10d,
+                  CASE WHEN avg_totalVol_20d_excluding_last = 0 THEN 0 ELSE (last_totalVol - avg_totalVol_20d_excluding_last) / avg_totalVol_20d_excluding_last * 100 END AS pct_change_20d,
+                  CASE WHEN avg_totalVol_60d_excluding_last = 0 THEN 0 ELSE (last_totalVol - avg_totalVol_60d_excluding_last) / avg_totalVol_60d_excluding_last * 100 END AS pct_change_60d
+            FROM average_volumes
+        )
+        SELECT code,
+              pct_change_5d AS perChangeOmVol_5d,
+              pct_change_10d AS perChangeOmVol_10d,
+              pct_change_20d AS perChangeOmVol_20d,
+              pct_change_60d AS perChangeOmVol_60d
+        FROM percent_changes
+        ORDER BY code;
+      `
+
+      //tính % thay đổi eps
+      const query_6 = `
+        WITH ranked_eps AS (
+            SELECT code, EPS, yearQuarter,
+                LEAD(EPS) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS next_EPS
+            FROM RATIO.dbo.ratioInYearQuarter 
+            WHERE RIGHT(yearQuarter, 1) <> '0' AND type = 'STOCK'
+        ),
+        temp AS (
+            SELECT code, yearQuarter,
+                (EPS - next_EPS) / NULLIF(next_EPS, 0) * 100 AS perEPS -- Sử dụng NULLIF để tránh chia cho 0
+            FROM ranked_eps
+        )
+        SELECT * 
+        FROM temp 
+        WHERE yearQuarter = (SELECT MAX(yearQuarter) FROM temp);
+      `
 
       const [data, data_2, data_3, data_4, data_5, data_6] = await Promise.all(
         [
@@ -231,12 +265,10 @@ export class FilterService {
         this.mssqlService.query(query_6),
         ])
       const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4, data_5, data_6)
-      await this.redis.set('filter2', dataMapped, { ttl: 500 })
+      await this.redis.set('filter2', dataMapped, { ttl: TimeToLive.TenMinutes })
       return dataMapped
     } catch (e) {
       throw new CatchException(e)
     }
   }
-
-
 }

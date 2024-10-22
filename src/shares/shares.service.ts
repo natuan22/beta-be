@@ -407,72 +407,80 @@ export class SharesService {
 
   async financialIndicators(stock: string, order: number, type: string) {
     const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}:${order}`)
-    if (redisData) return redisData
+    // if (redisData) return redisData
 
     const query_2 = `
-    WITH roaa as (
-      select code,
-               ROE as roae,
-               ROA as roaa,
-               yearQuarter
-  from RATIO.dbo.ratioInYearQuarter
-  where code = '${stock}' and right(yearQuarter, 1) <> 0
-  ),
-      sum_roaa as (
-          select roaa +
-         lead(roaa) over (partition by code order by yearQuarter desc)
-         + lead(roaa, 2) over (partition by code order by yearQuarter desc)
-          + lead(roaa, 3) over (partition by code order by yearQuarter desc)
-  as roaa,
-      roae +
-         lead(roae) over (partition by code order by yearQuarter desc)
-         + lead(roae, 2) over (partition by code order by yearQuarter desc)
-          + lead(roae, 3) over (partition by code order by yearQuarter desc)
-  as roae, code, yearQuarter
-  from roaa
+      WITH roaa AS (
+          SELECT 
+              code,
+              ROE AS roae,
+              ROA AS roaa,
+              yearQuarter
+          FROM RATIO.dbo.ratioInYearQuarter
+          WHERE code = '${stock}' AND RIGHT(yearQuarter, 1) <> 0
       ), 
-    temp
-    AS (SELECT
-      EPS AS value,
-      'EPS' AS name,
-      yearQuarter as date
-    FROM financialReport.dbo.calBCTC
-    WHERE code = '${stock}'
-    UNION ALL
-    SELECT
-      BVPS AS value,
-      'BVPS' AS name,
-      yearQuarter as date
-    FROM financialReport.dbo.calBCTC
-    WHERE code = '${stock}'
-    UNION ALL
-    SELECT
-      PE AS value,
-      'PE' AS name,
-      yearQuarter as date
-    FROM financialReport.dbo.calBCTC
-    WHERE code = '${stock}'
-    UNION ALL
-    SELECT
-      roae AS value,
-      'ROE' AS name,
-      yearQuarter as date
-    FROM sum_roaa
-    WHERE code = '${stock}'
-    UNION ALL
-    SELECT
-      roaa AS value,
-      'ROA' AS name,
-      yearQuarter as date
-    FROM sum_roaa
-    WHERE code = '${stock}'),
-    top_20 as (SELECT TOP 20
-      *
-    FROM temp
-    WHERE right(date, 1) ${order == 1 ? '=' : '<>'} 0
-    ORDER BY date desc)
-    select * from top_20 order by date asc,
-    case when name = 'EPS' then 0 when name = 'BVPS' then 1 when name = 'PE' then 2 when name = 'ROE' then 3 when name = 'ROA' then 4 end asc
+      sum_roaa AS (
+          SELECT
+              code,
+              yearQuarter,
+              -- Tính toán chỉ một lần cho ROAA và ROAE với LEAD
+              SUM(roaa) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roaa,
+              SUM(roae) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roae
+          FROM roaa
+      ), 
+      temp AS (
+          SELECT 
+              EPS AS value,
+              'EPS' AS name,
+              yearQuarter AS date
+          FROM financialReport.dbo.calBCTC
+          WHERE code = '${stock}'
+          UNION ALL
+          SELECT 
+              BVPS AS value,
+              'BVPS' AS name,
+              yearQuarter AS date
+          FROM financialReport.dbo.calBCTC
+          WHERE code = '${stock}'
+          UNION ALL
+          SELECT 
+              PE AS value,
+              'PE' AS name,
+              yearQuarter AS date
+          FROM financialReport.dbo.calBCTC
+          WHERE code = '${stock}'
+          UNION ALL
+          SELECT 
+              roae AS value,
+              'ROE' AS name,
+              yearQuarter AS date
+          FROM sum_roaa
+          WHERE code = '${stock}'
+          UNION ALL
+          SELECT 
+              roaa AS value,
+              'ROA' AS name,
+              yearQuarter AS date
+          FROM sum_roaa
+          WHERE code = '${stock}'
+      ), 
+      top_20 AS (
+          SELECT TOP 20 *
+          FROM temp
+          WHERE RIGHT(date, 1) ${order == 1 ? '=' : '<>'} 0
+          ORDER BY date DESC
+      )
+      SELECT *
+      FROM top_20
+      ORDER BY 
+          date ASC,
+          CASE 
+              WHEN name = 'EPS' THEN 0 
+              WHEN name = 'BVPS' THEN 1 
+              WHEN name = 'PE' THEN 2 
+              WHEN name = 'ROE' THEN 3 
+              WHEN name = 'ROA' THEN 4 
+          END ASC;
     `
     const data = await this.mssqlService.query<FinancialIndicatorsResponse[]>(query_2)
     const dataMapped = FinancialIndicatorsResponse.mapToList(data)

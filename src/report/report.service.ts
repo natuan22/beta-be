@@ -199,10 +199,8 @@ export class ReportService {
       const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, year, week])
       const pivot = same_day.map(item => `[${item}]`).join(',')
 
-      const code = `
-      'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD'
-      `
-      const sort = `case ${code.split(',').map((item, index) => `when code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const code = `'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD'`
+      const sort = UtilCommonTemplate.generateSortCase(code, 'code')
 
       const query = `
       WITH temp
@@ -234,7 +232,7 @@ export class ReportService {
   async merchandise() {
     try {
       const name = `N'Dầu Brent', N'Dầu Thô', N'Vàng', N'Cao su', N'Đường', N'Khí Gas', N'Thép', N'Xăng'`
-      const sort = `case ${name.split(',').map((item, index) => `when t2.name = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const sort = UtilCommonTemplate.generateSortCase(name, 't2.name')
 
       const query = `
       with temp as (select name, price,
@@ -286,6 +284,7 @@ export class ReportService {
               inner join temp_3 t3 on t3.name = t2.name and t3.date = t2.date
       order by row_num
       `
+      console.log(query)
       const data = await this.mssqlService.query<MerchandiseResponse[]>(query)
       const dataMapped = MerchandiseResponse.mapToList(data)
       return dataMapped
@@ -297,7 +296,8 @@ export class ReportService {
   async interestRate() {
     try {
       const code = `N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng'`
-      const sort = `case ${code.split(',').map((item, index) => `when code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const sort = UtilCommonTemplate.generateSortCase(code, 'code')
+
       const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.EconomicVN_byTriVo order by date desc`))[0].date).format('YYYY-MM-DD')
       const date = await this.mssqlService.query(
         `with date_ranges as (
@@ -369,7 +369,7 @@ export class ReportService {
           break;
       }
 
-      const sort = `case ${index.split(',').map((item, index) => `when t2.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const sort = UtilCommonTemplate.generateSortCase(index, 't2.code')
       const query = `
       with temp as (select name as code, closePrice,
         date,
@@ -455,7 +455,7 @@ export class ReportService {
   async morning() {
     try {
       const index = `'VNINDEX', 'HNX', 'UPCOM', 'VN30'`
-      const sort = `case ${index.split(',').map((item, index) => `when code = ${item.replace(/\n/g, "").trim()} then ${index + 4}`).join(' ')} end as row_num`
+      const sort = UtilCommonTemplate.generateSortCase(index, 'code')
 
       const query = `
       SELECT
@@ -1098,7 +1098,7 @@ export class ReportService {
   async transactionValueFluctuations(type: number) {
     try {
       const industry = `N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ'`
-      const sort = `case ${industry.split(',').map((item, index) => `when n.code = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
+      const sort = UtilCommonTemplate.generateSortCase(industry, 'n.code')
       const { now, prev, prev_4 } = this.get2WeekNow()
 
       const query = type == 0 ? `
