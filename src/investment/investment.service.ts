@@ -40,14 +40,14 @@ export class InvestmentService {
     const inds: string = b.industry ? UtilCommonTemplate.getIndustryFilter(b.industry.split(',')) : '';
 
     const query = `
-    SELECT
-      COUNT(*) OVER () as count, *
-    FROM VISUALIZED_DATA.dbo.filterInvesting
-    WHERE ${result}
-    AND floor IN (${b.exchange.toUpperCase() == 'ALL' ? `'HOSE', 'HNX', 'UPCOM'` : `${b.exchange.split(',').map(item => `'${item.toUpperCase()}'`)}`})
-    ${inds ? `AND LV2 IN ${inds}` : ``}
-    AND LEN(code) = 3
-    ORDER BY code asc
+      SELECT
+        COUNT(*) OVER () as count, *
+      FROM VISUALIZED_DATA.dbo.filterInvesting
+      WHERE ${result}
+      AND floor IN (${b.exchange.toUpperCase() == 'ALL' ? `'HOSE', 'HNX', 'UPCOM'` : `${b.exchange.split(',').map(item => `'${item.toUpperCase()}'`)}`})
+      ${inds ? `AND LV2 IN ${inds}` : ``}
+      AND LEN(code) = 3
+      ORDER BY code asc
     `
 
     const data = await this.mssqlService.query<InvestmentFilterResponse[]>(query)
@@ -516,7 +516,7 @@ export class InvestmentService {
       this.redis.get(`price:${from}`),
       this.redis.get(`price:${to}`),
     ])
-
+    
     let [data, lastPrice, date, dateTo] = await Promise.all([
           !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [], 
           !realtimePrice ? this.mssqlService.query(`
@@ -750,9 +750,7 @@ export class InvestmentService {
     if (redisData) return redisData;
     
     try {
-      const response = await axios.get(
-        `https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`,
-        {
+      const response = await axios.get(`https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`, {
           headers: {
             "host": "priceapi.bsc.com.vn",
             "origin": "https://trading.bsc.com.vn",
@@ -763,7 +761,7 @@ export class InvestmentService {
           },
         }
       );
-
+      
       const query = ` SELECT closePrice
                       FROM marketTrade.dbo.tickerTradeVND t
                       INNER JOIN (
@@ -772,7 +770,41 @@ export class InvestmentService {
                           WHERE date < (SELECT MAX(date) FROM tradeIntraday.dbo.tickerTradeVNDIntraday)
                       ) latest ON t.date = latest.max_previous_date
                       WHERE t.code = '${code}';
-      `
+                      `
+
+      // const query_data = `SELECT [time], [action], [matchPrice], [priceChangeReference], [volume]
+      //                     FROM [tradeIntraday].[dbo].[tickerTransVNDIntraday]
+      //                     WHERE code = '${code}' 
+      //                       AND date = '2024-10-17'
+      //                     ORDER BY [time] DESC, [id];
+      //                     `
+
+      // const promise = this.mssqlService.query(query_data)
+      // const promise_2 = this.mssqlService.query(query)
+
+      // const [data, data_2] = await Promise.all([promise, promise_2]) as any
+
+      // const dataCal = data.map((item) => {
+      //   const value = item.matchPrice * item.volume;
+      //   const type = value < 100_000_000 
+      //                         ? "small"
+      //                         : value < 1_000_000_000
+      //                         ? "medium"
+      //                         : "large";
+
+      //   return {
+      //     time: item.time,
+      //     action: item.action,
+      //     type,
+      //     volume: +item.volume,
+      //     value: value,
+      //     matchPrice: item.matchPrice / 1_000,
+      //     priceChangeReference: item.priceChangeReference / 1_000,
+      //     perChangeReference: (item.priceChangeReference / 1000 / data_2[0].closePrice) * 100,
+      //     highlight: value > 1_000_000_000,
+      //   }
+      // })
+
       const data_2 = await this.mssqlService.query(query)
         
       const dataCal = response.data.d.map((item) => {

@@ -539,31 +539,48 @@ export class StockService {
   ): Promise<NetTransactionValueResponse[]> {
     try {
       const { exchange } = q;
-      const parameters: string[] = [
-        moment().format('YYYY-MM-DD'),
-        moment().subtract(3, 'month').format('YYYY-MM-DD'),
-        exchange.toUpperCase(),
-      ];
+  
+      // Lưu trữ các giá trị ngày vào biến để tránh tính toán nhiều lần
+      const today = moment().format('YYYY-MM-DD');
+      const threeMonthsAgo = moment().subtract(3, 'month').format('YYYY-MM-DD');
+      const exchangeUpperCase = exchange.toUpperCase();
+  
+      // Thay đổi thứ tự parameters cho dễ đọc và logic hơn
+      const parameters: string[] = [today, threeMonthsAgo, exchangeUpperCase];
+  
+      // Truy vấn SQL được tối ưu hóa
       const query: string = `
-                SELECT e.date AS date, e.closePrice AS exchange_price, e.code AS exchange,
-                    SUM(n.net_value_td) AS net_proprietary,
-                    SUM(n.net_value_canhan) AS net_retail,
-                    SUM(n.net_value_foreign) AS net_foreign
-                FROM marketTrade.dbo.indexTradeVND e
-                JOIN PHANTICH.dbo.BCN_netvalue n ON e.date = n.date_time
-                WHERE e.code = @2 
-                AND e.date <= @0 
-                AND e.date >= @1
-                GROUP BY e.date, e.closePrice, e.code
-                ORDER BY date DESC
-            `;
+        SELECT 
+          e.date AS date, 
+          e.closePrice AS exchange_price, 
+          e.code AS exchange,
+          SUM(n.net_value_td) AS net_proprietary,
+          SUM(n.net_value_canhan) AS net_retail,
+          SUM(n.net_value_foreign) AS net_foreign
+        FROM 
+          marketTrade.dbo.indexTradeVND e
+        JOIN 
+          PHANTICH.dbo.BCN_netvalue n 
+          ON e.date = n.date_time
+        WHERE 
+          e.code = @2
+          AND e.date BETWEEN @1 AND @0 -- Tối ưu điều kiện thời gian trong khoảng
+        GROUP BY 
+          e.date, e.closePrice, e.code
+        ORDER BY 
+          e.date DESC
+      `;
+  
+      // Trả về kết quả truy vấn sau khi map dữ liệu
       return new NetTransactionValueResponse().mapToList(
         await this.dbServer.query(query, parameters),
       );
     } catch (e) {
+      // Sử dụng ngoại lệ để xử lý lỗi một cách tốt hơn
       throw new CatchException(e);
     }
   }
+  
 
   //Tin tức thị trường
   async getNews(): Promise<StockNewsResponse[]> {
@@ -1043,27 +1060,39 @@ export class StockService {
         `${RedisKeys.MerchandisePrice}:${type}`,
       );
       // if (redisData) return redisData;
-          
+      
+      const codeExchange = `'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD', 'THB', 'CNY', 'MYR', 'INR', 'KRW', 'RUB', 'SEK', 'CHF', 'NOK', 'DKK', 'SAR', 'KWD'`
+      const sortExchange = UtilCommonTemplate.generateSortCase(codeExchange, 'code')
+      
+      const nameGoods = `N'Dầu Brent', N'Dầu Thô', N'Vàng', N'Cao su', N'Đường', N'Khí Gas', N'Thép', N'Xăng', N'Đồng', N'Gạo', N'Bông', N'Cà phê', N'Ure', N'Thép HRC'`
+      const sortGoods = UtilCommonTemplate.generateSortCase(nameGoods, 'name')
+
       const query: string = +type ? `
             WITH temp
             AS (SELECT
               code + '/VND' as name,
               bySell AS price,
               date,
-              (bySell - LEAD(bySell) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(bySell) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS Day
+              (bySell - LEAD(bySell) OVER (PARTITION BY code ORDER BY date DESC)) / LEAD(bySell) OVER (PARTITION BY code ORDER BY date DESC) * 100 AS Day,
+              ${sortExchange}
             FROM macroEconomic.dbo.exchangeRateVCB)
             SELECT
-              *
+              name,
+              price,
+              date,
+              Day
             FROM temp
             WHERE date IN (SELECT TOP 1
               date
             FROM macroEconomic.dbo.exchangeRateVCB
             ORDER BY date DESC) 
+            ORDER BY row_num
       ` : `
       WITH temp
       AS (SELECT
         name,
-        MAX(lastUpdated) AS lastUpdated
+        MAX(lastUpdated) AS lastUpdated,
+        ${sortGoods}
       FROM [macroEconomic].[dbo].[HangHoa]
       WHERE unit != ''
       GROUP BY name)
@@ -1080,6 +1109,7 @@ export class StockService {
         AND t.name = h.name
       WHERE unit != ''
       AND id IS NOT NULL
+      ORDER BY row_num
             `;
       const data: MerchandisePriceInterface[] = await this.dbServer.query(
         query

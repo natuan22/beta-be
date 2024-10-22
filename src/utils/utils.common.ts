@@ -592,4 +592,8 @@ export class UtilCommonTemplate {
     if(same_day_index != 0) arr.splice(same_day_index, 1)
     return arr
   }
+
+  static generateSortCase(items: string, column: string) {
+    return `CASE ${items.split(',').map((item, index) => `WHEN ${column} = ${item.trim()} THEN ${index}`).join(' ')} END AS row_num`
+  }
 }
