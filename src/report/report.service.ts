@@ -284,7 +284,6 @@ export class ReportService {
               inner join temp_3 t3 on t3.name = t2.name and t3.date = t2.date
       order by row_num
       `
-      console.log(query)
       const data = await this.mssqlService.query<MerchandiseResponse[]>(query)
       const dataMapped = MerchandiseResponse.mapToList(data)
       return dataMapped

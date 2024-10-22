@@ -28,7 +28,7 @@ async function bootstrap() {
   // app.enableCors({
   //   origin: '*' // Chấp nhận mọi nguồn yêu cầu (không an toàn cho production)
   // });
-  
+
   app.enableCors({ origin: process.env.WHITELIST_IPS.split(','), credentials: true});
   app.use(cookieParser());
   app.setGlobalPrefix(process.env.API_PREFIX);

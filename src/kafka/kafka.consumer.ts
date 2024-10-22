@@ -97,7 +97,7 @@ export class KafkaConsumer {
       this.kafkaService.handleIndustry();
       this.kafkaService.handleIndustryFloor();
     } catch (error) {
-      console.log('loi phan nganh');
+      console.error('loi phan nganh');
       this.logger.error(error);
     }
   }

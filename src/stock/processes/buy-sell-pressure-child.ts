@@ -40,7 +40,7 @@ process.on('message', async (data: any) => {
     process.send(buySellData);
     await sql.close();
   } catch (e) {
-    console.log(e);
+    console.error(e);
     throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Error');
   }
 });

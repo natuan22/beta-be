@@ -33,7 +33,6 @@ export class QueueProcessor {
     // const verifyEntity: VerifyEntity = job.data;
     // await this.verifyRepo.delete({id: verifyEntity.id});
     console.log(job.data);
-    
 
     this.logger.debug('Finished processing job');
   }
