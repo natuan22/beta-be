@@ -153,32 +153,23 @@ export class WatchlistService {
 
       //roe, roa
       const query_4 = `
-      with roae as (
-        select code,
-               ROE as roae,
-               ROA as roaa,
-               yearQuarter
-      from RATIO.dbo.ratioInYearQuarter
-      where right(yearQuarter, 1) <> 0
-      ),
-      sum_roaa as (
-        select roaa +
-        lead(roaa) over (partition by code order by yearQuarter desc)
-        + lead(roaa, 2) over (partition by code order by yearQuarter desc)
-         + lead(roaa, 3) over (partition by code order by yearQuarter desc)
-        as roaa,
-          roae +
-              lead(roae) over (partition by code order by yearQuarter desc)
-              + lead(roae, 2) over (partition by code order by yearQuarter desc)
-              + lead(roae, 3) over (partition by code order by yearQuarter desc)
-        as roae, code, yearQuarter
-        from roae
-      ),
-        roaa
-      AS (
-        select code, roaa as ROA, roae as ROE from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa)
-      )
-        select * from roaa
+          with roae as (
+            select code, ROE as roae, ROA as roaa, yearQuarter
+            from RATIO.dbo.ratioInYearQuarter
+            where right(yearQuarter, 1) <> 0 and code in (${codes.map((item) => `'${item}'`).join(',')})
+          ),
+          sum_roaa as (
+            select roaa + lead(roaa) over (partition by code order by yearQuarter desc)
+                        + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+                        + lead(roaa, 3) over (partition by code order by yearQuarter desc) as roaa,
+                  roae + lead(roae) over (partition by code order by yearQuarter desc)
+                        + lead(roae, 2) over (partition by code order by yearQuarter desc)
+                        + lead(roae, 3) over (partition by code order by yearQuarter desc) as roae, 
+                  code, yearQuarter
+            from roae
+          ),
+          roaa AS (select code, roaa as ROA, roae as ROE from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa))
+          select * from roaa
       `;
 
       const [data, data_news, data_4] = await Promise.all([
@@ -186,7 +177,7 @@ export class WatchlistService {
         this.watchListRepo.query(news_query),
         this.watchListRepo.query(query_4)
       ]);
-
+      
       return WatchListDataResponse.mapToList(
         data.map((item) => ({
           ...item,

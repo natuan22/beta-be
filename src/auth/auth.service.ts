@@ -262,7 +262,7 @@ export class AuthService {
         ip_address,
         refresh_token: refreshToken,
         secret_key: secretKey,
-        expired_at: new Date()
+        expired_at: new Date(Date.now() + TimeToLive.OneDayMilliSeconds)
       })
 
       await this.deviceRepo.save(session)
