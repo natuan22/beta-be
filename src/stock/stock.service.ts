@@ -1068,7 +1068,7 @@ export class StockService {
       const sortGoods = UtilCommonTemplate.generateSortCase(nameGoods, 'name')
 
       const query: string = +type ? `
-            WITH temp
+          WITH temp
             AS (SELECT
               code + '/VND' as name,
               bySell AS price,
@@ -1087,30 +1087,30 @@ export class StockService {
             FROM macroEconomic.dbo.exchangeRateVCB
             ORDER BY date DESC) 
             ORDER BY row_num
-      ` : `
-      WITH temp
-      AS (SELECT
-        name,
-        MAX(lastUpdated) AS lastUpdated,
-        ${sortGoods}
-      FROM [macroEconomic].[dbo].[HangHoa]
-      WHERE unit != ''
-      GROUP BY name)
-      SELECT
-        h.name,
-        h.price,
-        h.unit,
-        h.change1D AS Day,
-        h.changeMTD AS MTD,
-        h.changeYTD AS YTD
-      FROM [macroEconomic].[dbo].[HangHoa] h
-      INNER JOIN temp t
-        ON t.lastUpdated = h.lastUpdated
-        AND t.name = h.name
-      WHERE unit != ''
-      AND id IS NOT NULL
-      ORDER BY row_num
-            `;
+        ` : `
+          WITH temp
+            AS (SELECT
+              name,
+              MAX(lastUpdated) AS lastUpdated,
+              ${sortGoods}
+            FROM [macroEconomic].[dbo].[HangHoa]
+            WHERE unit != ''
+            GROUP BY name)
+            SELECT
+              h.name,
+              h.price,
+              h.unit,
+              h.change1D AS Day,
+              h.changeMTD AS MTD,
+              h.changeYTD AS YTD
+            FROM [macroEconomic].[dbo].[HangHoa] h
+            INNER JOIN temp t
+              ON t.lastUpdated = h.lastUpdated
+              AND t.name = h.name
+            WHERE unit != ''
+            AND id IS NOT NULL
+            ORDER BY row_num
+          `;
       const data: MerchandisePriceInterface[] = await this.dbServer.query(
         query
       );

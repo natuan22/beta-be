@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger"
-
+import * as _ from 'lodash';
 
 class ISignal {
     @ApiProperty({
@@ -39,6 +39,7 @@ class INews {
     })
     href: string
 }
+
 export class WatchListDataResponse {
     @ApiProperty({
         type: String
@@ -278,7 +279,7 @@ export class WatchListDataResponse {
 
 
     static mapToList(data?: WatchListDataResponse[]) {
-        return data.map(item => new WatchListDataResponse(item))
+        return _.orderBy(data.map(item => new WatchListDataResponse(item)), ['code'], ['asc']);
     }
 
     private genStar(str?: string): ISignal {

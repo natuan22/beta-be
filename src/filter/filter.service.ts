@@ -21,6 +21,8 @@ export class FilterService {
 
       const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
       const query = `
+        SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+
         WITH latest_dates AS (
             SELECT DISTINCT TOP 2 date
             FROM VISUALIZED_DATA.dbo.filterResource
@@ -43,15 +45,13 @@ export class FilterService {
         ),
         temp AS (
             SELECT
-                f.code, f.floor, f.TyleNDTNNdangnamgiu, f.closePrice,
+                f.code, f.floor, f.TyleNDTNNdangnamgiu, f.closePrice, f.min_1_week, f.max_1_week, f.min_1_month, f.max_1_month, f.min_3_month, f.max_3_month, 
+                f.min_6_month, f.max_6_month, f.min_1_year, f.max_1_year, f.perChange1D, f.perChange5D, f.perChange1M, f.perChange3M, f.perChange6M, 
+                f.perChange1Y, f.perChangeYTD, f.beta, f.volume AS totalVol, f.TyLeKLMBCD, f.KNnetVal, f.KNnetVol, f.ma5, f.ma10, f.ma20, f.ma50, f.ma100, 
+                f.ma200, f.ema5, f.ema10, f.ema20, f.ema50, f.ema100, f.ema200, f.rsi, f.macd, f.macd_signal, f.BBL, f.BBU, f.doanh_thu_4_quy, f.loi_nhuan_4_quy,
+                f.tang_truong_doanh_thu_4_quy, f.tang_truong_loi_nhuan_4_quy, f.qoq_doanh_thu, f.qoq_loi_nhuan, f.yoy_doanh_thu, f.yoy_loi_nhuan, f.EPS, f.BVPS, 
+                f.PE, f.PB, f.PS, f.marketCap, f.TinHieuChiBaoKyThuat AS tech, f.TinHieuDuongXuHuong AS trend, f.TinHieuTongHop AS overview, f.date,
                 LEAD(f.closePrice) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS closePrice_pre,
-                f.min_1_week, f.max_1_week, f.min_1_month, f.max_1_month, f.min_3_month, f.max_3_month,
-                f.min_6_month, f.max_6_month, f.min_1_year, f.max_1_year,
-                f.perChange1D, f.perChange5D, f.perChange1M, f.perChange3M, f.perChange6M,
-                f.perChange1Y, f.perChangeYTD, f.beta, f.volume AS totalVol, f.TyLeKLMBCD,
-                f.KNnetVal, f.KNnetVol,
-                f.ma5, f.ma10, f.ma20, f.ma50, f.ma100, f.ma200,
-                f.ema5, f.ema10, f.ema20, f.ema50, f.ema100, f.ema200,
                 LEAD(f.ma5) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma5_pre,
                 LEAD(f.ma10) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma10_pre,
                 LEAD(f.ma20) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ma20_pre,
@@ -64,22 +64,12 @@ export class FilterService {
                 LEAD(f.ema50) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema50_pre,
                 LEAD(f.ema100) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema100_pre,
                 LEAD(f.ema200) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS ema200_pre,
-                f.rsi, LEAD(f.rsi) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS rsi_pre,
-                f.macd, f.macd_signal,
+                LEAD(f.rsi) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS rsi_pre,
                 LEAD(f.macd) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS macd_pre,
                 LEAD(f.macd_signal) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS macd_signal_pre,
-                f.BBL, f.BBU, f.doanh_thu_4_quy, f.loi_nhuan_4_quy,
-                f.tang_truong_doanh_thu_4_quy, f.tang_truong_loi_nhuan_4_quy,
-                f.qoq_doanh_thu, f.qoq_loi_nhuan, f.yoy_doanh_thu, f.yoy_loi_nhuan,
-                f.EPS,
-                f.BVPS, f.PE, f.PB, f.PS, f.marketCap,
-                f.TinHieuChiBaoKyThuat AS tech,
-                f.TinHieuDuongXuHuong AS trend,
-                f.TinHieuTongHop AS overview,
                 LEAD(f.TinHieuChiBaoKyThuat) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS tech_pre,
                 LEAD(f.TinHieuDuongXuHuong) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS trend_pre,
-                LEAD(f.TinHieuTongHop) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS overview_pre,
-                f.date
+                LEAD(f.TinHieuTongHop) OVER (PARTITION BY f.code ORDER BY f.date DESC) AS overview_pre
             FROM VISUALIZED_DATA.dbo.filterResource f
             WHERE f.date IN (SELECT date FROM latest_dates)
         )
@@ -254,17 +244,18 @@ export class FilterService {
         FROM temp 
         WHERE yearQuarter = (SELECT MAX(yearQuarter) FROM temp);
       `
-
+      
       const [data, data_2, data_3, data_4, data_5, data_6] = await Promise.all(
-        [
-          this.mssqlService.query<FilterResponse[]>(query),
-        this.mssqlService.query(query_2),
-        this.mssqlService.query(query_3),
-        this.mssqlService.query(query_4),
-        this.mssqlService.query(query_5),
-        this.mssqlService.query(query_6),
-        ])
+        [ 
+          this.mssqlService.query<FilterResponse[]>(query), 
+          this.mssqlService.query(query_2),
+          this.mssqlService.query(query_3), this.mssqlService.query(query_4),
+          this.mssqlService.query(query_5), this.mssqlService.query(query_6),
+        ]
+      )
+
       const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4, data_5, data_6)
+      
       await this.redis.set('filter2', dataMapped, { ttl: TimeToLive.TenMinutes })
       return dataMapped
     } catch (e) {
