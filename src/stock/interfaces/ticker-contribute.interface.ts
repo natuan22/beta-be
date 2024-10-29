@@ -1,4 +1,4 @@
 export interface TickerContributeInterface {
-    symbol: string;
-    contribute_price: number
+  symbol: string;
+  contribute_price: number;
 }

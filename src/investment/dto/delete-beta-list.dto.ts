@@ -1,8 +1,8 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class DeleteBetaListDto {
-    @ApiProperty({
-        type: String
-    })
-    code: string
+  @ApiProperty({
+    type: String,
+  })
+  code: string;
 }

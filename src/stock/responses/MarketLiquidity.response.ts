@@ -1,5 +1,5 @@
-import {ApiProperty, PartialType} from '@nestjs/swagger';
-import {BaseResponse} from '../../utils/utils.response';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { BaseResponse } from '../../utils/utils.response';
 
 export class MarketLiquidityResponse {
   @ApiProperty({
@@ -24,7 +24,7 @@ export class MarketLiquidityResponse {
   value: number;
 
   @ApiProperty({
-    type: "float",
+    type: 'float',
     description: '% thay đổi so với phiên trước',
     example: '0.4',
   })
@@ -42,8 +42,9 @@ export class MarketLiquidityResponse {
     this.industry = data?.industry || '';
     this.value = data?.value || 0;
     this.value_change_percent =
-        (data?.value_change_percent !== Infinity && data?.value_change_percent)
-        ? data?.value_change_percent : 0;
+      data?.value_change_percent !== Infinity && data?.value_change_percent
+        ? data?.value_change_percent
+        : 0;
     this.contribute = data?.contribute || 0;
   }
 

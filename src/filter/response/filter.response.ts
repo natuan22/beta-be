@@ -120,15 +120,15 @@ export class FilterResponse {
   avg_totalVol_10d: number;
   avg_totalVol_20d: number;
   avg_totalVol_60d: number;
-  omVol: number
+  omVol: number;
   avg_omVol_5d: number;
   avg_omVol_10d: number;
   avg_omVol_20d: number;
   avg_omVol_60d: number;
-  perChangeOmVol_5d: number
-  perChangeOmVol_10d: number
-  perChangeOmVol_20d: number
-  perChangeOmVol_60d: number
+  perChangeOmVol_5d: number;
+  perChangeOmVol_10d: number;
+  perChangeOmVol_20d: number;
+  perChangeOmVol_60d: number;
   grossProfitMargin: number;
   grossProfitMargin4Q: number;
   netProfitMargin: number;
@@ -301,9 +301,18 @@ export class FilterResponse {
     this.technicalSignal = this.genStar(data?.tech);
     this.trendSignal = this.genStar(data?.trend);
     this.generalSignal = this.genStar(data?.overview);
-    this.changeStatusTech = this.calChangeStatus(this.calculateChartValues(this.genStar(data?.tech)), this.calculateChartValues(this.genStar(data?.tech_pre)));
-    this.changeStatusTrend = this.calChangeStatus(this.calculateChartValues(this.genStar(data?.trend)), this.calculateChartValues(this.genStar(data?.trend_pre)));
-    this.changeStatusGeneral= this.calChangeStatus(this.calculateChartValues(this.genStar(data?.overview)), this.calculateChartValues(this.genStar(data?.overview_pre)));
+    this.changeStatusTech = this.calChangeStatus(
+      this.calculateChartValues(this.genStar(data?.tech)),
+      this.calculateChartValues(this.genStar(data?.tech_pre)),
+    );
+    this.changeStatusTrend = this.calChangeStatus(
+      this.calculateChartValues(this.genStar(data?.trend)),
+      this.calculateChartValues(this.genStar(data?.trend_pre)),
+    );
+    this.changeStatusGeneral = this.calChangeStatus(
+      this.calculateChartValues(this.genStar(data?.overview)),
+      this.calculateChartValues(this.genStar(data?.overview_pre)),
+    );
 
     this.VongQuayTaiSanNganHan = data?.VongQuayTaiSanNganHan || 0;
     this.VongQuayCacKhoanPhaiThu = data?.VongQuayCacKhoanPhaiThu || 0;
@@ -318,7 +327,7 @@ export class FilterResponse {
     data_2: any,
     data_4: any,
     data_5: any,
-    data_6
+    data_6,
   ) {
     return data.map(
       (item) =>

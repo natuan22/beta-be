@@ -32,7 +32,7 @@ export class ChartService {
     @InjectDataSource(DB_SERVER) private readonly dbServer: DataSource,
     private readonly stockService: StockService,
     private readonly mssqlService: MssqlService,
-  ) { }
+  ) {}
 
   timeCheck(): boolean {
     const now = new Date();
@@ -160,27 +160,29 @@ export class ChartService {
         select closePrice from marketTrade.dbo.indexTradeVND
         where date = (select max(date) from marketTrade.dbo.indexTradeVND where date < '${startDate}'
         ) and code = '${index}'
-        `
+        `;
 
-      const [data_1, data_2] = await Promise.all([this.mssqlService.query<LineChartInterface[]>(query), this.mssqlService.query(query_2)])
+      const [data_1, data_2] = await Promise.all([
+        this.mssqlService.query<LineChartInterface[]>(query),
+        this.mssqlService.query(query_2),
+      ]);
 
-      const mappedData = new VnIndexResponse().mapToList(
-        data_1,
-        type,
-      );
+      const mappedData = new VnIndexResponse().mapToList(data_1, type);
 
-      const lastData = mappedData[mappedData.length - 1]
+      const lastData = mappedData[mappedData.length - 1];
 
       mappedData[mappedData.length - 1] = {
         ...lastData,
         indexChange: data_2[0].closePrice - lastData.indexValue,
-        percentIndexChange: (data_2[0].closePrice - lastData.indexValue) / lastData.indexValue * 100
-      } as any
+        percentIndexChange:
+          ((data_2[0].closePrice - lastData.indexValue) / lastData.indexValue) *
+          100,
+      } as any;
 
       const data = {
         prevClosePrice: data_2[0].closePrice,
-        chart: mappedData
-      }
+        chart: mappedData,
+      };
 
       return data;
     } catch (e) {
@@ -208,12 +210,15 @@ export class ChartService {
         select closePrice from marketTrade.dbo.indexTradeVND
         where date = (select max(date) from tradeIntraday.dbo.indexTradeVNDIntraday where date < (select max(date) from tradeIntraday.dbo.indexTradeVNDIntraday)
         ) and code = '${index}'
-        `
+        `;
 
-      const [data_1, data_2] = await Promise.all([this.mssqlService.query<LineChartInterface[]>(query), this.mssqlService.query(query_2)]);
+      const [data_1, data_2] = await Promise.all([
+        this.mssqlService.query<LineChartInterface[]>(query),
+        this.mssqlService.query(query_2),
+      ]);
       return {
         prevClosePrice: data_2[0].closePrice,
-        chart: new LineChartResponse().mapToList(data_1)
+        chart: new LineChartResponse().mapToList(data_1),
       };
     } catch (e) {
       throw new CatchException(e);
@@ -296,7 +301,7 @@ export class ChartService {
                     contribute_price DESC;
                 `;
       }
-      
+
       const data = await this.mssqlService.query<TickerContributeInterface[]>(
         query,
       );

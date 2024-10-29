@@ -26,7 +26,7 @@ async function bootstrap() {
   // 'http://localhost:3000', 'http://192.168.9.146:3000', 'http://192.168.17.24:3001', 'https://morning-new-beta.vercel.app', 'http://resource1.bsi.com.vn'
 
   // app.enableCors({
-  //   origin: '*' // Chấp nhận mọi nguồn yêu cầu (không an toàn cho production)
+  //   origin: '*', // Chấp nhận mọi nguồn yêu cầu (không an toàn cho production)
   // });
 
   app.enableCors({ origin: process.env.WHITELIST_IPS.split(','), credentials: true});
@@ -47,16 +47,14 @@ async function bootstrap() {
   });
 
   app.useGlobalFilters(new ValidationFilter());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      transform: true,
-      exceptionFactory(errors: ValidationError[]) {
-        return new ExceptionResponse(
-          HttpStatus.BAD_REQUEST,
-          UtilCommonTemplate.getMessageValidator(errors),
-        );
-      },
-    }),
+  app.useGlobalPipes(new ValidationPipe({
+    transform: true,
+    exceptionFactory(errors: ValidationError[]) {
+      return new ExceptionResponse(
+        HttpStatus.BAD_REQUEST,
+        UtilCommonTemplate.getMessageValidator(errors),
+      );
+    }}),
   );
 
   app.useStaticAssets(join(__dirname, '..', 'public'));
@@ -71,9 +69,7 @@ async function bootstrap() {
   });
 
   // await app.listen(parseInt(process.env.SERVER_PORT), '192.168.9.146').then(() => {
-  //   console.log(
-  //     `Server is running at 192.168.9.146:${process.env.SERVER_PORT} --version: 0.1.17`,
-  //   );
+  //   console.log(`Server is running at 192.168.9.146:${process.env.SERVER_PORT} --version: 0.1.17`);
   // });
 }
 

@@ -354,7 +354,7 @@ export class CashFlowService {
     FROM data
     GROUP BY marketTotalVal, [date];
     `;
-      
+
     const data: InvestorTransactionRatioInterface[] = await this.dbServer.query(
       query,
     );

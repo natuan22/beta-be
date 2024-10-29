@@ -1,5 +1,5 @@
 export interface TopNetForeignByExInterface {
-    ticker: string;
-    exchange: string;
-    net_value: number
+  ticker: string;
+  exchange: string;
+  net_value: number;
 }

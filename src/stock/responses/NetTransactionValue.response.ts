@@ -1,6 +1,6 @@
-import {ApiProperty, PartialType} from '@nestjs/swagger';
-import {BaseResponse} from '../../utils/utils.response';
-import {UtilCommonTemplate} from "../../utils/utils.common";
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { BaseResponse } from '../../utils/utils.response';
+import { UtilCommonTemplate } from '../../utils/utils.common';
 
 export class NetTransactionValueResponse {
   @ApiProperty({
@@ -44,14 +44,13 @@ export class NetTransactionValueResponse {
   })
   date: Date | string;
 
-
   constructor(data?: NetTransactionValueResponse) {
-    this.exchange = data?.exchange || "";
+    this.exchange = data?.exchange || '';
     this.exchange_price = data?.exchange_price || 0;
     this.net_foreign = data?.net_foreign || 0;
     this.net_proprietary = data?.net_proprietary || 0;
     this.net_retail = data?.net_retail || 0;
-    this.date = UtilCommonTemplate.toDate(data?.date) || "2022/02/22"
+    this.date = UtilCommonTemplate.toDate(data?.date) || '2022/02/22';
   }
 
   public mapToList(data?: NetTransactionValueResponse[]) {

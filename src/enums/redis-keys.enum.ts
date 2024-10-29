@@ -80,7 +80,7 @@ export enum RedisKeys {
   indsProfitMarginsTable = 'inds-profit-margins-table',
 
   IndsInterestCoverage = 'inds-coverage',
-  
+
   interestRatesOnLoans = 'interest-rates-on-loans',
   netProfitMarginByIndustries = 'net-profit-margin-by-industries',
 
@@ -160,7 +160,7 @@ export enum RedisKeys {
   exchangeRateIndexTable = 'exchange-rate-index-table',
   interestRate = 'interest-rate',
   exchangeRateAndInterestRate = 'exchange-rate-and-interest-rate',
-    
+
   //Filter
   filter = 'filter',
 
@@ -201,6 +201,8 @@ export enum RedisKeys {
   //Công cụ đầu tư
   minMaxFilter = 'min-max-filter',
   tickerTransLog = 'ticker-trans-log',
+  betaSmart = 'beta-smart',
+  dataStockBasic = 'data-stock-basic',
 
   //Tin sáng
   morningNewsInternational = 'morning-news-international',

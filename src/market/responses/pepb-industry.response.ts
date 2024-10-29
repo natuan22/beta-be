@@ -97,7 +97,7 @@ export class PEPBIndustryResponse {
         this.color = '#90ed7d';
         break;
     }
-    this.date = data?.date ? data.date.toString() : ''
+    this.date = data?.date ? data.date.toString() : '';
     this.PE = data?.PE || 0;
     this.PB = data?.PB || 0;
   }

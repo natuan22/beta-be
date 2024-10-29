@@ -2,7 +2,10 @@ import { ApiProperty, ApiResponseProperty, PartialType } from '@nestjs/swagger';
 import * as moment from 'moment';
 import { VnIndexResponse } from '../../stock/responses/Vnindex.response';
 import { BaseResponse } from '../../utils/utils.response';
-import { LineChartInterface, LineChartInterfaceV2 } from '../interfaces/line-chart.interface';
+import {
+  LineChartInterface,
+  LineChartInterfaceV2,
+} from '../interfaces/line-chart.interface';
 
 export class LineChartResponse extends VnIndexResponse {
   @ApiResponseProperty({
@@ -58,7 +61,7 @@ export class LineChartResponseV2 {
       new Date().getDate(),
       moment(data.timeInday, 'HH:mm:ss').hour(),
       moment(data.timeInday, 'HH:mm:ss').minute(),
-    ).valueOf()
+    ).valueOf();
     this.indexChange = data?.change || 0;
     this.percentIndexChange = data?.perChange || 0;
     this.openIndex = data?.openPrice || 0;
@@ -72,6 +75,6 @@ export class LineChartResponseV2 {
   }
 
   static mapToList(data?: LineChartInterfaceV2[]) {
-    return data.map(item => new LineChartResponseV2(item))
+    return data.map((item) => new LineChartResponseV2(item));
   }
 }

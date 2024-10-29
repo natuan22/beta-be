@@ -1,4 +1,4 @@
 export interface MarketLiquidityInterface {
-    time: string;
-    value: number;
+  time: string;
+  value: number;
 }

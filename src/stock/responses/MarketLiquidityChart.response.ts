@@ -1,6 +1,6 @@
-import {ApiProperty, PartialType} from '@nestjs/swagger';
-import {BaseResponse} from '../../utils/utils.response';
-import {MarketLiquidityInterface} from "../interfaces/market-liquidity.interface";
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { BaseResponse } from '../../utils/utils.response';
+import { MarketLiquidityInterface } from '../interfaces/market-liquidity.interface';
 
 export class MarketLiquidityChartResponse {
   @ApiProperty({

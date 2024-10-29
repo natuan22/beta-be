@@ -8,7 +8,7 @@ export interface IndustryInterface {
   day_change_percent: number;
   week_change_percent: number;
   month_change_percent: number;
-  ytd: number
+  ytd: number;
 }
 
 export interface IndustryRawInterface {
@@ -22,5 +22,5 @@ export interface IndustryRawInterface {
   floorPrice: number;
   ceilingPrice: number;
   date_time: Date | string;
-  total_market_cap: number
+  total_market_cap: number;
 }

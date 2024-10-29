@@ -5,10 +5,10 @@ import { HttpStatus } from '@nestjs/common';
 process.on('message', async (data: any) => {
   try {
     const { marketCapQuery } = data;
-    
+
     // tạo database connection mới và thực hiện truy vấn
     const sql = await connectDB();
-    
+
     const marketCap = (await sql.query(marketCapQuery)).recordset;
 
     const groupByIndustry = marketCap.reduce((result, item) => {
@@ -21,22 +21,26 @@ process.on('message', async (data: any) => {
       ([industry, values]: any) => {
         return {
           industry,
-          day_change_percent: !values[1]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[1].total_market_cap) /
-              values[1].total_market_cap) *
-            100,
-          week_change_percent: !values[2]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[2].total_market_cap) /
-              values[2].total_market_cap) *
-            100,
-          month_change_percent: !values[3]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[3].total_market_cap) /
-              values[3].total_market_cap) *
-            100,
-          ytd: !values[4]?.total_market_cap ? 0 :
-            ((values[0].total_market_cap - values[4].total_market_cap) /
-              values[4].total_market_cap) *
-            100,
+          day_change_percent: !values[1]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[1].total_market_cap) /
+                values[1].total_market_cap) *
+              100,
+          week_change_percent: !values[2]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[2].total_market_cap) /
+                values[2].total_market_cap) *
+              100,
+          month_change_percent: !values[3]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[3].total_market_cap) /
+                values[3].total_market_cap) *
+              100,
+          ytd: !values[4]?.total_market_cap
+            ? 0
+            : ((values[0].total_market_cap - values[4].total_market_cap) /
+                values[4].total_market_cap) *
+              100,
         };
       },
     );

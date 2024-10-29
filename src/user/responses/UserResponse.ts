@@ -1,6 +1,6 @@
 import { ApiResponseProperty, PartialType } from '@nestjs/swagger';
 import { BaseResponse } from '../../utils/utils.response';
-import {UtilCommonTemplate} from "../../utils/utils.common";
+import { UtilCommonTemplate } from '../../utils/utils.common';
 
 export class UserResponse {
   @ApiResponseProperty({
@@ -79,16 +79,17 @@ export class UserResponse {
   refresh_token: string;
 
   @ApiResponseProperty({
-    type: Date
+    type: Date,
   })
-  expired_at: Date
+  expired_at: Date;
 
   constructor(data?: UserResponse | any) {
     this.user_id = data?.user_id ?? 0;
     this.email = data?.email ?? '';
     this.name = data?.name ?? '';
     this.avatar = data?.avatar ?? '';
-    this.date_of_birth = UtilCommonTemplate.toDateTime(data?.date_of_birth) ?? '';
+    this.date_of_birth =
+      UtilCommonTemplate.toDateTime(data?.date_of_birth) ?? '';
     this.phone = data?.phone ?? 0;
     this.is_verified = data?.is_verified ?? 0;
     this.role = data?.role ?? 0;

@@ -8,10 +8,10 @@ import { FilterService } from './filter.service';
 export class FilterController {
   constructor(private readonly filterService: FilterService) {}
 
-  @ApiOperation({summary: 'Lấy dữ liệu'})
+  @ApiOperation({ summary: 'Lấy dữ liệu' })
   @Get()
   async create(@Res() res: Response) {
-    const data = await this.filterService.get()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+    const data = await this.filterService.get();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 }

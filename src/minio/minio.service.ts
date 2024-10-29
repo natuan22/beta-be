@@ -3,15 +3,13 @@ import { MinioService } from 'nestjs-minio-client';
 
 @Injectable()
 export class MinioOptionService {
-  constructor(
-    private readonly minio: MinioService,
-  ){}
+  constructor(private readonly minio: MinioService) {}
 
-  async listBucket(){
+  async listBucket() {
     return await this.minio.client.listBuckets();
   }
 
-  async put(bucket: string, name: string, buffer: Buffer, metaData: any){
-    await this.minio.client.putObject(bucket, name, buffer, metaData)
+  async put(bucket: string, name: string, buffer: Buffer, metaData: any) {
+    await this.minio.client.putObject(bucket, name, buffer, metaData);
   }
 }

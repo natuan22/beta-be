@@ -3,7 +3,10 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
-import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
+import {
+  CatchException,
+  ExceptionResponse,
+} from '../exceptions/common.exception';
 import { UserResponse } from '../user/responses/UserResponse';
 import { UserEntity } from '../user/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -40,7 +43,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly smsService: SmsService,
     private readonly queueService: QueueService,
-  ) { }
+  ) {}
 
   generateAccessToken(
     userId: number,
@@ -61,7 +64,11 @@ export class AuthService {
     );
   }
 
-  generateRefreshToken(userId: number, sessionId: string, secretKey: string): string {
+  generateRefreshToken(
+    userId: number,
+    sessionId: string,
+    secretKey: string,
+  ): string {
     return this.jwtService.sign(
       {
         userId: userId,
@@ -191,7 +198,7 @@ export class AuthService {
     const refreshToken: string = this.generateRefreshToken(
       user.user_id,
       deviceId,
-      secretKey
+      secretKey,
     );
     const expiredAt: Date = new Date(
       Date.now() + TimeToLive.OneDayMilliSeconds,
@@ -242,15 +249,24 @@ export class AuthService {
         );
       }
 
-      const mac_id = req['headers']['mac'] as string
-      const user_agent = req['headers']['user-agent']
-      const ip_address = req['realIP'] || req['ip']
+      const mac_id = req['headers']['mac'] as string;
+      const user_agent = req['headers']['user-agent'];
+      const ip_address = req['realIP'] || req['ip'];
 
-      const sessionId = randomUUID()
-      const secretKey = UtilCommonTemplate.uuid()
+      const sessionId = randomUUID();
+      const secretKey = UtilCommonTemplate.uuid();
 
-      const accessToken = this.generateAccessToken(userByPhone.user_id, userByPhone.role, sessionId, secretKey)
-      const refreshToken = this.generateRefreshToken(userByPhone.user_id, sessionId, secretKey)
+      const accessToken = this.generateAccessToken(
+        userByPhone.user_id,
+        userByPhone.role,
+        sessionId,
+        secretKey,
+      );
+      const refreshToken = this.generateRefreshToken(
+        userByPhone.user_id,
+        sessionId,
+        secretKey,
+      );
 
       //Tạo session mới
       const session = this.deviceRepo.create({
@@ -262,15 +278,15 @@ export class AuthService {
         ip_address,
         refresh_token: refreshToken,
         secret_key: secretKey,
-        expired_at: new Date(Date.now() + TimeToLive.OneDayMilliSeconds)
-      })
+        expired_at: new Date(Date.now() + TimeToLive.OneDayMilliSeconds),
+      });
 
-      await this.deviceRepo.save(session)
+      await this.deviceRepo.save(session);
 
       res.cookie('rt', refreshToken, {
         path: '/',
       });
-  
+
       res.cookie('at', accessToken, {
         path: '/',
       });
@@ -281,9 +297,8 @@ export class AuthService {
         refresh_token: refreshToken,
         expired_at: '',
       });
-
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
@@ -323,23 +338,23 @@ export class AuthService {
     return 'logged out successfully';
   }
 
-  async logoutV2(sessionId: string, res: Response){
+  async logoutV2(sessionId: string, res: Response) {
     try {
       res.cookie('rt', '', {
         maxAge: -1,
         path: '/',
         // httpOnly: true,
       });
-  
+
       res.cookie('at', '', {
         maxAge: -1,
         path: '/',
         // httpOnly: true,
       });
-      await this.deviceRepo.delete({id: sessionId})
-      return 'logged out successfully'
+      await this.deviceRepo.delete({ id: sessionId });
+      return 'logged out successfully';
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
@@ -352,15 +367,15 @@ export class AuthService {
     });
   }
 
-  async getSecretKeyV2(
-    sessionId: string
-  ){
-    return (await this.deviceRepo.findOne({
-      where: {
-        id: sessionId
-      },
-      select: ['secret_key']
-    }))?.secret_key
+  async getSecretKeyV2(sessionId: string) {
+    return (
+      await this.deviceRepo.findOne({
+        where: {
+          id: sessionId,
+        },
+        select: ['secret_key'],
+      })
+    )?.secret_key;
   }
 
   async refreshToken(
@@ -432,7 +447,7 @@ export class AuthService {
     const newRefreshToken: string = this.generateRefreshToken(
       currentDevice.user.user_id,
       deviceId,
-      secretKey
+      secretKey,
     );
 
     // Lưu refreshToken mới vào cookies của response
@@ -456,11 +471,15 @@ export class AuthService {
 
   async refreshTokenV2(req: Request, res: Response) {
     try {
-      const token = req['token']
-      const user_id = req['user'].userId
+      const token = req['token'];
+      const user_id = req['user'].userId;
 
-      const session = await this.deviceRepo.findOne({ where: { refresh_token: token }, relations: {user: true} })
-      if (!session) throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid')
+      const session = await this.deviceRepo.findOne({
+        where: { refresh_token: token },
+        relations: { user: true },
+      });
+      if (!session)
+        throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'Token invalid');
 
       // Tạo secretKey mới để sử dụng cho accessToken
       const secretKey = UtilCommonTemplate.uuid();
@@ -477,7 +496,7 @@ export class AuthService {
       const newRefreshToken: string = this.generateRefreshToken(
         user_id,
         session.id,
-        secretKey
+        secretKey,
       );
 
       // Lưu refreshToken mới vào cookies của response
@@ -503,19 +522,18 @@ export class AuthService {
       // Trả về đối tượng RefreshTokenResponse cho client
       return new RefreshTokenResponse({
         access_token: newAccessToken,
-        refresh_token: newRefreshToken
+        refresh_token: newRefreshToken,
       });
-
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
-  async removeSession(sessionId: string){
+  async removeSession(sessionId: string) {
     try {
-      await this.deviceRepo.delete({id: sessionId})
+      await this.deviceRepo.delete({ id: sessionId });
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
@@ -592,7 +610,11 @@ export class AuthService {
       `Your OTP is: ${verifyOTP} (5 minutes)`,
     );
 
-    if (response_incom.StatusCode != 1) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Lỗi khi gửi OTP vui lòng thử lại sau')
+    if (response_incom.StatusCode != 1)
+      throw new ExceptionResponse(
+        HttpStatus.BAD_REQUEST,
+        'Lỗi khi gửi OTP vui lòng thử lại sau',
+      );
 
     // Lưu mã OTP vào cơ sở dữ liệu và đặt một công việc trong hàng đợi để xóa mã OTP sau 5 phút
     const verifyData: VerifyEntity = await this.verifyRepo.save({
@@ -600,7 +622,6 @@ export class AuthService {
       user: user,
       verify_otp: verifyOTP,
     });
-
 
     // await this.queueService.addJob(
     //   'delete-expired-otp',

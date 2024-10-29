@@ -4,7 +4,7 @@ import {
   Ctx,
   KafkaContext,
   MessagePattern,
-  Payload
+  Payload,
 } from '@nestjs/microservices';
 import { KAFKA_MODULE } from '../constants';
 import { requestPatterns, Topics } from '../enums/kafka-topics.enum';
@@ -194,28 +194,38 @@ export class KafkaConsumer {
   }
 
   @MessagePattern(Topics.ChartNenCoPhieu)
-  async handleChartNen(@Payload() payload: ChartNenInterface[], @Ctx() context: KafkaContext){
+  async handleChartNen(
+    @Payload() payload: ChartNenInterface[],
+    @Ctx() context: KafkaContext,
+  ) {
     try {
-      this.kafkaService.handleChartNen(payload)
+      this.kafkaService.handleChartNen(payload);
     } catch (error) {
-      this.logger.error(error)
+      this.logger.error(error);
     }
   }
 
   @MessagePattern(Topics.ChartNenCoPhieuNew)
-  async handleChartNenNew(@Payload() payload: ChartNenInterface[], @Ctx() context: KafkaContext){
+  async handleChartNenNew(
+    @Payload() payload: ChartNenInterface[],
+    @Ctx() context: KafkaContext,
+  ) {
     try {
-        this.kafkaService.handleBetaWatchListSocket(payload)
+      this.kafkaService.handleBetaWatchListSocket(payload);
     } catch (error) {
-      this.logger.error(error)
+      this.logger.error(error);
     }
   }
+  
   @MessagePattern(Topics.GiaoDichCoPhieu)
-  async handleGiaoDichCoPhieu(@Payload() payload: TickerTransInterface[], @Ctx() context: KafkaContext){
+  async handleGiaoDichCoPhieu(
+    @Payload() payload: TickerTransInterface[],
+    @Ctx() context: KafkaContext,
+  ) {
     try {
-        this.kafkaService.handleGiaoDichCoPhieu(payload)
+      this.kafkaService.handleGiaoDichCoPhieu(payload);
     } catch (error) {
-      this.logger.error(error)
+      this.logger.error(error);
     }
   }
 }

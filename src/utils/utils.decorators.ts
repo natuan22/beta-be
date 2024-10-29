@@ -1,52 +1,65 @@
-import {createParamDecorator, ExecutionContext, HttpStatus, SetMetadata} from '@nestjs/common';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  HttpStatus,
+  SetMetadata,
+} from '@nestjs/common';
 
-import {JwtService} from '@nestjs/jwt';
-import {ExceptionResponse} from "../exceptions/common.exception";
-import {DEVICE_METADATA} from "../constants";
-import {MRequest} from "../types/middleware"
+import { JwtService } from '@nestjs/jwt';
+import { ExceptionResponse } from '../exceptions/common.exception';
+import { DEVICE_METADATA } from '../constants';
+import { MRequest } from '../types/middleware';
 
-export const GetUserIdFromToken = createParamDecorator<number>(async (data: unknown, ctx: ExecutionContext) => {
+export const GetUserIdFromToken = createParamDecorator<number>(
+  async (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     const jwt = new JwtService();
     const bearer = request.headers.authorization;
     if (!bearer) {
-        throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
+      throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
     }
     const token = bearer.split(' ')[1];
     const payload: any = jwt.decode(token);
     if (!payload || !payload.userId) {
-        throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
+      throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
     }
     return payload.userId;
-});
+  },
+);
 
-export const GetToken = createParamDecorator<string>(async (data: unknown, ctx: ExecutionContext) => {
+export const GetToken = createParamDecorator<string>(
+  async (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     const bearer = request?.headers?.authorization;
 
     if (!bearer) {
-        throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
+      throw new ExceptionResponse(HttpStatus.UNAUTHORIZED, 'token not found');
     }
     return bearer.split(' ')[1];
-});
+  },
+);
 
-export const GetRoleFromTokenV2 = createParamDecorator<string>(async (data: unknown, ctx: ExecutionContext) => {
+export const GetRoleFromTokenV2 = createParamDecorator<string>(
+  async (data: unknown, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
     const bearer = request?.headers?.authorization;
     const jwt = new JwtService();
 
-    if(!bearer) return null
+    if (!bearer) return null;
 
     const token = bearer.split(' ')[1];
 
     const payload: any = jwt.decode(token);
-    if (!payload || !payload.role) return null
+    if (!payload || !payload.role) return null;
     return payload.role;
-});
+  },
+);
 
-export const GetDeviceId = createParamDecorator<string>(async (data: unknown, ctx: ExecutionContext) => {
-   const req: MRequest = ctx.switchToHttp().getRequest();
-   return req?.deviceId || "";
-});
+export const GetDeviceId = createParamDecorator<string>(
+  async (data: unknown, ctx: ExecutionContext) => {
+    const req: MRequest = ctx.switchToHttp().getRequest();
+    return req?.deviceId || '';
+  },
+);
 
 export const LoginMetadata = () => SetMetadata(DEVICE_METADATA, true);

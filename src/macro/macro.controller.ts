@@ -1,4 +1,12 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
 import { CatchException } from '../exceptions/common.exception';
@@ -8,7 +16,11 @@ import { ExchangeRateAndInterestRateDto } from './dto/exchange-rate-interest-rat
 import { FDIOrderDto } from './dto/fdi-order.dto';
 import { ForeignInvestmentIndexDto } from './dto/foreign-investment-index.dto';
 import { IndustrialIndexDto } from './dto/ipp-industry-index.dto';
-import { IPPIndustryDto, IPPMostIndusProductionDto, IPPProductionIndexDto } from './dto/ipp-industry.dto';
+import {
+  IPPIndustryDto,
+  IPPMostIndusProductionDto,
+  IPPProductionIndexDto,
+} from './dto/ipp-industry.dto';
 import { MacroService } from './macro.service';
 import { AccumulatedResponse } from './responses/accumulated.response';
 import { CentralExchangeRateResponse } from './responses/central-exchange-rate.response';
@@ -30,14 +42,14 @@ export class MacroController {
   constructor(private readonly macrosService: MacroService) {}
 
   @Post('test')
-    async test(@Body() body: {email: string}, @Res() res: Response){
-        try {
-            await this.macrosService.test(body.email)
-            return res.status(HttpStatus.OK).send(new BaseResponse({}));
-        } catch (e) {
-            throw new CatchException(e)
-        }
+  async test(@Body() body: { email: string }, @Res() res: Response) {
+    try {
+      await this.macrosService.test(body.email);
+      return res.status(HttpStatus.OK).send(new BaseResponse({}));
+    } catch (e) {
+      throw new CatchException(e);
     }
+  }
 
   /**
    * API site GDP
@@ -218,10 +230,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Lực lượng lao động',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async laborForce(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async laborForce(@Res() res: Response) {
     const data = await this.macrosService.laborForce();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -230,10 +240,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Tỷ lệ thất nghiệp các nhóm lao động',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async unemployedRate(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async unemployedRate(@Res() res: Response) {
     const data = await this.macrosService.unemployedRate();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -242,10 +250,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Tỷ lệ lao động theo lĩnh vực (%)',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async laborRate(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async laborRate(@Res() res: Response) {
     const data = await this.macrosService.laborRate();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -254,10 +260,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Tỷ lệ lao động phi chính thức (%)',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async informalLaborRate(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async informalLaborRate(@Res() res: Response) {
     const data = await this.macrosService.informalLaborRate();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -266,10 +270,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Mức lương bình quân trên thị trường lao động ',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async averageSalary(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async averageSalary(@Res() res: Response) {
     const data = await this.macrosService.averageSalary();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -278,10 +280,8 @@ export class MacroController {
   @ApiOperation({
     summary: 'Biến động việc làm so với cùng kỳ',
   })
-  @ApiOkResponse({type: LaborForceResponse})
-  async employmentFluctuations(
-    @Res() res: Response,
-  ) {
+  @ApiOkResponse({ type: LaborForceResponse })
+  async employmentFluctuations(@Res() res: Response) {
     const data = await this.macrosService.employmentFluctuations();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -289,265 +289,284 @@ export class MacroController {
   //Tín dụng
 
   @Get('tong-phuong-tien-thanh-toan')
-  @ApiOperation({summary: 'Tổng phương tiện thanh toán'})
-  async totalPayment(@Res() res: Response){
+  @ApiOperation({ summary: 'Tổng phương tiện thanh toán' })
+  async totalPayment(@Res() res: Response) {
     try {
-      const data = await this.macrosService.totalPayment()
+      const data = await this.macrosService.totalPayment();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('tang-truong-tong-phuong-tien-thanh-toan')
-  @ApiOperation({summary: 'Tổng phương tiện thanh toán tăng trưởng'})
-  async totalPaymentPercent(@Res() res: Response){
+  @ApiOperation({ summary: 'Tổng phương tiện thanh toán tăng trưởng' })
+  async totalPaymentPercent(@Res() res: Response) {
     try {
-      const data = await this.macrosService.totalPaymentPercent()
+      const data = await this.macrosService.totalPaymentPercent();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('can-can-thanh-toan-quoc-te')
-  @ApiOperation({summary: 'Cán cân thanh toán quốc tế'})
-  async balancePaymentInternational(@Res() res: Response){
+  @ApiOperation({ summary: 'Cán cân thanh toán quốc tế' })
+  async balancePaymentInternational(@Res() res: Response) {
     try {
-      const data = await this.macrosService.balancePaymentInternational()
+      const data = await this.macrosService.balancePaymentInternational();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('du-no-tin-dung')
-  @ApiOperation({summary: 'Dư nợ tín dụng đối với nền kinh tế (tỷ VNĐ)'})
-  async creditDebt(@Res() res: Response){
+  @ApiOperation({ summary: 'Dư nợ tín dụng đối với nền kinh tế (tỷ VNĐ)' })
+  async creditDebt(@Res() res: Response) {
     try {
-      const data = await this.macrosService.creditDebt()
+      const data = await this.macrosService.creditDebt();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('tang-truong-du-no-tin-dung')
-  @ApiOperation({summary: 'Tăng trưởng dư nợ tín dụng đối với nền kinh tế (%)'})
-  async creditDebtPercent(@Res() res: Response){
+  @ApiOperation({
+    summary: 'Tăng trưởng dư nợ tín dụng đối với nền kinh tế (%)',
+  })
+  async creditDebtPercent(@Res() res: Response) {
     try {
-      const data = await this.macrosService.creditDebtPercent()
+      const data = await this.macrosService.creditDebtPercent();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('thong-ke-theo-loai-hinh-to-chuc-tin-dung')
-  @ApiOperation({summary: 'Thống kê theo loại hình tổ chức tín dụng'})
-  async creditInstitution(@Res() res: Response){
+  @ApiOperation({ summary: 'Thống kê theo loại hình tổ chức tín dụng' })
+  async creditInstitution(@Res() res: Response) {
     try {
-      const data = await this.macrosService.creditInstitution()
+      const data = await this.macrosService.creditInstitution();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   //FDI
-  @ApiOperation({summary: 'Tổng số dự án đầu tư'})
-  @ApiOkResponse({type: TotalInvestmentProjectsResponse})
+  @ApiOperation({ summary: 'Tổng số dự án đầu tư' })
+  @ApiOkResponse({ type: TotalInvestmentProjectsResponse })
   @Get('tong-so-du-an-dau-tu')
-  async totalInvestmentProjects(@Res() res: Response, @Query() q: FDIOrderDto){
+  async totalInvestmentProjects(@Res() res: Response, @Query() q: FDIOrderDto) {
     try {
-      const data = await this.macrosService.totalInvestmentProjects(+q.order)
+      const data = await this.macrosService.totalInvestmentProjects(+q.order);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('chi-so-dau-tu-nuoc-ngoai')
-  @ApiOperation({summary: 'Chỉ số đầu tư nước ngoài'})
-  @ApiOkResponse({type: ForeignInvestmentIndexResponse})
-  async foreignInvestmentIndex(@Res() res: Response, @Query() q: ForeignInvestmentIndexDto){
+  @ApiOperation({ summary: 'Chỉ số đầu tư nước ngoài' })
+  @ApiOkResponse({ type: ForeignInvestmentIndexResponse })
+  async foreignInvestmentIndex(
+    @Res() res: Response,
+    @Query() q: ForeignInvestmentIndexDto,
+  ) {
     try {
-      const data = await this.macrosService.foreignInvestmentIndex(q)
+      const data = await this.macrosService.foreignInvestmentIndex(q);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('luy-ke')
-  @ApiOperation({summary: 'Lũy kế số dự án cấp mới và tổng vốn đầu tư từ năm 1988'})
-  @ApiOkResponse({type: AccumulatedResponse})
-  async accumulated(@Res() res: Response, @Query() q: FDIOrderDto){
+  @ApiOperation({
+    summary: 'Lũy kế số dự án cấp mới và tổng vốn đầu tư từ năm 1988',
+  })
+  @ApiOkResponse({ type: AccumulatedResponse })
+  async accumulated(@Res() res: Response, @Query() q: FDIOrderDto) {
     try {
-      const data = await this.macrosService.accumulated(q)
+      const data = await this.macrosService.accumulated(q);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('tong-von-dang-ky-va-giai-ngan')
-  @ApiOperation({summary: 'Tổng vốn đăng ký và giải ngân (triệu USD)'})
-  @ApiOkResponse({type: LaborForceResponse})
-  async totalRegisteredAndDisbursed(@Res() res: Response, @Query() q: FDIOrderDto){
+  @ApiOperation({ summary: 'Tổng vốn đăng ký và giải ngân (triệu USD)' })
+  @ApiOkResponse({ type: LaborForceResponse })
+  async totalRegisteredAndDisbursed(
+    @Res() res: Response,
+    @Query() q: FDIOrderDto,
+  ) {
     try {
-      const data = await this.macrosService.totalRegisteredAndDisbursed(q)
+      const data = await this.macrosService.totalRegisteredAndDisbursed(q);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   //Trái phiếu
 
   @Get('tpdn-phat-hanh-thanh-cong-theo-tung-ky')
-  @ApiOperation({summary: 'TPDN phát hành thành công theo từng kỳ '})
-  @ApiOkResponse({type: LaborForceResponse})
-  async corporateBondsIssuedSuccessfully(@Res() res: Response){
+  @ApiOperation({ summary: 'TPDN phát hành thành công theo từng kỳ ' })
+  @ApiOkResponse({ type: LaborForceResponse })
+  async corporateBondsIssuedSuccessfully(@Res() res: Response) {
     try {
-      const data = await this.macrosService.corporateBondsIssuedSuccessfully()
+      const data = await this.macrosService.corporateBondsIssuedSuccessfully();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('lai-suat-trai-phieu-huy-dong-binh-quan')
-  @ApiOperation({summary: 'Lãi suất trái phiếu huy động bình quân'})
-  @ApiOkResponse({type: LaborForceResponse})
-  async averageDepositInterestRate(@Res() res: Response){
+  @ApiOperation({ summary: 'Lãi suất trái phiếu huy động bình quân' })
+  @ApiOkResponse({ type: LaborForceResponse })
+  async averageDepositInterestRate(@Res() res: Response) {
     try {
-      const data = await this.macrosService.averageDepositInterestRate()
+      const data = await this.macrosService.averageDepositInterestRate();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('bang-doanh-nghiep-tong-du-no-va-lai-suat-tp-binh-quan')
-  @ApiOperation({summary: 'Bảng doanh nghiệp, tổng dư nợ và lãi suất TP bình quân'})
-  @ApiOkResponse({type: TotalOutstandingBalanceResponse})
-  async totalOutstandingBalance(@Res() res: Response){
+  @ApiOperation({
+    summary: 'Bảng doanh nghiệp, tổng dư nợ và lãi suất TP bình quân',
+  })
+  @ApiOkResponse({ type: TotalOutstandingBalanceResponse })
+  async totalOutstandingBalance(@Res() res: Response) {
     try {
-      const data = await this.macrosService.totalOutstandingBalance()
+      const data = await this.macrosService.totalOutstandingBalance();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('uoc-tinh-gia-tri-tpdn-dao-han')
-  @ApiOperation({summary: 'Ước tính giá trị TPDN đáo hạn theo từng kỳ'})
-  @ApiOkResponse({type: CorporateBondsIssuedSuccessfullyResponse})
-  async estimatedValueOfCorporateBonds(@Res() res: Response){
+  @ApiOperation({ summary: 'Ước tính giá trị TPDN đáo hạn theo từng kỳ' })
+  @ApiOkResponse({ type: CorporateBondsIssuedSuccessfullyResponse })
+  async estimatedValueOfCorporateBonds(@Res() res: Response) {
     try {
-      const data = await this.macrosService.estimatedValueOfCorporateBonds()
+      const data = await this.macrosService.estimatedValueOfCorporateBonds();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('danh-sach-trai-phieu-den-ky-dao-han')
-  @ApiOperation({summary: 'Danh sách trái phiếu đến kỳ đáo hạn'})
-  @ApiOkResponse({type: ListOfBondsToMaturityResponse})
-  async listOfBondsToMaturity(@Res() res: Response){
+  @ApiOperation({ summary: 'Danh sách trái phiếu đến kỳ đáo hạn' })
+  @ApiOkResponse({ type: ListOfBondsToMaturityResponse })
+  async listOfBondsToMaturity(@Res() res: Response) {
     try {
-      const data = await this.macrosService.listOfBondsToMaturity()
+      const data = await this.macrosService.listOfBondsToMaturity();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('danh-sach-doanh-nghiep-cham-nghia-vu-trai-phieu')
-  @ApiOperation({summary: 'Danh sách doanh nghiệp chậm nghĩa vụ trái phiếu'})
-  @ApiOkResponse({type: ListOfEnterprisesWithLateBondResponse})
-  async listOfEnterprisesWithLateBond (@Res() res: Response){
+  @ApiOperation({ summary: 'Danh sách doanh nghiệp chậm nghĩa vụ trái phiếu' })
+  @ApiOkResponse({ type: ListOfEnterprisesWithLateBondResponse })
+  async listOfEnterprisesWithLateBond(@Res() res: Response) {
     try {
-      const data = await this.macrosService.listOfEnterprisesWithLateBond()
+      const data = await this.macrosService.listOfEnterprisesWithLateBond();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('co-cau-du-no-tpdn')
-  @ApiOperation({summary: 'Cơ cấu dư nợ TPDN'})
-  @ApiOkResponse({type: CorporateBondsIssuedSuccessfullyResponse})
-  async structureOfOutstandingDebt (@Res() res: Response){
+  @ApiOperation({ summary: 'Cơ cấu dư nợ TPDN' })
+  @ApiOkResponse({ type: CorporateBondsIssuedSuccessfullyResponse })
+  async structureOfOutstandingDebt(@Res() res: Response) {
     try {
-      const data = await this.macrosService.structureOfOutstandingDebt()
+      const data = await this.macrosService.structureOfOutstandingDebt();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('ty-trong-du-no-cac-dn')
-  @ApiOperation({summary: 'Tỷ trọng dư nợ các DN chậm thanh toán '})
-  @ApiOkResponse({type: CorporateBondsIssuedSuccessfullyResponse})
-  async proportionOfOutstandingLoansOfEnterprises (@Res() res: Response){
+  @ApiOperation({ summary: 'Tỷ trọng dư nợ các DN chậm thanh toán ' })
+  @ApiOkResponse({ type: CorporateBondsIssuedSuccessfullyResponse })
+  async proportionOfOutstandingLoansOfEnterprises(@Res() res: Response) {
     try {
-      const data = await this.macrosService.proportionOfOutstandingLoansOfEnterprises()
+      const data =
+        await this.macrosService.proportionOfOutstandingLoansOfEnterprises();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   //Tỷ giá và lãi suất
 
   @Get('ty-gia-trung-tam')
-  @ApiOperation({summary: 'Tỷ giá trung tâm USD/VND'})
-  @ApiOkResponse({type: CentralExchangeRateResponse})
-  async centralExchangeRate (@Res() res: Response){
+  @ApiOperation({ summary: 'Tỷ giá trung tâm USD/VND' })
+  @ApiOkResponse({ type: CentralExchangeRateResponse })
+  async centralExchangeRate(@Res() res: Response) {
     try {
-      const data = await this.macrosService.centralExchangeRate()
+      const data = await this.macrosService.centralExchangeRate();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('bang-chi-so-ty-gia')
-  @ApiOperation({summary: 'Bảng chỉ số tỷ giá'})
-  @ApiOkResponse({type: ExchangeRateIndexTableResponse})
-  async exchangeRateIndexTable (@Res() res: Response){
+  @ApiOperation({ summary: 'Bảng chỉ số tỷ giá' })
+  @ApiOkResponse({ type: ExchangeRateIndexTableResponse })
+  async exchangeRateIndexTable(@Res() res: Response) {
     try {
-      const data = await this.macrosService.exchangeRateIndexTable()
+      const data = await this.macrosService.exchangeRateIndexTable();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('bien-dong-ty-gia-lai-suat-voi-thi-truong')
-  @ApiOperation({summary: 'Biến động tỷ giá & lãi suất với thị trường'})
-  @ApiOkResponse({type: ExchangeRateAndInterestRateResponse})
-  async exchangeRateAndInterestRate (@Query() query: ExchangeRateAndInterestRateDto,@Res() res: Response){
+  @ApiOperation({ summary: 'Biến động tỷ giá & lãi suất với thị trường' })
+  @ApiOkResponse({ type: ExchangeRateAndInterestRateResponse })
+  async exchangeRateAndInterestRate(
+    @Query() query: ExchangeRateAndInterestRateDto,
+    @Res() res: Response,
+  ) {
     try {
-      const data = await this.macrosService.exchangeRateAndInterestRate(+query.type, +query.category)
+      const data = await this.macrosService.exchangeRateAndInterestRate(
+        +query.type,
+        +query.category,
+      );
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('lai-suat')
-  @ApiOperation({summary: 'Lãi suất (%)'})
-  @ApiOkResponse({type: InterestRateResponse})
-  async interestRate(@Res() res: Response){
+  @ApiOperation({ summary: 'Lãi suất (%)' })
+  @ApiOkResponse({ type: InterestRateResponse })
+  async interestRate(@Res() res: Response) {
     try {
-      const data = await this.macrosService.interestRate()
+      const data = await this.macrosService.interestRate();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 }

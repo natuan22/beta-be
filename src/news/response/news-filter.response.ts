@@ -1,43 +1,43 @@
-import { ApiProperty } from "@nestjs/swagger"
-import { UtilCommonTemplate } from "../../utils/utils.common"
+import { ApiProperty } from '@nestjs/swagger';
+import { UtilCommonTemplate } from '../../utils/utils.common';
 
 export class NewsFilterResponse {
-    @ApiProperty({
-        type: String
-    })
-    title: string
+  @ApiProperty({
+    type: String,
+  })
+  title: string;
 
-    @ApiProperty({
-        type: String
-    })
-    href: string
+  @ApiProperty({
+    type: String,
+  })
+  href: string;
 
-    @ApiProperty({
-        type: String
-    })
-    date: string
+  @ApiProperty({
+    type: String,
+  })
+  date: string;
 
-    @ApiProperty({
-        type: String
-    })
-    img: string
+  @ApiProperty({
+    type: String,
+  })
+  img: string;
 
-    @ApiProperty({
-        type: String
-    })
-    code: string
+  @ApiProperty({
+    type: String,
+  })
+  code: string;
 
-    total_record: number
+  total_record: number;
 
-    constructor(data?: NewsFilterResponse){
-        this.title = data?.title || ''
-        this.href = data?.href || ''
-        this.date = data?.date ? UtilCommonTemplate.toDate(data.date) : ''
-        this.img = data?.img || ''
-        this.code = data?.code || '' 
-    }
+  constructor(data?: NewsFilterResponse) {
+    this.title = data?.title || '';
+    this.href = data?.href || '';
+    this.date = data?.date ? UtilCommonTemplate.toDate(data.date) : '';
+    this.img = data?.img || '';
+    this.code = data?.code || '';
+  }
 
-    static mapToList(data?: NewsFilterResponse[]){
-        return data.map(item => new NewsFilterResponse(item))
-    }
-} 
+  static mapToList(data?: NewsFilterResponse[]) {
+    return data.map((item) => new NewsFilterResponse(item));
+  }
+}

@@ -1,6 +1,22 @@
-import { Body, Controller, Get, HttpStatus, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Post,
+  Query,
+  Res,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Response } from 'express';
 import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
@@ -10,7 +26,10 @@ import { RolesGuard } from '../guards/roles.guard';
 import { StockDto } from '../shares/dto/stock.dto';
 import { BaseResponse } from '../utils/utils.response';
 import { getNewsDto } from './dto/get-news.dto';
-import { IdentifyMarketDto, SaveStockRecommendDto } from './dto/identifyMarket.dto';
+import {
+  IdentifyMarketDto,
+  SaveStockRecommendDto,
+} from './dto/identifyMarket.dto';
 import { QueryNewsDto } from './dto/queryNews.dto';
 import { SaveNewsDto } from './dto/save-news.dto';
 import { SaveMarketCommentDto } from './dto/saveMarketMovements.dto';
@@ -20,7 +39,10 @@ import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
 import { StockMarketDto } from './dto/stockMarket.dto';
 import { TopNetBuyingAndSellingDto } from './dto/topNetBuyingAndSelling.dto';
 import { ReportService } from './report.service';
-import { AfternoonReport1, IStockContribute } from './response/afternoonReport1.response';
+import {
+  AfternoonReport1,
+  IStockContribute,
+} from './response/afternoonReport1.response';
 import { BuyingAndSellingStatisticsResponse } from './response/buyingAndSellingStatistics.response';
 import { EventResponse } from './response/event.response';
 import { ExchangeRateResponse } from './response/exchangeRate.response';
@@ -38,9 +60,7 @@ import { TransactionValueFluctuationsResponse } from './response/transactionValu
 @Controller('report')
 @ApiTags('Report')
 export class ReportController {
-  constructor(
-    private readonly reportService: ReportService
-    ) {}
+  constructor(private readonly reportService: ReportService) {}
 
   // @Post('upload')
   // @UseInterceptors(AnyFilesInterceptor())
@@ -54,327 +74,366 @@ export class ReportController {
 
   @Post('upload-report')
   @UseInterceptors(AnyFilesInterceptor())
-  async uploadReport(@UploadedFiles() file: any, @Res() res: Response){
+  async uploadReport(@UploadedFiles() file: any, @Res() res: Response) {
     try {
-      await this.reportService.uploadFileReport(file)
-      return res.status(HttpStatus.OK).send(new BaseResponse({}))
+      await this.reportService.uploadFileReport(file);
+      return res.status(HttpStatus.OK).send(new BaseResponse({}));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
 
-  @ApiOperation({summary: 'Tin quốc tế'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Tin quốc tế' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('tin-quoc-te')
-  async newsInternational(@Query() q: QueryNewsDto, @Res() res: Response){
-    const data = await this.reportService.newsInternational(+q.quantity, +q.type || 0)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async newsInternational(@Query() q: QueryNewsDto, @Res() res: Response) {
+    const data = await this.reportService.newsInternational(
+      +q.quantity,
+      +q.type || 0,
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tin trong nước'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Tin trong nước' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('tin-trong-nuoc')
-  async newsDomestic(@Query() q: QueryNewsDto, @Res() res: Response){
-    const data = await this.reportService.newsDomestic(+q.quantity, +q.type || 0)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async newsDomestic(@Query() q: QueryNewsDto, @Res() res: Response) {
+    const data = await this.reportService.newsDomestic(
+      +q.quantity,
+      +q.type || 0,
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tin doanh nghiệp'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsEnterpriseResponse})
+  @ApiOperation({ summary: 'Tin doanh nghiệp' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsEnterpriseResponse })
   @Get('tin-doanh-nghiep')
-  async newsEnterprise(@Query() q: QueryNewsDto, @Res() res: Response){
-    const data = await this.reportService.newsEnterprise(+q.quantity)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async newsEnterprise(@Query() q: QueryNewsDto, @Res() res: Response) {
+    const data = await this.reportService.newsEnterprise(+q.quantity);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Lịch sự kiện'})
-  @ApiOkResponse({status: HttpStatus.OK, type: EventResponse})
+  @ApiOperation({ summary: 'Lịch sự kiện' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: EventResponse })
   @Get('lich-su-kien')
-  async event(@Res() res: Response){
-    const data = await this.reportService.event()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async event(@Res() res: Response) {
+    const data = await this.reportService.event();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tỷ giá'})
-  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateResponse})
+  @ApiOperation({ summary: 'Tỷ giá' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: ExchangeRateResponse })
   @Get('ty-gia')
-  async exchangeRate(@Res() res: Response){
-    const data = await this.reportService.exchangeRate()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async exchangeRate(@Res() res: Response) {
+    const data = await this.reportService.exchangeRate();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Hàng hoá'})
-  @ApiOkResponse({status: HttpStatus.OK, type: MerchandiseResponse})
+  @ApiOperation({ summary: 'Hàng hoá' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: MerchandiseResponse })
   @Get('hang-hoa')
-  async merchandise(@Res() res: Response){
-    const data = await this.reportService.merchandise()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async merchandise(@Res() res: Response) {
+    const data = await this.reportService.merchandise();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Lãi suất bình quân liên ngân hàng'})
-  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateResponse})
+  @ApiOperation({ summary: 'Lãi suất bình quân liên ngân hàng' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: ExchangeRateResponse })
   @Get('lai-suat')
-  async interestRate(@Res() res: Response){
-    const data = await this.reportService.interestRate()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async interestRate(@Res() res: Response) {
+    const data = await this.reportService.interestRate();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Thị trường chứng khoán Việt Nam và Quốc tế'})
-  @ApiOkResponse({status: HttpStatus.OK, type: MerchandiseResponse})
+  @ApiOperation({ summary: 'Thị trường chứng khoán Việt Nam và Quốc tế' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: MerchandiseResponse })
   @Get('thi-truong-chung-khoan')
-  async stockMarket(@Query() q: StockMarketDto, @Res() res: Response){
-    const data = await this.reportService.stockMarket(q.type || 0)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async stockMarket(@Query() q: StockMarketDto, @Res() res: Response) {
+    const data = await this.reportService.stockMarket(q.type || 0);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Diễn biến kết phiên sáng'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsEnterpriseResponse})
+  @ApiOperation({ summary: 'Diễn biến kết phiên sáng' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsEnterpriseResponse })
   @Get('ket-phien-sang')
-  async morning(@Res() res: Response){
-    const data = await this.reportService.morning()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async morning(@Res() res: Response) {
+    const data = await this.reportService.morning();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Diễn biến kết phiên sáng tại HOSE'})
-  @ApiOkResponse({status: HttpStatus.OK, type: MorningHoseResponse})
+  @ApiOperation({ summary: 'Diễn biến kết phiên sáng tại HOSE' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: MorningHoseResponse })
   @Get('ket-phien-sang-hose')
-  async morningHose(@Res() res: Response){
-    const data = await this.reportService.morningHose()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async morningHose(@Res() res: Response) {
+    const data = await this.reportService.morningHose();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Top đóng góp điểm số'})
-  @ApiOkResponse({status: HttpStatus.OK, type: TopScoreResponse})
+  @ApiOperation({ summary: 'Top đóng góp điểm số' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: TopScoreResponse })
   @Get('top-dong-gop-diem-so')
-  async topScore(@Res() res: Response){
-    const data = await this.reportService.topScore()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async topScore(@Res() res: Response) {
+    const data = await this.reportService.topScore();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Nhận định thị trường'})
-  @ApiOkResponse({status: HttpStatus.OK})
+  @ApiOperation({ summary: 'Nhận định thị trường' })
+  @ApiOkResponse({ status: HttpStatus.OK })
   @Get('nhan-dinh-thi-truong')
-  async identifyMarket(@Res() res: Response){
-    const data = await this.reportService.identifyMarket()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async identifyMarket(@Res() res: Response) {
+    const data = await this.reportService.identifyMarket();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Lưu tin'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu tin' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-tin')
-  async saveNewsInternational(@Body() b: SaveNewsDto, @Res() res: Response){
-    const data = await this.reportService.saveNews(+b.id, b.value)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveNewsInternational(@Body() b: SaveNewsDto, @Res() res: Response) {
+    const data = await this.reportService.saveNews(+b.id, b.value);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tin tức redis'})
-  @ApiOkResponse({status: HttpStatus.OK})
+  @ApiOperation({ summary: 'Tin tức redis' })
+  @ApiOkResponse({ status: HttpStatus.OK })
   @Get('tin-tuc-redis')
-  async newsRedis(@Query() q: getNewsDto, @Res() res: Response){
-    const data = await this.reportService.getNews(+q.id)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async newsRedis(@Query() q: getNewsDto, @Res() res: Response) {
+    const data = await this.reportService.getNews(+q.id);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Lưu nhận định thị trường'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu nhận định thị trường' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-nhan-dinh-thi-truong')
-  async saveIdentifyMarket(@Body() b: IdentifyMarketDto, @Res() res: Response){
-    const data = await this.reportService.saveIdentifyMarket(b.text)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveIdentifyMarket(@Body() b: IdentifyMarketDto, @Res() res: Response) {
+    const data = await this.reportService.saveIdentifyMarket(b.text);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Lưu cổ phiếu khuyến nghị'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu cổ phiếu khuyến nghị' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-co-phieu-khuyen-nghi')
-  async saveStockRecommend(@Body() b: SaveStockRecommendDto, @Res() res: Response){
-    const data = await this.reportService.saveStockRecommend(b.stock_buy, b.stock_sell)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveStockRecommend(
+    @Body() b: SaveStockRecommendDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.saveStockRecommend(
+      b.stock_buy,
+      b.stock_sell,
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Nhận định thị trường redis'})
-  @ApiOkResponse({status: HttpStatus.OK})
+  @ApiOperation({ summary: 'Nhận định thị trường redis' })
+  @ApiOkResponse({ status: HttpStatus.OK })
   @Get('nhan-dinh-thi-truong-redis')
-  async identifyMarketReis(@Res() res: Response){
-    const data = await this.reportService.identifyMarketRedis()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async identifyMarketReis(@Res() res: Response) {
+    const data = await this.reportService.identifyMarketRedis();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
   //Bản tin chiều
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin chiều trang 1'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu diễn biến thị trường bản tin chiều trang 1' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-dien-bien-thi-truong')
-  async saveMarketMovements(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketMovements(b.text)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveMarketMovements(
+    @Body() b: SaveMarketCommentDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.saveMarketMovements(b.text);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
   // @UseGuards(AuthGuard2, RolesGuard)
   // @Roles(Role.Admin)
-  @ApiOperation({summary: 'Bản tin chiều trang 1'})
-  @ApiOkResponse({status: HttpStatus.OK, type: AfternoonReport1})
+  @ApiOperation({ summary: 'Bản tin chiều trang 1' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: AfternoonReport1 })
   @Get('ban-tin-chieu-1')
-  async afternoonReport1(@Res() res: Response){
-    const data = await this.reportService.afternoonReport1()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async afternoonReport1(@Res() res: Response) {
+    const data = await this.reportService.afternoonReport1();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
-  @ApiOperation({summary: 'Lưu nhận định thị trường bản tin chiều trang 2'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu nhận định thị trường bản tin chiều trang 2' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-nhan-dinh-thi-truong-chieu')
-  async saveMarketComment(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketComment(b.text, b.img)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveMarketComment(
+    @Body() b: SaveMarketCommentDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.saveMarketComment(b.text, b.img);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Bản tin chiều trang 2'})
-  @ApiOkResponse({status: HttpStatus.OK, type: AfterNoonReport2Response})
+  @ApiOperation({ summary: 'Bản tin chiều trang 2' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: AfterNoonReport2Response })
   @Get('ban-tin-chieu-2')
-  async afternoonReport2(@Res() res: Response){
-    const data = await this.reportService.afternoonReport2()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async afternoonReport2(@Res() res: Response) {
+    const data = await this.reportService.afternoonReport2();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Biến động GTGD một số ngành quan trọng'})
-  @ApiOkResponse({status: HttpStatus.OK, type: TransactionValueFluctuationsResponse})
+  @ApiOperation({ summary: 'Biến động GTGD một số ngành quan trọng' })
+  @ApiOkResponse({
+    status: HttpStatus.OK,
+    type: TransactionValueFluctuationsResponse,
+  })
   @Get('bien-dong-gtgd')
-  async transactionValueFluctuations(@Query() q: StockMarketDto, @Res() res: Response){
-    const data = await this.reportService.transactionValueFluctuations(q.type || 0)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async transactionValueFluctuations(
+    @Query() q: StockMarketDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.transactionValueFluctuations(
+      q.type || 0,
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Thanh khoản thị trường qua 60 phiên gần nhất'})
-  @ApiOkResponse({status: HttpStatus.OK, type: LiquidityMarketResponse})
+  @ApiOperation({ summary: 'Thanh khoản thị trường qua 60 phiên gần nhất' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: LiquidityMarketResponse })
   @Get('thanh-khoan-thi-truong')
-  async liquidityMarket(@Res() res: Response){
-    const data = await this.reportService.liquidityMarket()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async liquidityMarket(@Res() res: Response) {
+    const data = await this.reportService.liquidityMarket();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tỷ trọng dòng tiền các nhóm NĐT qua 60 phiên gần nhất'})
-  @ApiOkResponse({status: HttpStatus.OK, type: LiquidityMarketResponse})
+  @ApiOperation({
+    summary: 'Tỷ trọng dòng tiền các nhóm NĐT qua 60 phiên gần nhất',
+  })
+  @ApiOkResponse({ status: HttpStatus.OK, type: LiquidityMarketResponse })
   @Get('ty-trong-dong-tien')
-  async cashFlowRatio(@Res() res: Response){
-    const data = await this.reportService.cashFlowRatio()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async cashFlowRatio(@Res() res: Response) {
+    const data = await this.reportService.cashFlowRatio();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Top ngành mua bán ròng khối ngoại, tự doanh'})
-  @ApiOkResponse({status: HttpStatus.OK, type: IStockContribute})
+  @ApiOperation({ summary: 'Top ngành mua bán ròng khối ngoại, tự doanh' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: IStockContribute })
   @Get('top-mua-ban-rong')
-  async topNetBuyingAndSelling(@Query() q: TopNetBuyingAndSellingDto, @Res() res: Response){
-    const data = await this.reportService.topNetBuyingAndSelling(+q.type)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async topNetBuyingAndSelling(
+    @Query() q: TopNetBuyingAndSellingDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.topNetBuyingAndSelling(+q.type);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Dòng tiền ròng khối ngoại, tự doanh qua 20 phiên gần nhất'})
-  @ApiOkResponse({status: HttpStatus.OK, type: LiquidityMarketResponse})
+  @ApiOperation({
+    summary: 'Dòng tiền ròng khối ngoại, tự doanh qua 20 phiên gần nhất',
+  })
+  @ApiOkResponse({ status: HttpStatus.OK, type: LiquidityMarketResponse })
   @Get('dong-tien-rong')
-  async cashFlow(@Query() q: TopNetBuyingAndSellingDto, @Res() res: Response){
-    const data = await this.reportService.cashFlow(+q.type)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async cashFlow(@Query() q: TopNetBuyingAndSellingDto, @Res() res: Response) {
+    const data = await this.reportService.cashFlow(+q.type);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Phân ngành'})
-  @ApiOkResponse({status: HttpStatus.OK})
+  @ApiOperation({ summary: 'Phân ngành' })
+  @ApiOkResponse({ status: HttpStatus.OK })
   @Get('phan-nganh')
-  async industry(@Query() q: StockMarketDto, @Res() res: Response){
-    const data = await this.reportService.industry(+q.type || 0)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async industry(@Query() q: StockMarketDto, @Res() res: Response) {
+    const data = await this.reportService.industry(+q.type || 0);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Lưu diễn biến thị trường bản tin tuần trang 1'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu diễn biến thị trường bản tin tuần trang 1' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-dien-bien-thi-truong-tuan')
-  async saveMarketWeekMovements(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketWeekComment(b.text)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveMarketWeekMovements(
+    @Body() b: SaveMarketCommentDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.saveMarketWeekComment(b.text);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Bản tin tuần trang 1'})
-  @ApiOkResponse({status: HttpStatus.OK, type: AfternoonReport1})
+  @ApiOperation({ summary: 'Bản tin tuần trang 1' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: AfternoonReport1 })
   @Get('ban-tin-tuan-1')
-  async weekReport1(@Res() res: Response){
-    const data = await this.reportService.weekReport1()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async weekReport1(@Res() res: Response) {
+    const data = await this.reportService.weekReport1();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
-  @ApiOperation({summary: 'Lưu nhận định thị trường bản tin tuần trang 2'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu nhận định thị trường bản tin tuần trang 2' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-nhan-dinh-thi-truong-tuan-trang-2')
-  async saveMarketWeekPage2(@Body() b: SaveMarketCommentDto, @Res() res: Response){
-    const data = await this.reportService.saveMarketWeekPage2(b.text, b.img)
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async saveMarketWeekPage2(
+    @Body() b: SaveMarketCommentDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.saveMarketWeekPage2(b.text, b.img);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Bản tin tuần trang 2'})
-  @ApiOkResponse({status: HttpStatus.OK, type: AfterNoonReport2Response})
+  @ApiOperation({ summary: 'Bản tin tuần trang 2' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: AfterNoonReport2Response })
   @Get('ban-tin-tuan-2')
-  async weekReport2(@Res() res: Response){
-    const data = await this.reportService.weekReport2()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async weekReport2(@Res() res: Response) {
+    const data = await this.reportService.weekReport2();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Hiệu suất sinh lời của các chỉ số trong tuần'})
-  @ApiOkResponse({status: HttpStatus.OK, type: IStockContribute})
+  @ApiOperation({ summary: 'Hiệu suất sinh lời của các chỉ số trong tuần' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: IStockContribute })
   @Get('hieu-suat-sinh-loi-chi-so-theo-tuan')
-  async profitablePerformanceIndex(@Res() res: Response){
-    const data = await this.reportService.profitablePerformanceIndex()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async profitablePerformanceIndex(@Res() res: Response) {
+    const data = await this.reportService.profitablePerformanceIndex();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Hiệu suất sinh lời theo các nhóm ngành (Tuần)'})
-  @ApiOkResponse({status: HttpStatus.OK, type: IStockContribute})
+  @ApiOperation({ summary: 'Hiệu suất sinh lời theo các nhóm ngành (Tuần)' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: IStockContribute })
   @Get('hieu-suat-sinh-loi-nhom-nganh-theo-tuan')
-  async profitablePerformanceIndustry(@Res() res: Response){
-    const data = await this.reportService.profitablePerformanceIndustry()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async profitablePerformanceIndustry(@Res() res: Response) {
+    const data = await this.reportService.profitablePerformanceIndustry();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tỷ giá USD và EUR'})
-  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @ApiOperation({ summary: 'Tỷ giá USD và EUR' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: ExchangeRateUSDEURResponse })
   @Get('ty-gia-usd-eur')
-  async exchangeRateUSDEUR(@Res() res: Response){
-    const data = await this.reportService.exchangeRateUSDEUR()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async exchangeRateUSDEUR(@Res() res: Response) {
+    const data = await this.reportService.exchangeRateUSDEUR();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Lãi suất BQ liên Ngân hàng (%/năm)'})
-  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @ApiOperation({ summary: 'Lãi suất BQ liên Ngân hàng (%/năm)' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: ExchangeRateUSDEURResponse })
   @Get('lai-suat-binh-quan-lien-ngan-hang')
-  async averageInterbankInterestRate(@Res() res: Response){
-    const data = await this.reportService.averageInterbankInterestRate()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async averageInterbankInterestRate(@Res() res: Response) {
+    const data = await this.reportService.averageInterbankInterestRate();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Biến động giá cả hàng hóa'})
-  @ApiOkResponse({status: HttpStatus.OK, type: ExchangeRateUSDEURResponse})
+  @ApiOperation({ summary: 'Biến động giá cả hàng hóa' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: ExchangeRateUSDEURResponse })
   @Get('bien-dong-gia-ca-hang-hoa')
-  async commodityPriceFluctuations(@Res() res: Response){
-    const data = await this.reportService.commodityPriceFluctuations()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async commodityPriceFluctuations(@Res() res: Response) {
+    const data = await this.reportService.commodityPriceFluctuations();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
   // @ApiOperation({summary: 'Lưu danh sách cổ phiếu khuyến nghị bản tin tuần'})
@@ -385,86 +444,105 @@ export class ReportController {
   //   return res.status(HttpStatus.OK).send(new BaseResponse({data}))
   // }
 
-  @ApiOperation({summary: 'Danh sách cổ phiếu khuyến nghị bản tin tuần'})
-  @ApiOkResponse({status: HttpStatus.OK, type: GetStockRecommendWeekResponse})
+  @ApiOperation({ summary: 'Danh sách cổ phiếu khuyến nghị bản tin tuần' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: GetStockRecommendWeekResponse })
   @Get('co-phieu-khuyen-nghi-tuan')
-  async stockRecommendWeek(@Body() b: SaveStockRecommendWeekDto, @Res() res: Response){
-    const data = await this.reportService.getStockRecommendWeek()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async stockRecommendWeek(
+    @Body() b: SaveStockRecommendWeekDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.getStockRecommendWeek();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
-  @ApiOperation({summary: 'Lưu trang linh động'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu trang linh động' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-trang-linh-dong')
-  async setFlexiblePage(@Body() b: SetFlexiblePageDto, @Res() res: Response){
-    await this.reportService.setFlexiblePage(b)
-    return res.status(HttpStatus.OK).send(new BaseResponse({}))
+  async setFlexiblePage(@Body() b: SetFlexiblePageDto, @Res() res: Response) {
+    await this.reportService.setFlexiblePage(b);
+    return res.status(HttpStatus.OK).send(new BaseResponse({}));
   }
 
-  @ApiOperation({summary: 'Lấy trang linh động'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lấy trang linh động' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('trang-linh-dong')
-  async getFlexiblePage(@Body() b: SaveStockRecommendWeekDto, @Res() res: Response){
-    const data = await this.reportService.getFlexiblePage()
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async getFlexiblePage(
+    @Body() b: SaveStockRecommendWeekDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.getFlexiblePage();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
   /**
    * Báo cáo phân tích kỹ thuật
    */
-   @UseGuards(AuthGuard, RolesGuard)
+  @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin)
   @ApiBearerAuth()
   @FormDataRequest()
-  @ApiOperation({summary: 'Lưu thông tin báo cáo phân tích kỹ thuật'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Lưu thông tin báo cáo phân tích kỹ thuật' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Post('luu-thong-tin-bao-cao-ky-thuat')
-  async setInfoReportTechnical(@Body() b: SetInfoReportTechnicalDto, @Res() res: Response){
-    await this.reportService.setInfoReportTechnical(b)
-    return res.status(HttpStatus.OK).send(new BaseResponse({}))
+  async setInfoReportTechnical(
+    @Body() b: SetInfoReportTechnicalDto,
+    @Res() res: Response,
+  ) {
+    await this.reportService.setInfoReportTechnical(b);
+    return res.status(HttpStatus.OK).send(new BaseResponse({}));
   }
 
-  @ApiOperation({summary: 'Thông tin cổ phiếu'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Thông tin cổ phiếu' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('thong-tin-co-phieu')
-  async stockInfo(@Query() b: StockDto, @Res() res: Response){
-    const data = await this.reportService.stockInfo(b.stock.toUpperCase())
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async stockInfo(@Query() b: StockDto, @Res() res: Response) {
+    const data = await this.reportService.stockInfo(b.stock.toUpperCase());
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Tương quan biến động giá cổ phiếu trong 1 năm'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Tương quan biến động giá cổ phiếu trong 1 năm' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('tuong-quan-bien-dong-gia')
-  async priceFluctuationCorrelation(@Query() b: StockDto, @Res() res: Response){
-    const data = await this.reportService.priceFluctuationCorrelation(b.stock.toUpperCase())
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async priceFluctuationCorrelation(
+    @Query() b: StockDto,
+    @Res() res: Response,
+  ) {
+    const data = await this.reportService.priceFluctuationCorrelation(
+      b.stock.toUpperCase(),
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Biến động giá (%)'})
-  @ApiOkResponse({status: HttpStatus.OK, type: NewsInternationalResponse})
+  @ApiOperation({ summary: 'Biến động giá (%)' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: NewsInternationalResponse })
   @Get('bien-dong-gia')
-  async priceChange(@Query() b: StockDto, @Res() res: Response){
-    const data = await this.reportService.priceChange(b.stock.toUpperCase())
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async priceChange(@Query() b: StockDto, @Res() res: Response) {
+    const data = await this.reportService.priceChange(b.stock.toUpperCase());
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Thống kê lệnh mua bán chủ động'})
-  @ApiOkResponse({status: HttpStatus.OK, type: BuyingAndSellingStatisticsResponse})
+  @ApiOperation({ summary: 'Thống kê lệnh mua bán chủ động' })
+  @ApiOkResponse({
+    status: HttpStatus.OK,
+    type: BuyingAndSellingStatisticsResponse,
+  })
   @Get('thong-ke-lenh-mua-ban')
-  async buyingAndSellingStatistics(@Query() b: StockDto, @Res() res: Response){
-    const data = await this.reportService.buyingAndSellingStatistics(b.stock.toUpperCase())
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async buyingAndSellingStatistics(@Query() b: StockDto, @Res() res: Response) {
+    const data = await this.reportService.buyingAndSellingStatistics(
+      b.stock.toUpperCase(),
+    );
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({summary: 'Chỉ số kỹ thuật'})
-  @ApiOkResponse({status: HttpStatus.OK, type: TechnicalIndexResponse})
+  @ApiOperation({ summary: 'Chỉ số kỹ thuật' })
+  @ApiOkResponse({ status: HttpStatus.OK, type: TechnicalIndexResponse })
   @Get('chi-so-ky-thuat')
-  async technicalIndex(@Query() b: StockDto, @Res() res: Response){
-    const data = await this.reportService.technicalIndex(b.stock.toUpperCase())
-    return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+  async technicalIndex(@Query() b: StockDto, @Res() res: Response) {
+    const data = await this.reportService.technicalIndex(b.stock.toUpperCase());
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 }

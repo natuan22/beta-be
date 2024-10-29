@@ -2,7 +2,7 @@ import {
   CacheModule,
   MiddlewareConsumer,
   Module,
-  NestModule
+  NestModule,
 } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -83,9 +83,10 @@ import { TCBSModule } from './tcbs/tcbs.module';
     //Minio
     MinioModule.registerAsync({
       imports: [ConfigModuleModule],
-      useFactory: (configService: ConfigServiceProvider) => configService.minioConfig(),
+      useFactory: (configService: ConfigServiceProvider) =>
+        configService.minioConfig(),
       inject: [ConfigServiceProvider],
-      isGlobal: true
+      isGlobal: true,
     }),
     //aplication modules
     ConfigModuleModule,
@@ -107,7 +108,7 @@ import { TCBSModule } from './tcbs/tcbs.module';
     WatchlistModule,
     FilterModule,
     AnalysisModule,
-    TCBSModule
+    TCBSModule,
   ],
 })
 export class AppModule implements NestModule {

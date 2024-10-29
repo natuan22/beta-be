@@ -19,10 +19,13 @@ import { VerifyEntity } from './entities/verify.entity';
 @Global()
 @Module({
   imports: [
-    TypeOrmModule.forFeature([DeviceEntity, UserEntity, VerifyEntity], DB_SERVER),
+    TypeOrmModule.forFeature(
+      [DeviceEntity, UserEntity, VerifyEntity],
+      DB_SERVER,
+    ),
     //queue
     BullModule.registerQueue({ name: QueueEnum.MainProcessor }),
-    UserModule
+    UserModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -34,11 +37,11 @@ import { VerifyEntity } from './entities/verify.entity';
     AuthService,
     JwtService,
     SmsService,
-    QueueService
+    QueueService,
   ],
-  exports: [AuthService]
+  exports: [AuthService],
 })
-export class AuthModule { }
+export class AuthModule {}
 
 // implements NestModule {
 //   configure(consumer: MiddlewareConsumer): void {

@@ -11,15 +11,15 @@ export class FilterService {
   constructor(
     private readonly mssqlService: MssqlService,
     @Inject(CACHE_MANAGER)
-    private readonly redis: Cache
-  ) { }
+    private readonly redis: Cache,
+  ) {}
 
   async get() {
     try {
-      const redisData = await this.redis.get('filter2')
-      if (redisData) return redisData
+      const redisData = await this.redis.get('filter2');
+      if (redisData) return redisData;
 
-      const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD')
+      const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD');
       const query = `
         SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
@@ -86,7 +86,7 @@ export class FilterService {
         LEFT JOIN min_max l ON l.code = t.code
         WHERE t.date = (SELECT MAX(date) FROM latest_dates)
         AND i.status = 'listed';
-      `
+      `;
 
       //Query lấy totalVol trung bình
       const query_2 = `
@@ -108,7 +108,7 @@ export class FilterService {
         SELECT code, avg_totalVol_5d, avg_totalVol_10d, avg_totalVol_20d, avg_totalVol_60d
         FROM average_volumes
         ORDER BY code;
-      `
+      `;
 
       const query_3 = `
         WITH yearQuarter4 AS (
@@ -151,42 +151,25 @@ export class FilterService {
             FROM financialReport.dbo.calBCTC
             ORDER BY yearQuarter DESC
         );
-      `
+      `;
 
       //roe, roa
       const query_4 = `
-        WITH roae AS (
-            -- Giữ nguyên việc lấy các giá trị ROE, ROA từ bảng ratioInYearQuarter
-            SELECT code,
-                  ROE AS roae,
-                  ROA AS roaa,
-                  yearQuarter
-            FROM RATIO.dbo.ratioInYearQuarter
-            WHERE RIGHT(yearQuarter, 1) <> '0'
-              AND yearQuarter >= '20224'
-        ),
-        sum_roaa AS (
-            -- Tính tổng giá trị của ROA và ROE cho 4 quý gần nhất bằng LEAD
-            SELECT
-                code,
-                yearQuarter,
-                roaa + LEAD(roaa, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                      LEAD(roaa, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                      LEAD(roaa, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roaa,
-                roae + LEAD(roae, 1) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                      LEAD(roae, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) +
-                      LEAD(roae, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roae
-            FROM roae
-        ),
-        -- Sử dụng cách tìm giá trị lớn nhất của yearQuarter trong cùng một bước tính toán
-        max_yearQuarter AS (
-            SELECT MAX(yearQuarter) AS maxYQ FROM sum_roaa
-        )
-        -- Truy vấn chính để trả về kết quả
-        SELECT s.code, s.roaa AS ROA, s.roae AS ROE
-        FROM sum_roaa s
-        JOIN max_yearQuarter m ON s.yearQuarter = m.maxYQ;
-      `
+          WITH filtered_roae AS (
+              SELECT code, ROE AS roae, ROA AS roaa, yearQuarter, 
+                      ROW_NUMBER() OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS rn
+              FROM RATIO.dbo.ratioInYearQuarter
+              WHERE RIGHT(yearQuarter, 1) <> '0'
+          ),
+          sum_roaa AS (
+              SELECT code, SUM(roaa) AS roaa, SUM(roae) AS roae
+              FROM filtered_roae
+              WHERE rn <= 4
+              GROUP BY code
+          )
+          SELECT code, roaa AS ROA, roae AS ROE
+          FROM sum_roaa;
+      `;
 
       const query_5 = `
         WITH ranked_trades AS (
@@ -225,7 +208,7 @@ export class FilterService {
               pct_change_60d AS perChangeOmVol_60d
         FROM percent_changes
         ORDER BY code;
-      `
+      `;
 
       //tính % thay đổi eps
       const query_6 = `
@@ -243,23 +226,32 @@ export class FilterService {
         SELECT * 
         FROM temp 
         WHERE yearQuarter = (SELECT MAX(yearQuarter) FROM temp);
-      `
-      
-      const [data, data_2, data_3, data_4, data_5, data_6] = await Promise.all(
-        [ 
-          this.mssqlService.query<FilterResponse[]>(query), 
-          this.mssqlService.query(query_2),
-          this.mssqlService.query(query_3), this.mssqlService.query(query_4),
-          this.mssqlService.query(query_5), this.mssqlService.query(query_6),
-        ]
-      )
+      `;
 
-      const dataMapped = FilterResponse.mapToList(data, data_2, data_3, data_4, data_5, data_6)
-      
-      await this.redis.set('filter2', dataMapped, { ttl: TimeToLive.TenMinutes })
-      return dataMapped
+      const [data, data_2, data_3, data_4, data_5, data_6] = await Promise.all([
+        this.mssqlService.query<FilterResponse[]>(query),
+        this.mssqlService.query(query_2),
+        this.mssqlService.query(query_3),
+        this.mssqlService.query(query_4),
+        this.mssqlService.query(query_5),
+        this.mssqlService.query(query_6),
+      ]);
+
+      const dataMapped = FilterResponse.mapToList(
+        data,
+        data_2,
+        data_3,
+        data_4,
+        data_5,
+        data_6,
+      );
+
+      await this.redis.set('filter2', dataMapped, {
+        ttl: TimeToLive.TenMinutes,
+      });
+      return dataMapped;
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 }

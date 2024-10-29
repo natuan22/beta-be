@@ -42,37 +42,76 @@ import { ValuationRatingResponse } from './responses/valuationRating.response';
 export class SharesService {
   constructor(
     private readonly mssqlService: MssqlService,
-    @Inject(CACHE_MANAGER) private readonly redis: Cache
-  ) { }
+    @Inject(CACHE_MANAGER) private readonly redis: Cache,
+  ) {}
   async searchStock(key_search: string) {
     const query = `
     with temp as (select code, LV2 as type, companyName as company_name, shortNameEng as short_name, floor, status from marketInfor.dbo.info
-    where code like N'%${UtilCommonTemplate.normalizedString(key_search)}%' or lower(dbo.fn_RemoveVietNamese5(companyName)) like '%${UtilCommonTemplate.normalizedString(key_search)}%')
+    where code like N'%${UtilCommonTemplate.normalizedString(
+      key_search,
+    )}%' or lower(dbo.fn_RemoveVietNamese5(companyName)) like '%${UtilCommonTemplate.normalizedString(
+      key_search,
+    )}%')
     select * from temp where status = 'listed'
-    `
+    `;
 
-    const data = await this.mssqlService.query<SearchStockResponse[]>(query)
-    const dataMapped = SearchStockResponse.mapToList(data)
-    return dataMapped
+    const data = await this.mssqlService.query<SearchStockResponse[]>(query);
+    const dataMapped = SearchStockResponse.mapToList(data);
+    return dataMapped;
   }
 
   async header(stock: string, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.headerStock}:${stock}:${type}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.headerStock}:${stock}:${type}`,
+    );
+    if (redisData) return redisData;
 
-    const date = (await this.mssqlService.query(`select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`))[0]?.date
-    if (!date) return {}
+    const date = (
+      await this.mssqlService.query(
+        `select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`,
+      )
+    )[0]?.date;
+    if (!date) return {};
 
-    const dateTickerTrade = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where code = '${stock}' order by date desc`))[0]?.date
+    const dateTickerTrade = (
+      await this.mssqlService.query(
+        `select top 1 date from marketTrade.dbo.tickerTradeVND where code = '${stock}' order by date desc`,
+      )
+    )[0]?.date;
 
-    const isStock = (await this.mssqlService.query(`select top 1 case when LV2 = N'Ngân hàng' then 'NH' when LV2 = N'Dịch vụ tài chính' then 'CK' when LV2 = N'Bảo hiểm' then 'BH' else 'CTCP' end as LV2 from marketInfor.dbo.info where code = '${stock}'`))[0]?.LV2
-    if (!isStock || isStock != type.toUpperCase()) throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'stock not found')
+    const isStock = (
+      await this.mssqlService.query(
+        `select top 1 case when LV2 = N'Ngân hàng' then 'NH' when LV2 = N'Dịch vụ tài chính' then 'CK' when LV2 = N'Bảo hiểm' then 'BH' else 'CTCP' end as LV2 from marketInfor.dbo.info where code = '${stock}'`,
+      )
+    )[0]?.LV2;
+    if (!isStock || isStock != type.toUpperCase())
+      throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'stock not found');
 
-    const now = moment(date).format('YYYY-MM-DD')
+    const now = moment(date).format('YYYY-MM-DD');
 
-    const week = moment(now).subtract(7, 'day').format('YYYY-MM-DD')
-    const month = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const year = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
+    const week = moment(now).subtract(7, 'day').format('YYYY-MM-DD');
+    const month = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(
+            now,
+          )
+            .subtract(1, 'month')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const year = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(
+            now,
+          )
+            .subtract(1, 'year')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
 
     const query = `
     WITH temp
@@ -157,31 +196,40 @@ export class SharesService {
       ON e.code = t.code
     INNER JOIN vh v
       ON v.code = t.code
-    `
-    const data = await this.mssqlService.query<HeaderStockResponse[]>(query)
-    const dataMapped = new HeaderStockResponse(data[0])
-    await this.redis.set(`${RedisKeys.headerStock}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.Minute })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<HeaderStockResponse[]>(query);
+    const dataMapped = new HeaderStockResponse(data[0]);
+    await this.redis.set(
+      `${RedisKeys.headerStock}:${stock}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.Minute },
+    );
+    return dataMapped;
   }
 
   async candleChart(stock: string) {
-    const query = `select distinct openPrice, closePrice, highPrice, lowPrice, totalVol, timeInday as time from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}' and date = (select MAX(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}') order by time asc`
+    const query = `select distinct openPrice, closePrice, highPrice, lowPrice, totalVol, timeInday as time from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}' and date = (select MAX(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where code = '${stock}') order by time asc`;
     const query_2 = `
     select closePrice from marketTrade.dbo.tickerTradeVND
     where date = (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where date < (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday)
     ) and code = '${stock}'
-    `
-    const [data_1, data_2] = await Promise.all([this.mssqlService.query<CandleChartResponse[]>(query), this.mssqlService.query(query_2)])
-    const dataMapped = CandleChartResponse.mapToList(data_1)
+    `;
+    const [data_1, data_2] = await Promise.all([
+      this.mssqlService.query<CandleChartResponse[]>(query),
+      this.mssqlService.query(query_2),
+    ]);
+    const dataMapped = CandleChartResponse.mapToList(data_1);
     return {
       prevClosePrice: data_2[0].closePrice,
       chart: dataMapped,
-    }
+    };
   }
 
   async transactionStatistics(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.transactionStatistics}:${stock.toUpperCase()}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.transactionStatistics}:${stock.toUpperCase()}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     WITH temp
@@ -226,90 +274,98 @@ export class SharesService {
     LEFT JOIN fo f
       ON f.date = t.date
     ORDER BY t.date desc  
-    `
+    `;
 
-    const data = await this.mssqlService.query<TransactionStatisticsResponse[]>(query)
-    const dataMapped = TransactionStatisticsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.transactionStatistics}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    const data = await this.mssqlService.query<TransactionStatisticsResponse[]>(
+      query,
+    );
+    const dataMapped = TransactionStatisticsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.transactionStatistics}:${stock.toUpperCase()}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   private getNameBusinessResults(type: string) {
-    let name = ``
+    let name = ``;
     switch (type) {
       case 'NH':
-        name = `1, 2, 8, 11, 13`
+        name = `1, 2, 8, 11, 13`;
         break;
       case 'BH':
-        name = `7, 8, 20, 31, 35`
+        name = `7, 8, 20, 31, 35`;
         break;
       case 'CK':
-        name = `112, 305, 9, 11`
+        name = `112, 305, 9, 11`;
         break;
       default:
-        name = `3, 5, 15, 18, 19`
+        name = `3, 5, 15, 18, 19`;
         break;
     }
-    return name
+    return name;
   }
 
   private getNameBalanceSheet(type: string) {
-    let name = ``
+    let name = ``;
     switch (type) {
       case 'NH':
-        name = `102, 303, 108, 2, 308`
+        name = `102, 303, 108, 2, 308`;
         break;
       case 'BH':
-        name = `10101, 10104, 2, 301, 30201`
+        name = `10101, 10104, 2, 301, 30201`;
         break;
       case 'CK':
-        name = `101, 102, 2, 3, 401`
+        name = `101, 102, 2, 3, 401`;
         break;
       default:
-        name = `101, 102, 301, 30201, 4`
+        name = `101, 102, 301, 30201, 4`;
         break;
     }
-    return name
+    return name;
   }
 
   private getIDCastflow(type: string) {
-    let id = ``
+    let id = ``;
     switch (type) {
       case 'NH':
-        id = `112, 211, 307, 4, 7`
+        id = `112, 211, 307, 4, 7`;
         break;
       case 'BH':
-        id = `104, 208, 307, 4, 7`
+        id = `104, 208, 307, 4, 7`;
         break;
       case 'CK':
-        id = `107, 206, 307, 4, 6`
+        id = `107, 206, 307, 4, 6`;
         break;
       default:
-        id = `104, 212, 311, 4, 7`
+        id = `104, 212, 311, 4, 7`;
         break;
     }
-    return id
+    return id;
   }
 
   async businessResults(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.businessResults}:${order}:${stock}:${type}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.businessResults}:${order}:${stock}:${type}`,
+    );
+    if (redisData) return redisData;
 
-    let group = ``
-    let select = ``
+    let group = ``;
+    let select = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date`
-        group = `order by yearQuarter desc`
+        select = `value, yearQuarter as date`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name, id order by year desc`
+        select = `sum(value) as value, cast(year as varchar) + '4' as date`;
+        group = `group by year, name, id order by year desc`;
         break;
       default:
         break;
     }
-    const id = this.getNameBusinessResults(type)
+    const id = this.getNameBusinessResults(type);
 
     const query = `
       with temp as (SELECT TOP ${type == 'CK' ? 16 : 20}
@@ -320,34 +376,45 @@ export class SharesService {
       AND f.type = 'KQKD'
       AND f.id IN (${id})
       ${group})
-      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
-    `
+      select * from temp order by date, case ${id
+        .split(',')
+        .map((item, index) => `when id =${item} then ${index}`)
+        .join(' ')} end
+    `;
 
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.businessResults}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(
+      query,
+    );
+    const dataMapped = BusinessResultsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.businessResults}:${order}:${stock}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async balanceSheet(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.balanceSheet}:${order}:${stock}:${type}`,
+    );
+    if (redisData) return redisData;
 
-    let group = ``
-    let select = ``
+    let group = ``;
+    let select = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date`
-        group = `order by yearQuarter desc`
+        select = `value, yearQuarter as date`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name, id order by year desc`
+        select = `sum(value) as value, cast(year as varchar) + '4' as date`;
+        group = `group by year, name, id order by year desc`;
         break;
       default:
         break;
     }
-    const id = this.getNameBalanceSheet(type)
+    const id = this.getNameBalanceSheet(type);
 
     const query = `
       with temp as (SELECT TOP 20
@@ -358,30 +425,41 @@ export class SharesService {
       AND f.type = 'CDKT'
       AND f.id IN (${id})
       ${group})
-      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
-    `
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+      select * from temp order by date, case ${id
+        .split(',')
+        .map((item, index) => `when id =${item} then ${index}`)
+        .join(' ')} end
+    `;
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(
+      query,
+    );
+    const dataMapped = BusinessResultsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.balanceSheet}:${order}:${stock}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async castFlow(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.castFlow}:${order}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.castFlow}:${order}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const id = this.getIDCastflow(type)
+    const id = this.getIDCastflow(type);
 
-    let group = ``
-    let select = ``
+    let group = ``;
+    let select = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date`
-        group = `order by yearQuarter desc`
+        select = `value, yearQuarter as date`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, cast(year as varchar) + '4' as date`
-        group = `group by year, name, id order by year desc`
+        select = `sum(value) as value, cast(year as varchar) + '4' as date`;
+        group = `group by year, name, id order by year desc`;
         break;
       default:
         break;
@@ -396,17 +474,28 @@ export class SharesService {
       AND f.type like 'LC%'
       AND f.id IN (${id})
       ${group})
-      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
-    `
+      select * from temp order by date, case ${id
+        .split(',')
+        .map((item, index) => `when id =${item} then ${index}`)
+        .join(' ')} end
+    `;
 
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
-    const dataMapped = BusinessResultsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.castFlow}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(
+      query,
+    );
+    const dataMapped = BusinessResultsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.castFlow}:${order}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async financialIndicators(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.financialIndicators}:${stock}:${order}`)
+    const redisData = await this.redis.get(
+      `${RedisKeys.financialIndicators}:${stock}:${order}`,
+    );
     // if (redisData) return redisData
 
     const query_2 = `
@@ -481,18 +570,28 @@ export class SharesService {
               WHEN name = 'ROE' THEN 3 
               WHEN name = 'ROA' THEN 4 
           END ASC;
-    `
-    const data = await this.mssqlService.query<FinancialIndicatorsResponse[]>(query_2)
-    const dataMapped = FinancialIndicatorsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.financialIndicators}:${stock}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<FinancialIndicatorsResponse[]>(
+      query_2,
+    );
+    const dataMapped = FinancialIndicatorsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.financialIndicators}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async enterprisesSameIndustry(stock: string, exchange: string) {
-    const redisData = await this.redis.get(`${RedisKeys.enterprisesSameIndustry}:${exchange}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.enterprisesSameIndustry}:${exchange}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const date = await this.mssqlService.query(`select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`)
+    const date = await this.mssqlService.query(
+      `select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`,
+    );
 
     const query = `
       WITH temp
@@ -515,7 +614,9 @@ export class SharesService {
       INNER JOIN RATIO.dbo.ratio r
         ON temp.code = r.code
       WHERE ratioCode IN ('PRICE_TO_BOOK', 'PRICE_TO_EARNINGS', 'MARKETCAP')
-      AND r.date = '${UtilCommonTemplate.toDate(date[0].date)}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_TO_BOOK], [PRICE_TO_EARNINGS], [MARKETCAP])) AS chuyen)
+      AND r.date = '${UtilCommonTemplate.toDate(
+        date[0].date,
+      )}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_TO_BOOK], [PRICE_TO_EARNINGS], [MARKETCAP])) AS chuyen)
       SELECT
         p.code as code,
         t.closePrice,
@@ -529,16 +630,24 @@ export class SharesService {
       INNER JOIN pivotted
         ON pivotted.code = p.code
       WHERE t.date = '${UtilCommonTemplate.toDate(date[0].date)}'
-    `
-    const data = await this.mssqlService.query<EnterprisesSameIndustryResponse[]>(query)
-    const dataMapped = EnterprisesSameIndustryResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.enterprisesSameIndustry}:${exchange}:${stock}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      EnterprisesSameIndustryResponse[]
+    >(query);
+    const dataMapped = EnterprisesSameIndustryResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.enterprisesSameIndustry}:${exchange}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async eventCalendar(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.eventCalendar}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.eventCalendar}:${stock}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     SELECT
@@ -547,11 +656,13 @@ export class SharesService {
     FROM PHANTICH.dbo.LichSukien
     WHERE ticker = '${stock}'
     ORDER BY NgayDKCC DESC
-    `
-    const data = await this.mssqlService.query<EventCalendarResponse[]>(query)
-    const dataMapped = EventCalendarResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.eventCalendar}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<EventCalendarResponse[]>(query);
+    const dataMapped = EventCalendarResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.eventCalendar}:${stock}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async transactionData(stock: string, from: string, to: string) {
@@ -581,29 +692,101 @@ export class SharesService {
       ON t.code = r.code
       AND t.date = r.date
     ORDER BY t.date DESC
-    `
-    const data = await this.mssqlService.query<TransactionDataResponse[]>(query)
-    const dataMapped = TransactionDataResponse.mapToList(data)
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<TransactionDataResponse[]>(
+      query,
+    );
+    const dataMapped = TransactionDataResponse.mapToList(data);
+    return dataMapped;
   }
 
   async tradingPriceFluctuations(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`,
+    );
+    if (redisData) return redisData;
 
-    const date = UtilCommonTemplate.getLastTwoQuarters()
-    
-    const now = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment().format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const week = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(7, 'day').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const month = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const year = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const quarter_start = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(date.months[2], 'YYYY/MM/DD').endOf('month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const quarter_end = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(date.months[5], 'YYYY/MM/DD').endOf('month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD')
-    const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD')
+    const date = UtilCommonTemplate.getLastTwoQuarters();
+
+    const now = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment().format(
+            'YYYY-MM-DD',
+          )}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const week = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+            now,
+          )
+            .subtract(7, 'day')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const month = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+            now,
+          )
+            .subtract(1, 'month')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const year = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+            now,
+          )
+            .subtract(1, 'year')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const quarter_start = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+            date.months[2],
+            'YYYY/MM/DD',
+          )
+            .endOf('month')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const quarter_end = moment(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+            date.months[5],
+            'YYYY/MM/DD',
+          )
+            .endOf('month')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    ).format('YYYY-MM-DD');
+    const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD');
 
     //Xoá những ngày trùng nhau
-    const same_day = UtilCommonTemplate.checkSameDate([now, week, month, year, quarter_end, quarter_start, week_52])
-    const pivot = same_day.map(item => `[${item}]`).join(',')
+    const same_day = UtilCommonTemplate.checkSameDate([
+      now,
+      week,
+      month,
+      year,
+      quarter_end,
+      quarter_start,
+      week_52,
+    ]);
+    const pivot = same_day.map((item) => `[${item}]`).join(',');
 
     const query = `
     WITH temp
@@ -642,19 +825,25 @@ export class SharesService {
     FROM pivotted p
     INNER JOIN mimax m
       ON m.code = p.code
-    `
-    const data = await this.mssqlService.query<TradingPriceFluctuationsResponse[]>(query)
-    const dataMapped = new TradingPriceFluctuationsResponse(data[0])
-    await this.redis.set(`${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      TradingPriceFluctuationsResponse[]
+    >(query);
+    const dataMapped = new TradingPriceFluctuationsResponse(data[0]);
+    await this.redis.set(
+      `${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
-
-
   async averageTradingVolume(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.averageTradingVolume}:${stock.toUpperCase()}`)
-    if (redisData) return redisData
-    const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD')
+    const redisData = await this.redis.get(
+      `${RedisKeys.averageTradingVolume}:${stock.toUpperCase()}`,
+    );
+    if (redisData) return redisData;
+    const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD');
     const query = `
     WITH week
     AS (SELECT
@@ -716,24 +905,30 @@ export class SharesService {
       ON week.code = year.code
     INNER JOIN minmax
       ON week.code = minmax.code
-    `
-    const data = await this.mssqlService.query(query)
-    const dataMapped = new AverageTradingVolumeResponse(data[0])
-    await this.redis.set(`${RedisKeys.averageTradingVolume}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query(query);
+    const dataMapped = new AverageTradingVolumeResponse(data[0]);
+    await this.redis.set(
+      `${RedisKeys.averageTradingVolume}:${stock.toUpperCase()}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async statisticsMonthQuarterYear(stock: string, order: number) {
-    const redisData = await this.redis.get(`${RedisKeys.statisticsMonthQuarterYear}:${order}:${stock.toUpperCase()}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.statisticsMonthQuarterYear}:${order}:${stock.toUpperCase()}`,
+    );
+    if (redisData) return redisData;
 
-    let group = ``
-    let select = ``
+    let group = ``;
+    let select = ``;
     switch (order) {
       case TimeTypeEnum.Month:
-        select = `'1/' + cast(month(date) as varchar) + '/' + cast(year(date) as varchar) as date`
+        select = `'1/' + cast(month(date) as varchar) + '/' + cast(year(date) as varchar) as date`;
         group = `group by month(date), year(date), code
-        order by year(date) desc, month(date) desc`
+        order by year(date) desc, month(date) desc`;
         break;
       case TimeTypeEnum.Quarter:
         select = `
@@ -743,15 +938,15 @@ export class SharesService {
         WHEN DATEPART(QUARTER, date) = 3 THEN '30/9/' + CAST(DATEPART(YEAR, date) AS varchar)
         WHEN DATEPART(QUARTER, date) = 4 THEN '31/12/' + CAST(DATEPART(YEAR, date) AS varchar)
       END AS date
-      `
+      `;
         group = `group by datepart(quarter, date), datepart(year, date), code
-      order by datepart(year, date) desc, datepart(quarter, date) desc;`
-        break
+      order by datepart(year, date) desc, datepart(quarter, date) desc;`;
+        break;
       case TimeTypeEnum.Year:
-        select = `'31/12/' + cast(year(date) as varchar) as date`
+        select = `'31/12/' + cast(year(date) as varchar) as date`;
         group = `group by year(date), code
-        order by date desc`
-        break
+        order by date desc`;
+        break;
       default:
         break;
     }
@@ -766,17 +961,25 @@ export class SharesService {
     FROM marketTrade.dbo.tickerTradeVND
     WHERE code = '${stock}'
     ${group}
-    `
+    `;
 
-    const data = await this.mssqlService.query<StatisticsMonthQuarterYearResponse[]>(query)
-    const dataMapped = StatisticsMonthQuarterYearResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.statisticsMonthQuarterYear}:${order}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      StatisticsMonthQuarterYearResponse[]
+    >(query);
+    const dataMapped = StatisticsMonthQuarterYearResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.statisticsMonthQuarterYear}:${order}:${stock.toUpperCase()}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async tradingGroupsInvestors(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.tradingGroupsInvestors}:${stock.toUpperCase()}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.tradingGroupsInvestors}:${stock.toUpperCase()}`,
+    );
+    if (redisData) return redisData;
     const query = `
     WITH kn
     AS (SELECT TOP 50
@@ -837,40 +1040,46 @@ export class SharesService {
       ON i.code = stock.floor
     INNER JOIN temp
       ON temp.date = i.date
-    `
-    const data = await this.mssqlService.query<TradingGroupsInvestorsResponse[]>(query)
-    const dataMapped = TradingGroupsInvestorsResponse.mapToList(data.reverse())
-    await this.redis.set(`${RedisKeys.tradingGroupsInvestors}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      TradingGroupsInvestorsResponse[]
+    >(query);
+    const dataMapped = TradingGroupsInvestorsResponse.mapToList(data.reverse());
+    await this.redis.set(
+      `${RedisKeys.tradingGroupsInvestors}:${stock.toUpperCase()}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async eventCalendarDetail(stock: string, type: number) {
-    let query = ``
+    let query = ``;
     switch (type) {
       case 0:
-        query = `select ticker as code, san as exchange, NgayGDKHQ as date_gdkhq, NgayDKCC as date_dkcc, case when NgayThucHien = '1900-01-01' then null else NgayThucHien end AS date, NoiDungSuKien as content, LoaiSuKien as type from PHANTICH.dbo.LichSukien where ticker = '${stock}' order by NgayDKCC desc`
+        query = `select ticker as code, san as exchange, NgayGDKHQ as date_gdkhq, NgayDKCC as date_dkcc, case when NgayThucHien = '1900-01-01' then null else NgayThucHien end AS date, NoiDungSuKien as content, LoaiSuKien as type from PHANTICH.dbo.LichSukien where ticker = '${stock}' order by NgayDKCC desc`;
         break;
       case 1:
         query = `
         with temp as (select code from marketInfor.dbo.info where LV2 = (select LV2 from marketInfor.dbo.info where code = '${stock}'))
         select l.ticker as code, san as exchange, NgayGDKHQ as date_gdkhq, NgayDKCC as date_dkcc, case when NgayThucHien = '1900-01-01' then null else NgayThucHien end AS date, NoiDungSuKien as content, LoaiSuKien as type from PHANTICH.dbo.LichSukien l inner join temp t on t.code = l.ticker
         order by NgayDKCC desc
-        `
-        break
+        `;
+        break;
       case 2:
-        query = `select ticker as code, san as exchange, NgayGDKHQ as date_gdkhq, NgayDKCC as date_dkcc, case when NgayThucHien = '1900-01-01' then null else NgayThucHien end AS date, NoiDungSuKien as content, LoaiSuKien as type from PHANTICH.dbo.LichSukien order by NgayDKCC desc`
-        break
+        query = `select ticker as code, san as exchange, NgayGDKHQ as date_gdkhq, NgayDKCC as date_dkcc, case when NgayThucHien = '1900-01-01' then null else NgayThucHien end AS date, NoiDungSuKien as content, LoaiSuKien as type from PHANTICH.dbo.LichSukien order by NgayDKCC desc`;
+        break;
       default:
         break;
     }
 
-    const data = await this.mssqlService.query<NewsEventResponse[]>(query)
-    const dataMapped = NewsEventResponse.mapToList(data)
-    return dataMapped
+    const data = await this.mssqlService.query<NewsEventResponse[]>(query);
+    const dataMapped = NewsEventResponse.mapToList(data);
+    return dataMapped;
   }
 
   async newsStock(stock: string, type: number) {
-    let query = ``
+    let query = ``;
     switch (type) {
       case 0:
         query = `
@@ -882,7 +1091,7 @@ export class SharesService {
         AND Href NOT LIKE 'https://ndh.vn%'
         AND TickerTitle = '${stock}'
         ORDER BY n.date DESC
-        `
+        `;
         break;
       case 1:
         query = `
@@ -903,8 +1112,8 @@ export class SharesService {
       WHERE Href NOT LIKE 'https://cafef.vn%'
       AND Href NOT LIKE 'https://ndh.vn%'
       ORDER BY t.date DESC
-      `
-        break
+      `;
+        break;
       case 2:
         query = `
         SELECT
@@ -914,21 +1123,21 @@ export class SharesService {
         WHERE Href NOT LIKE 'https://cafef.vn%'
         AND Href NOT LIKE 'https://ndh.vn%'
         ORDER BY date DESC
-        `
-        break
+        `;
+        break;
       default:
         break;
     }
 
-    const data = await this.mssqlService.query<NewsStockResponse[]>(query)
-    const dataMapped = NewsStockResponse.mapToList(data)
-    return dataMapped
+    const data = await this.mssqlService.query<NewsStockResponse[]>(query);
+    const dataMapped = NewsStockResponse.mapToList(data);
+    return dataMapped;
   }
 
   private getChiTieuLCTT(type: string, is_chart: number) {
-    let chiTieu = ``
-    let top = 0
-    let cate = ``
+    let chiTieu = ``;
+    let top = 0;
+    let cate = ``;
     if (is_chart) {
       switch (type) {
         case 'Ngân hàng':
@@ -937,9 +1146,9 @@ export class SharesService {
           N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
           N'LƯU CHUYỂN TIỀN THUẦN TRONG KỲ',
           N'Tiền và tương đương tiền đầu kỳ',
-          N'Tiền và tương đương tiền cuối kỳ'`
-          top = 48
-          cate = `LCTT`
+          N'Tiền và tương đương tiền cuối kỳ'`;
+          top = 48;
+          cate = `LCTT`;
           break;
         case 'Bảo hiểm':
           chiTieu = `N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
@@ -947,9 +1156,9 @@ export class SharesService {
             N'Lưu chuyển tiền thuần từ hoạt động tài chính',
             N'Lưu chuyển tiền thuần trong kỳ',
             N'Tiền và tương đương tiền đầu kỳ',
-            N'Tiền và tương đương tiền cuối kỳ'`
-          top = 48
-          cate = `LCGT`
+            N'Tiền và tương đương tiền cuối kỳ'`;
+          top = 48;
+          cate = `LCGT`;
           break;
         case 'Dịch vụ tài chính':
           chiTieu = `
@@ -958,10 +1167,10 @@ export class SharesService {
         N'Lưu chuyển tiền thuần từ hoạt động tài chính',
         N'V. Tiền và các khoản tương đương tiền đầu kỳ',
         N'VI. Tiền và các khoản tương đương tiền cuối kỳ'
-        `
-          top = 40
-          cate = `LCGT`
-          break
+        `;
+          top = 40;
+          cate = `LCGT`;
+          break;
         default:
           chiTieu = `
           N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
@@ -970,13 +1179,19 @@ export class SharesService {
           N'Lưu chuyển tiền thuần trong kỳ',
           N'Tiền và tương đương tiền đầu kỳ',
           N'Tiền và tương đương tiền cuối kỳ'
-          `
-          top = 48
-          cate = `LCGT`
+          `;
+          top = 48;
+          cate = `LCGT`;
           break;
       }
-      const sort = `case ${chiTieu.split(',').map((item, index) => `when name = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
-      return { chiTieu, top, cate, sort }
+      const sort = `case ${chiTieu
+        .split(',')
+        .map(
+          (item, index) =>
+            `when name = ${item.replace(/\n/g, '').trim()} then ${index}`,
+        )
+        .join(' ')} end as row_num`;
+      return { chiTieu, top, cate, sort };
     }
     switch (type) {
       case 'Ngân hàng':
@@ -999,9 +1214,9 @@ export class SharesService {
         N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
         N'Lưu chuyển tiền thuần trong kỳ',
         N'Tiền và tương đương tiền đầu kỳ',
-        N'Tiền và tương đương tiền cuối kỳ'`
-        top = 160
-        cate = `LCTT`
+        N'Tiền và tương đương tiền cuối kỳ'`;
+        top = 160;
+        cate = `LCTT`;
         break;
       case 'Bảo hiểm':
         chiTieu = `
@@ -1030,10 +1245,10 @@ export class SharesService {
         N'Lưu chuyển tiền thuần trong kỳ',
         N'Tiền và tương đương tiền đầu kỳ',
         N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
-        N'Tiền và tương đương tiền cuối kỳ'`
-        top = 208
-        cate = 'LCGT'
-        break
+        N'Tiền và tương đương tiền cuối kỳ'`;
+        top = 208;
+        cate = 'LCGT';
+        break;
       case 'Dịch vụ tài chính':
         chiTieu = `
           N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH',
@@ -1065,10 +1280,10 @@ export class SharesService {
         N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
         N'VI. Tiền và các khoản tương đương tiền cuối kỳ',
         N'Tiền gửi ngân hàng cuối kỳ'
-          `
-        top = 248
-        cate = `LCGT`
-        break
+          `;
+        top = 248;
+        cate = `LCGT`;
+        break;
       default:
         chiTieu = `
         N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
@@ -1102,14 +1317,22 @@ export class SharesService {
         N'Tiền và tương đương tiền đầu kỳ',
         N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
         N'Tiền và tương đương tiền cuối kỳ'
-        `
-        cate = `LCGT`
-        top = 248
+        `;
+        cate = `LCGT`;
+        top = 248;
         break;
     }
-    const sort = type != 'Dịch vụ tài chính' ?
-      `case ${chiTieu.split(`',`).map((item, index) => index !== chiTieu.split(`',`).length - 1 ? `when name = ${item.replace(/\n/g, "").trim()}' then ${index}` : `when name = ${item.replace(/\n/g, "").trim()} then ${index}`).join(' ')} end as row_num`
-      : `CASE
+    const sort =
+      type != 'Dịch vụ tài chính'
+        ? `case ${chiTieu
+            .split(`',`)
+            .map((item, index) =>
+              index !== chiTieu.split(`',`).length - 1
+                ? `when name = ${item.replace(/\n/g, '').trim()}' then ${index}`
+                : `when name = ${item.replace(/\n/g, '').trim()} then ${index}`,
+            )
+            .join(' ')} end as row_num`
+        : `CASE
     WHEN name = N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH' THEN 0
     WHEN name = N'1. Lợi nhuận trước Thuế Thu nhập doanh nghiệp' THEN 1
     WHEN name = N'- Khấu hao TSCĐ' THEN 2
@@ -1141,27 +1364,34 @@ export class SharesService {
     WHEN name = N'Tiền gửi ngân hàng cuối kỳ' THEN 28
     WHEN name = N'Các khoản tương đương tiền' and id = 602 then 29
      WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 30
-  END AS row_num`
-    return { chiTieu, top, cate, sort }
+  END AS row_num`;
+    return { chiTieu, top, cate, sort };
   }
 
   async castFlowDetail(stock: string, order: number, is_chart: number) {
-    const redisData = await this.redis.get(`${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`,
+    );
+    if (redisData) return redisData;
 
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`)
-    const { chiTieu, top, cate, sort } = this.getChiTieuLCTT(LV2[0].LV2, is_chart)
+    const LV2 = await this.mssqlService.query(
+      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
+    const { chiTieu, top, cate, sort } = this.getChiTieuLCTT(
+      LV2[0].LV2,
+      is_chart,
+    );
 
-    let group = ``
-    let select = ``
+    let group = ``;
+    let select = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        group = `order by yearQuarter desc`
-        select = `name, value, yearQuarter as date, id`
+        group = `order by yearQuarter desc`;
+        select = `name, value, yearQuarter as date, id`;
         break;
       case TimeTypeEnum.Year:
-        group = `group by name, id, year order by year desc`
-        select = `year as date, name, sum(value) as value, id`
+        group = `group by name, id, year order by year desc`;
+        select = `year as date, name, sum(value) as value, id`;
         break;
       default:
         break;
@@ -1187,78 +1417,100 @@ export class SharesService {
     ${sort}
     from temp
     order by date asc, row_num asc
-    `
-    const data = await this.mssqlService.query<CastFlowDetailResponse[]>(query)
-    const dataMapped = CastFlowDetailResponse.mapToList(data, is_chart, LV2[0].LV2)
-    await this.redis.set(`${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<CastFlowDetailResponse[]>(query);
+    const dataMapped = CastFlowDetailResponse.mapToList(
+      data,
+      is_chart,
+      LV2[0].LV2,
+    );
+    await this.redis.set(
+      `${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   private getChiTieuKQKD(type: string, is_chart: number) {
-    let chiTieu = ``
-    let top = 0
+    let chiTieu = ``;
+    let top = 0;
     if (is_chart) {
       switch (type) {
         case 'Ngân hàng':
-          chiTieu = '1,2,8,11,13,10'
-          top = 48
+          chiTieu = '1,2,8,11,13,10';
+          top = 48;
           break;
         case 'Bảo hiểm':
-          chiTieu = '7,18,15,31,35,8'
-          top = 48
-          break
+          chiTieu = '7,18,15,31,35,8';
+          top = 48;
+          break;
         case 'Dịch vụ tài chính':
-          chiTieu = '112,214,305,405,9,11'
-          top = 48
-          break
+          chiTieu = '112,214,305,405,9,11';
+          top = 48;
+          break;
         default:
-          chiTieu = '3,15,5,19'
-          top = 32
+          chiTieu = '3,15,5,19';
+          top = 32;
           break;
       }
-      const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`
-      return { chiTieu, top, sort }
+      const sort = `case ${chiTieu
+        .split(',')
+        .map((item, index) => `when id = ${+item} then ${index}`)
+        .join(' ')} end as row_num`;
+      return { chiTieu, top, sort };
     }
     switch (type) {
       case 'Ngân hàng':
-        chiTieu = '1,101,102,2,201,202,3,4,5,6,601,602,7,8,9,10,11,12,1201,1202,13,14,15'
-        top = 184
+        chiTieu =
+          '1,101,102,2,201,202,3,4,5,6,601,602,7,8,9,10,11,12,1201,1202,13,14,15';
+        top = 184;
         break;
       case 'Bảo hiểm':
-        chiTieu = '1,2,3,4,5,7,8,9,305,11,13,14,15,16,17,18,20,21,22,23,24,25,28,29,31,33,34,35,36,37'
-        top = 240
+        chiTieu =
+          '1,2,3,4,5,7,8,9,305,11,13,14,15,16,17,18,20,21,22,23,24,25,28,29,31,33,34,35,36,37';
+        top = 240;
       case 'Dịch vụ tài chính':
-        chiTieu = '1,101,102,103,104,106,108,110,111,112,2,201,206,207,209,211,212,214,3,301,302,304,4,401,402,404,405,6,7,9,901,902,10,1001,1002,11,1101'
-        top = 296
-        break
+        chiTieu =
+          '1,101,102,103,104,106,108,110,111,112,2,201,206,207,209,211,212,214,3,301,302,304,4,401,402,404,405,6,7,9,901,902,10,1001,1002,11,1101';
+        top = 296;
+        break;
       default:
-        chiTieu = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21'
-        top = 168
+        chiTieu = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21';
+        top = 168;
         break;
     }
-    const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`
-    return { chiTieu, top, sort }
+    const sort = `case ${chiTieu
+      .split(',')
+      .map((item, index) => `when id = ${+item} then ${index}`)
+      .join(' ')} end as row_num`;
+    return { chiTieu, top, sort };
   }
 
   async businessResultDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`)
-    if (!LV2[0]) return []
+    const LV2 = await this.mssqlService.query(
+      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
+    if (!LV2[0]) return [];
 
-    const redisData = await this.redis.get(`${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`,
+    );
+    if (redisData) return redisData;
 
-    const { chiTieu, top, sort } = this.getChiTieuKQKD(LV2[0].LV2, is_chart)
+    const { chiTieu, top, sort } = this.getChiTieuKQKD(LV2[0].LV2, is_chart);
 
-    let select = ``, group = ``
+    let select = ``,
+      group = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, case when LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC) <> 0 then ((value - LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) / LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) * 100 else 0 end AS per, yearQuarter AS date,`
-        group = `order by yearQuarter desc`
+        select = `value, case when LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC) <> 0 then ((value - LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) / LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) * 100 else 0 end AS per, yearQuarter AS date,`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, case when (lead(sum(value), 1) over ( partition by name order by year desc)) <> 0 then ((sum(value) - lead(sum(value), 1) over ( partition by name order by year desc)) / (lead(sum(value), 1) over ( partition by name order by year desc))) * 100 else 0 end as per, year as date,`
-        group = `group by year, name, id order by year desc`
-        break
+        select = `sum(value) as value, case when (lead(sum(value), 1) over ( partition by name order by year desc)) <> 0 then ((sum(value) - lead(sum(value), 1) over ( partition by name order by year desc)) / (lead(sum(value), 1) over ( partition by name order by year desc))) * 100 else 0 end as per, year as date,`;
+        group = `group by year, name, id order by year desc`;
+        break;
       default:
         break;
     }
@@ -1288,78 +1540,104 @@ export class SharesService {
       *
     FROM temp
     ORDER BY date ASC, row_num ASC
-    `
-    const data = await this.mssqlService.query<BusinessResultDetailResponse[]>(query)
-    const dataMapped = BusinessResultDetailResponse.mapToList(data, is_chart, LV2[0].LV2)
-    await this.redis.set(`${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<BusinessResultDetailResponse[]>(
+      query,
+    );
+    const dataMapped = BusinessResultDetailResponse.mapToList(
+      data,
+      is_chart,
+      LV2[0].LV2,
+    );
+    await this.redis.set(
+      `${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   private getChiTieuCDKT(type: string, is_chart: number) {
-    let chiTieu = '', top = 0
+    let chiTieu = '',
+      top = 0;
     if (is_chart) {
       switch (type) {
         case 'Ngân hàng':
-          chiTieu = '102,108,2,302,303,308'
-          top = 48
+          chiTieu = '102,108,2,302,303,308';
+          top = 48;
           break;
         case 'Bảo hiểm':
-          chiTieu = '10101,10104,2,301,302,303'
-          top = 48
+          chiTieu = '10101,10104,2,301,302,303';
+          top = 48;
           break;
         case 'Dịch vụ tài chính':
-          chiTieu = '10101,10201,3,4'
-          top = 32
+          chiTieu = '10101,10201,3,4';
+          top = 32;
           break;
         default:
-          chiTieu = '102,101,301,302'
-          top = 32
+          chiTieu = '102,101,301,302';
+          top = 32;
           break;
       }
-      const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`
-      return { chiTieu, top, sort }
+      const sort = `case ${chiTieu
+        .split(',')
+        .map((item, index) => `when id = ${+item} then ${index}`)
+        .join(' ')} end as row_num`;
+      return { chiTieu, top, sort };
     }
     switch (type) {
       case 'Ngân hàng':
-        chiTieu = '1,101,102,104,105,106,108,109,110,111,112,2,301,302,303,304,305,306,307,308,309,4'
-        top = 176
+        chiTieu =
+          '1,101,102,104,105,106,108,109,110,111,112,2,301,302,303,304,305,306,307,308,309,4';
+        top = 176;
         break;
       case 'Bảo hiểm':
-        chiTieu = '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,2,301,30101,30102,30103,30104,302,30201,30202,303,304'
-        top = 192
-        break
+        chiTieu =
+          '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,2,301,30101,30102,30103,30104,302,30201,30202,303,304';
+        top = 192;
+        break;
       case 'Dịch vụ tài chính':
-        chiTieu = '1,10101,10102,10201,10202,10205,2,3,30101,30103,30106,30109,30110,30111,30113,30117,302,30204,4,40101,40107,5'
-        top = 176
-        break
+        chiTieu =
+          '1,10101,10102,10201,10202,10205,2,3,30101,30103,30106,30109,30110,30111,30113,30117,302,30204,4,40101,40107,5';
+        top = 176;
+        break;
       default:
-        chiTieu = '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,10207,2,301,30101,30102,302,30201,30202,4'
-        top = 176
+        chiTieu =
+          '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,10207,2,301,30101,30102,302,30201,30202,4';
+        top = 176;
         break;
     }
-    const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`
-    return { chiTieu, top, sort }
+    const sort = `case ${chiTieu
+      .split(',')
+      .map((item, index) => `when id = ${+item} then ${index}`)
+      .join(' ')} end as row_num`;
+    return { chiTieu, top, sort };
   }
 
   async balanceSheetDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`)
-    if (!LV2[0]) return []
+    const LV2 = await this.mssqlService.query(
+      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
+    if (!LV2[0]) return [];
 
-    const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`,
+    );
+    if (redisData) return redisData;
 
-    const { chiTieu, top, sort } = this.getChiTieuCDKT(LV2[0].LV2, is_chart)
+    const { chiTieu, top, sort } = this.getChiTieuCDKT(LV2[0].LV2, is_chart);
 
-    let select = ``, group = ``
+    let select = ``,
+      group = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter AS date,`
-        group = `order by yearQuarter desc`
+        select = `value, yearQuarter AS date,`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, year as date,`
-        group = `group by year, name, id order by year desc`
-        break
+        select = `sum(value) as value, year as date,`;
+        group = `group by year, name, id order by year desc`;
+        break;
       default:
         break;
     }
@@ -1389,30 +1667,46 @@ export class SharesService {
       *
     FROM temp
     ORDER BY date ASC, row_num ASC
-    `
+    `;
 
-    const data = await this.mssqlService.query<BalanceSheetDetailResponse[]>(query)
-    const dataMapped = BalanceSheetDetailResponse.mapToList(data, is_chart, LV2[0].LV2)
-    await this.redis.set(`${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<BalanceSheetDetailResponse[]>(
+      query,
+    );
+    const dataMapped = BalanceSheetDetailResponse.mapToList(
+      data,
+      is_chart,
+      LV2[0].LV2,
+    );
+    await this.redis.set(
+      `${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async balanceSheetDetailCircle(stock: string, order: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`)
-    if (!LV2[0]?.LV2) return []
+    const LV2 = await this.mssqlService.query(
+      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
+    if (!LV2[0]?.LV2) return [];
 
-    const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    let select = ``, group = ``, query = ``
+    let select = ``,
+      group = ``,
+      query = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date, id`
-        group = `order by yearQuarter desc`
+        select = `value, yearQuarter as date, id`;
+        group = `order by yearQuarter desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `sum(value) as value, year as date, id`
-        group = `group by year, id order by year desc`
+        select = `sum(value) as value, year as date, id`;
+        group = `group by year, id order by year desc`;
       default:
         break;
     }
@@ -1445,8 +1739,7 @@ export class SharesService {
         select * from no_phai_tra
         union all
         select * from von_so_huu
-      `
-
+      `;
     } else {
       query = `
       with temp as (select top 3 ${select}
@@ -1471,13 +1764,19 @@ export class SharesService {
       union all
       select *
       from tong_von
-      `
+      `;
     }
 
-    const data = await this.mssqlService.query<BalanceSheetDetailCircleResponse[]>(query)
-    const dataMapped = BalanceSheetDetailCircleResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      BalanceSheetDetailCircleResponse[]
+    >(query);
+    const dataMapped = BalanceSheetDetailCircleResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   private getChiTieuCSTC(industry: string, stock: string): string {
@@ -1508,14 +1807,17 @@ export class SharesService {
         { name: 'NDR', value: 'NDR' },
         { name: 'LLP_NPL', value: 'LLP_NPL' },
         { name: 'NPL_TR', value: 'NPL_TR' },
-      ].map((item, index) => item.name != 'ROA' && item.name != 'ROE' ? `
+      ]
+        .map((item, index) =>
+          item.name != 'ROA' && item.name != 'ROE'
+            ? `
       select '${item.name}' as name, ${item.value} as value, cast(year as varchar) + cast(quarter as varchar) as date, ${index} as row from financialReport.dbo.calBCTCNH where code = '${stock}'
       `
-      :
-      `
+            : `
       select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `
-      ).join(`union all`)
+      `,
+        )
+        .join(`union all`);
     } else {
       return [
         { name: 'Chi so danh gia', value: 0 },
@@ -1530,7 +1832,10 @@ export class SharesService {
         { name: 'Vong quay VCSH', value: 'CT' },
         { name: 'Kha nang thanh toan', value: 0 },
         { name: 'Chi so kha nang tra no', value: 'DSCR' },
-        { name: 'Ty le no hien tai/Tong tai san', value: 'totalDebtToTotalAssets' },
+        {
+          name: 'Ty le no hien tai/Tong tai san',
+          value: 'totalDebtToTotalAssets',
+        },
         { name: 'Ty le no hien tai/VCSH', value: 'DE' },
         { name: 'Ty le dam bao tra no bang tai san', value: 'ACR' },
         { name: 'Thanh khoan', value: 0 },
@@ -1543,35 +1848,47 @@ export class SharesService {
         { name: 'Ty suat loi nhuan rong', value: 'NPM' },
         { name: 'ROE', value: 'roae' },
         { name: 'ROA', value: 'roaa' },
-      ].map((item, index) => item.name != 'ROE' && item.name != 'ROA' ? `
+      ]
+        .map((item, index) =>
+          item.name != 'ROE' && item.name != 'ROA'
+            ? `
       select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from financialReport.dbo.calBCTC where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `: 
       `
+            : `
       select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `
-      ).join(`union all`)
+      `,
+        )
+        .join(`union all`);
     }
   }
 
-  async financialIndicatorsDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`)
-    if (!LV2[0]?.LV2) return []
+  async financialIndicatorsDetail(
+    stock: string,
+    order: number,
+    is_chart: number,
+  ) {
+    const LV2 = await this.mssqlService.query(
+      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
+    if (!LV2[0]?.LV2) return [];
 
-    const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`,
+    );
+    if (redisData) return redisData;
 
     const temp = this.getChiTieuCSTC(LV2[0]?.LV2, stock);
-    if (!temp) return []
+    if (!temp) return [];
 
-    let select = ``
+    let select = ``;
 
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `select top 200 * from temp order by date desc`
+        select = `select top 200 * from temp order by date desc`;
         break;
       case TimeTypeEnum.Year:
-        select = `select top 200 name, sum(value) as value, LEFT(date, 4) as date, sum(row) as row from temp group by LEFT(date, 4), name order by LEFT(date, 4) desc`
-        break
+        select = `select top 200 name, sum(value) as value, LEFT(date, 4) as date, sum(row) as row from temp group by LEFT(date, 4), name order by LEFT(date, 4) desc`;
+        break;
       default:
         break;
     }
@@ -1598,30 +1915,51 @@ export class SharesService {
     temp as (${temp}),
     date as (${select})
     select * from date order by date asc, row asc
-    `
+    `;
 
-    const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query)
-    const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart)
-    await this.redis.set(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const data: any[] = await this.mssqlService.query<
+      FinancialIndicatorsDetailResponse[]
+    >(query);
+    const dataMapped = FinancialIndicatorsDetailResponse.mapToList(
+      data,
+      is_chart,
+    );
+    await this.redis.set(
+      `${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async financialHealthRating(stock: string) {
-    const LV2 = (await this.mssqlService.query(`select LV2 from marketInfor.dbo.info where code = '${stock}'`))[0].LV2
+    const LV2 = (
+      await this.mssqlService.query(
+        `select LV2 from marketInfor.dbo.info where code = '${stock}'`,
+      )
+    )[0].LV2;
     if (LV2 == 'Ngân hàng') {
-      const data = await this.financialHealthRatingNH(stock)
-      return data
+      const data = await this.financialHealthRatingNH(stock);
+      return data;
     }
     if (LV2 == 'Dịch vụ tài chính' || LV2 == 'Bảo hiểm') {
-      const data = await this.financialHealthRatingCKBH(stock, LV2)
-      return data
+      const data = await this.financialHealthRatingCKBH(stock, LV2);
+      return data;
     }
 
-    const redisData = await this.redis.get(`${RedisKeys.financialHealthRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const quarter = (await this.mssqlService.query(`select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating order by yearQuarter desc`))[0].yearQuarter
-    const prevQuarter = moment(quarter, 'YYYYQ').subtract(1, 'quarter').format('YYYYQ')
+    const quarter = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating order by yearQuarter desc`,
+      )
+    )[0].yearQuarter;
+    const prevQuarter = moment(quarter, 'YYYYQ')
+      .subtract(1, 'quarter')
+      .format('YYYYQ');
 
     const query = `
     WITH stock
@@ -1868,21 +2206,33 @@ and yearQuarter = '${prevQuarter}')
       ON q.code = s.code
     INNER JOIN thi_truong_4_quy y on t.code = s.code
     INNER JOIN thi_truong_quy_truoc p on p.code = s.code
-    `
+    `;
 
-    const data = await this.mssqlService.query(query)
-    const { star, starIndustry, starAll }: any = this.checkStarFinancialHealthRating(data[0])
+    const data = await this.mssqlService.query(query);
+    const { star, starIndustry, starAll }: any =
+      this.checkStarFinancialHealthRating(data[0]);
 
-
-    const dataMapped = FinancialHealthRatingResponse.mapToList(star, starIndustry, starAll)
-    await this.redis.set(`${RedisKeys.financialHealthRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    await this.redis.set(`${RedisKeys.financialHealthRatingAll}`, starAll, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const dataMapped = FinancialHealthRatingResponse.mapToList(
+      star,
+      starIndustry,
+      starAll,
+    );
+    await this.redis.set(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    await this.redis.set(`${RedisKeys.financialHealthRatingAll}`, starAll, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async financialHealthRatingNH(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.financialHealthRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     SELECT
@@ -1911,7 +2261,7 @@ and yearQuarter = '${prevQuarter}')
     WHERE code = '${stock}'
     AND RIGHT(yearQuarter, 1) <> 0
     ORDER BY yearQuarter DESC)
-    `
+    `;
     const query_2 = `
     SELECT
       AVG(LFR) as LFR,
@@ -1940,25 +2290,39 @@ and yearQuarter = '${prevQuarter}')
     AND RIGHT(yearQuarter, 1) <> 0
     ORDER BY yearQuarter DESC)
     GROUP BY code
-    `
+    `;
 
-    const promise = this.mssqlService.query(query)
-    const promise_2 = this.mssqlService.query(query_2)
+    const promise = this.mssqlService.query(query);
+    const promise_2 = this.mssqlService.query(query_2);
 
-    const [data, data_2] = await Promise.all([promise, promise_2]) as any
+    const [data, data_2] = (await Promise.all([promise, promise_2])) as any;
 
-    const stock_data = data.find(item => item.code == stock)
-    const industry_data = data.find(item => item.code == 'Ngân hàng')
-    const compv_data = data.find(item => item.code == `${stock}compoV`)
-    const industry_data_4_quarter = data_2[0]
-    const industry_compv_data = data.find(item => item.code == 'NHcompoV')
+    const stock_data = data.find((item) => item.code == stock);
+    const industry_data = data.find((item) => item.code == 'Ngân hàng');
+    const compv_data = data.find((item) => item.code == `${stock}compoV`);
+    const industry_data_4_quarter = data_2[0];
+    const industry_compv_data = data.find((item) => item.code == 'NHcompoV');
 
-    const star = this.checkRatingFinanceHealthNH(stock_data, industry_data, compv_data) as any
+    const star = this.checkRatingFinanceHealthNH(
+      stock_data,
+      industry_data,
+      compv_data,
+    ) as any;
 
-    const star_industry = this.checkRatingFinanceHealthNH(industry_data, industry_data_4_quarter, industry_compv_data) as any
+    const star_industry = this.checkRatingFinanceHealthNH(
+      industry_data,
+      industry_data_4_quarter,
+      industry_compv_data,
+    ) as any;
 
-    const quarter = (await this.mssqlService.query(`select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating order by yearQuarter desc`))[0].yearQuarter
-    const prevQuarter = moment(quarter, 'YYYYQ').subtract(1, 'quarter').format('YYYYQ')
+    const quarter = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating order by yearQuarter desc`,
+      )
+    )[0].yearQuarter;
+    const prevQuarter = moment(quarter, 'YYYYQ')
+      .subtract(1, 'quarter')
+      .format('YYYYQ');
 
     const query_3 = `
     with thi_truong
@@ -2080,23 +2444,36 @@ and yearQuarter = '${prevQuarter}')
     from thi_truong t
     inner join thi_truong_quy_truoc q on q.code = t.code
     inner join thi_truong_4_quy n on n.code = t.code
-    `
-    let starAll: any = {}
-    const rd = await this.redis.get(`${RedisKeys.financialHealthRatingAll}`) as any
-    if (rd) { starAll = rd }
-    else {
-      const data_3 = await this.mssqlService.query(query_3)
-      const result: any = this.checkStarFinancialHealthRating(data_3[0])
-      starAll = result.starAll
+    `;
+    let starAll: any = {};
+    const rd = (await this.redis.get(
+      `${RedisKeys.financialHealthRatingAll}`,
+    )) as any;
+    if (rd) {
+      starAll = rd;
+    } else {
+      const data_3 = await this.mssqlService.query(query_3);
+      const result: any = this.checkStarFinancialHealthRating(data_3[0]);
+      starAll = result.starAll;
     }
-    const dataMapped = FinancialHealthRatingNHResponse.mapToList(star, star_industry, starAll)
-    await this.redis.set(`${RedisKeys.financialHealthRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const dataMapped = FinancialHealthRatingNHResponse.mapToList(
+      star,
+      star_industry,
+      starAll,
+    );
+    await this.redis.set(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async financialHealthRatingCKBH(stock: string, LV2: string) {
-    const redisData = await this.redis.get(`${RedisKeys.financialHealthRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     select c.currentRatio, c.cashRatio, c.quickRatio, c.interestCoverageRatio,
@@ -2152,95 +2529,135 @@ and yearQuarter = '${prevQuarter}')
     from financialReport.dbo.calBCTC c
     where code IN (N'${LV2}')
     and yearQuarter IN ('20232', '20231', '20224', '20223')
-    `
-    const data = await this.mssqlService.query(query) as any
+    `;
+    const data = (await this.mssqlService.query(query)) as any;
 
-    const stock_data = data.find(item => item.code == stock)
-    const industry_data = data.find(item => item.code == LV2)
-    const all_data = data.find(item => item.code == 'ALL')
-    const industry_4_data = data.find(item => item.code == 'Industry4Quarter')
-    const all_4_data = data.find(item => item.code == 'ALL4Quarter')
-    const all_prev_data = data.find(item => item.code == 'ALLPrev')
+    const stock_data = data.find((item) => item.code == stock);
+    const industry_data = data.find((item) => item.code == LV2);
+    const all_data = data.find((item) => item.code == 'ALL');
+    const industry_4_data = data.find(
+      (item) => item.code == 'Industry4Quarter',
+    );
+    const all_4_data = data.find((item) => item.code == 'ALL4Quarter');
+    const all_prev_data = data.find((item) => item.code == 'ALLPrev');
 
-    const { star, starAll, starIndustry } = this.checkRatingFinanceHealthCK(stock_data, industry_data, all_data, industry_4_data, all_4_data, all_prev_data)
+    const { star, starAll, starIndustry } = this.checkRatingFinanceHealthCK(
+      stock_data,
+      industry_data,
+      all_data,
+      industry_4_data,
+      all_4_data,
+      all_prev_data,
+    );
 
-    const dataMapped = await FinancialHealthRatingResponse.mapToList(star, starIndustry, starAll)
-    await this.redis.set(`${RedisKeys.financialHealthRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const dataMapped = await FinancialHealthRatingResponse.mapToList(
+      star,
+      starIndustry,
+      starAll,
+    );
+    await this.redis.set(
+      `${RedisKeys.financialHealthRating}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
-  private checkRatingFinanceHealthCK(stock: any, industry: any, all: any, industry_4_quarter: any, all_4_quarter: any, all_prev: any) {
+  private checkRatingFinanceHealthCK(
+    stock: any,
+    industry: any,
+    all: any,
+    industry_4_quarter: any,
+    all_4_quarter: any,
+    all_prev: any,
+  ) {
     const key = Object.keys(stock).slice(0, Object.keys(stock).length - 1);
 
-    const star = {}
-    const starIndustry = {}
-    const starAll = {}
+    const star = {};
+    const starIndustry = {};
+    const starAll = {};
 
     for (const item of key) {
-      const data_stock = stock[item]
-      const data_industry = industry[item]
-      const data_all = all[item]
-      const data_industry_4 = industry_4_quarter[item]
-      const data_all_4 = all_4_quarter[item]
-      const data_all_prev = all_prev[item]
+      const data_stock = stock[item];
+      const data_industry = industry[item];
+      const data_all = all[item];
+      const data_industry_4 = industry_4_quarter[item];
+      const data_all_4 = all_4_quarter[item];
+      const data_all_prev = all_prev[item];
 
       //Cổ phiếu
-      if (data_stock > data_industry > data_all) star[item] = 5
-      else if (data_stock > data_all > data_industry) star[item] = 4
-      else if (data_industry > data_stock > data_all) star[item] = 3
-      else if (data_all > data_stock > data_industry) star[item] = 2
-      else star[item] = 1
+      if (data_stock > data_industry > data_all) star[item] = 5;
+      else if (data_stock > data_all > data_industry) star[item] = 4;
+      else if (data_industry > data_stock > data_all) star[item] = 3;
+      else if (data_all > data_stock > data_industry) star[item] = 2;
+      else star[item] = 1;
 
       //Ngành
-      if (data_industry > data_industry_4 > data_all) starIndustry[item] = 5
-      else if (data_industry > data_all > data_industry_4) starIndustry[item] = 4
-      else if (data_industry_4 > data_industry > data_all) starIndustry[item] = 3
-      else if (data_all > data_industry > data_industry_4) starIndustry[item] = 2
-      else starIndustry[item] = 1
+      if (data_industry > data_industry_4 > data_all) starIndustry[item] = 5;
+      else if (data_industry > data_all > data_industry_4)
+        starIndustry[item] = 4;
+      else if (data_industry_4 > data_industry > data_all)
+        starIndustry[item] = 3;
+      else if (data_all > data_industry > data_industry_4)
+        starIndustry[item] = 2;
+      else starIndustry[item] = 1;
 
       //Thị trường
-      if (data_all > data_all_prev > data_all_4) starAll[item] = 5
-      else if (data_all > data_all_4 > data_all_prev) starAll[item] = 4
-      else if (data_all_prev > data_all > data_all_4) starAll[item] = 3
-      else if (data_all_4 > data_all > data_all_prev) starAll[item] = 2
-      else starAll[item] = 1
+      if (data_all > data_all_prev > data_all_4) starAll[item] = 5;
+      else if (data_all > data_all_4 > data_all_prev) starAll[item] = 4;
+      else if (data_all_prev > data_all > data_all_4) starAll[item] = 3;
+      else if (data_all_4 > data_all > data_all_prev) starAll[item] = 2;
+      else starAll[item] = 1;
     }
 
-    return { star, starIndustry, starAll }
+    return { star, starIndustry, starAll };
   }
 
   private checkRatingFinanceHealthNH(stock: any, industry: any, compv: any) {
     const key = Object.keys(stock).slice(0, Object.keys(stock).length - 1);
 
-    const star = {}
+    const star = {};
     for (const item of key) {
-      const data_stock = stock[item]
-      const data_industry = industry[item]
-      const data_compv = compv[item]
+      const data_stock = stock[item];
+      const data_industry = industry[item];
+      const data_compv = compv[item];
 
-      if (item == 'LFR' || item == 'LTR' || item == 'NPLR' || item == 'NPL_TR' || item == 'COF') {
-
-        if (data_stock < data_compv && data_compv < data_industry) star[item] = 5
-        else if (data_stock < data_industry && data_industry < data_compv) star[item] = 4
-        else if (data_compv < data_stock && data_stock < data_industry) star[item] = 3
-        else if (data_industry < data_industry && data_industry < data_compv) star[item] = 2
-        else star[item] = 1
-
+      if (
+        item == 'LFR' ||
+        item == 'LTR' ||
+        item == 'NPLR' ||
+        item == 'NPL_TR' ||
+        item == 'COF'
+      ) {
+        if (data_stock < data_compv && data_compv < data_industry)
+          star[item] = 5;
+        else if (data_stock < data_industry && data_industry < data_compv)
+          star[item] = 4;
+        else if (data_compv < data_stock && data_stock < data_industry)
+          star[item] = 3;
+        else if (data_industry < data_industry && data_industry < data_compv)
+          star[item] = 2;
+        else star[item] = 1;
       } else {
-        if (data_stock > data_compv && data_compv > data_industry) star[item] = 5
-        else if (data_stock > data_industry && data_industry > data_compv) star[item] = 4
-        else if (data_compv > data_stock && data_stock > data_industry) star[item] = 3
-        else if (data_industry > data_stock && data_stock > data_compv) star[item] = 2
-        else star[item] = 1
-
+        if (data_stock > data_compv && data_compv > data_industry)
+          star[item] = 5;
+        else if (data_stock > data_industry && data_industry > data_compv)
+          star[item] = 4;
+        else if (data_compv > data_stock && data_stock > data_industry)
+          star[item] = 3;
+        else if (data_industry > data_stock && data_stock > data_compv)
+          star[item] = 2;
+        else star[item] = 1;
       }
     }
-    return star
+    return star;
   }
 
   async techniqueRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.techniqueRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.techniqueRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
     //Cổ phiếu
     const query = `
@@ -2249,8 +2666,8 @@ and yearQuarter = '${prevQuarter}')
     WHERE code = '${stock}'
     and date >= '2021-01-01'
     order by date
-    `
-    const promise = this.mssqlService.query(query)
+    `;
+    const promise = this.mssqlService.query(query);
 
     //Ngành
     const query_2 = `
@@ -2269,8 +2686,8 @@ and yearQuarter = '${prevQuarter}')
     AND date >= '2021-01-01'
     GROUP BY date
     ORDER BY date
-    `
-    const promise_2 = this.mssqlService.query(query_2)
+    `;
+    const promise_2 = this.mssqlService.query(query_2);
     //Thị trường
     const query_3 = `
     SELECT
@@ -2285,105 +2702,220 @@ and yearQuarter = '${prevQuarter}')
     AND date >= '2021-01-01'
     GROUP BY date
     ORDER BY date ASC
-    `
-    const promise_3 = this.mssqlService.query(query_3)
-    const [data, data_2, data_3] = await Promise.all([promise, promise_2, promise_3]) as any
+    `;
+    const promise_3 = this.mssqlService.query(query_3);
+    const [data, data_2, data_3] = (await Promise.all([
+      promise,
+      promise_2,
+      promise_3,
+    ])) as any;
 
     //Tính toán cổ phiếu
-    const closePrice = data.map(item => item.closePrice / 1000)
-    const highPrice = data.map(item => item.highPrice / 1000)
-    const lowPrice = data.map(item => item.lowPrice / 1000)
-    const ma5 = this.ma(closePrice, 5)
-    const ma10 = this.ma(closePrice, 10)
-    const ma20 = this.ma(closePrice, 20)
-    const ma50 = this.ma(closePrice, 50)
-    const ma100 = this.ma(closePrice, 5)
-    const ma200 = this.ma(closePrice, 200)
-    const ema5 = this.ema(closePrice, 5)
-    const ema10 = this.ema(closePrice, 10)
-    const ema20 = this.ema(closePrice, 20)
-    const ema50 = this.ema(closePrice, 50)
-    const ema100 = this.ema(closePrice, 100)
-    const ema200 = this.ema(closePrice, 200)
-    const williamR = this.williamR(closePrice, highPrice, lowPrice, 14)
-    const { macd, histogram, signal } = this.macD(closePrice)
-    const rsi = this.rsi(closePrice, 14)
-    const adx = this.adx(closePrice, highPrice, lowPrice, 14)
-    const cci = this.cci(closePrice, highPrice, lowPrice, 14)
-    const stochRSI = this.stochRSI(closePrice)
-    const { dStoch, kStoch } = this.stoch(closePrice, highPrice, lowPrice, 14)
+    const closePrice = data.map((item) => item.closePrice / 1000);
+    const highPrice = data.map((item) => item.highPrice / 1000);
+    const lowPrice = data.map((item) => item.lowPrice / 1000);
+    const ma5 = this.ma(closePrice, 5);
+    const ma10 = this.ma(closePrice, 10);
+    const ma20 = this.ma(closePrice, 20);
+    const ma50 = this.ma(closePrice, 50);
+    const ma100 = this.ma(closePrice, 5);
+    const ma200 = this.ma(closePrice, 200);
+    const ema5 = this.ema(closePrice, 5);
+    const ema10 = this.ema(closePrice, 10);
+    const ema20 = this.ema(closePrice, 20);
+    const ema50 = this.ema(closePrice, 50);
+    const ema100 = this.ema(closePrice, 100);
+    const ema200 = this.ema(closePrice, 200);
+    const williamR = this.williamR(closePrice, highPrice, lowPrice, 14);
+    const { macd, histogram, signal } = this.macD(closePrice);
+    const rsi = this.rsi(closePrice, 14);
+    const adx = this.adx(closePrice, highPrice, lowPrice, 14);
+    const cci = this.cci(closePrice, highPrice, lowPrice, 14);
+    const stochRSI = this.stochRSI(closePrice);
+    const { dStoch, kStoch } = this.stoch(closePrice, highPrice, lowPrice, 14);
 
     //Tính toán ngành
-    const closePriceIndustry = data_2.map(item => item.closePrice / 1000)
-    const highPriceIndustry = data_2.map(item => item.highPrice / 1000)
-    const lowPriceIndustry = data_2.map(item => item.lowPrice / 1000)
-    const ma5Industry = this.ma(closePriceIndustry, 5)
-    const ma10Industry = this.ma(closePriceIndustry, 10)
-    const ma20Industry = this.ma(closePriceIndustry, 20)
-    const ma50Industry = this.ma(closePriceIndustry, 50)
-    const ma100Industry = this.ma(closePriceIndustry, 5)
-    const ma200Industry = this.ma(closePriceIndustry, 200)
-    const ema5Industry = this.ema(closePriceIndustry, 5)
-    const ema10Industry = this.ema(closePriceIndustry, 10)
-    const ema20Industry = this.ema(closePriceIndustry, 20)
-    const ema50Industry = this.ema(closePriceIndustry, 50)
-    const ema100Industry = this.ema(closePriceIndustry, 100)
-    const ema200Industry = this.ema(closePriceIndustry, 200)
-    const williamRIndustry = this.williamR(closePriceIndustry, highPriceIndustry, lowPriceIndustry, 14)
-    const macIndustry = this.macD(closePriceIndustry)
-    const macdIndustry = macIndustry.macd
-    const histogramIndustry = macIndustry.histogram
-    const signalIndustry = macIndustry.signal
-    const rsiIndustry = this.rsi(closePriceIndustry, 14)
-    const adxIndustry = this.adx(closePriceIndustry, highPriceIndustry, lowPriceIndustry, 14)
-    const cciIndustry = this.cci(closePriceIndustry, highPriceIndustry, lowPriceIndustry, 14)
-    const stochRSIIndustry = this.stochRSI(closePriceIndustry)
-    const stochIndustry = this.stoch(closePriceIndustry, highPriceIndustry, lowPriceIndustry, 14)
-    const dStochIndustry = stochIndustry.dStoch
-    const kStochIndustry = stochIndustry.kStoch
+    const closePriceIndustry = data_2.map((item) => item.closePrice / 1000);
+    const highPriceIndustry = data_2.map((item) => item.highPrice / 1000);
+    const lowPriceIndustry = data_2.map((item) => item.lowPrice / 1000);
+    const ma5Industry = this.ma(closePriceIndustry, 5);
+    const ma10Industry = this.ma(closePriceIndustry, 10);
+    const ma20Industry = this.ma(closePriceIndustry, 20);
+    const ma50Industry = this.ma(closePriceIndustry, 50);
+    const ma100Industry = this.ma(closePriceIndustry, 5);
+    const ma200Industry = this.ma(closePriceIndustry, 200);
+    const ema5Industry = this.ema(closePriceIndustry, 5);
+    const ema10Industry = this.ema(closePriceIndustry, 10);
+    const ema20Industry = this.ema(closePriceIndustry, 20);
+    const ema50Industry = this.ema(closePriceIndustry, 50);
+    const ema100Industry = this.ema(closePriceIndustry, 100);
+    const ema200Industry = this.ema(closePriceIndustry, 200);
+    const williamRIndustry = this.williamR(
+      closePriceIndustry,
+      highPriceIndustry,
+      lowPriceIndustry,
+      14,
+    );
+    const macIndustry = this.macD(closePriceIndustry);
+    const macdIndustry = macIndustry.macd;
+    const histogramIndustry = macIndustry.histogram;
+    const signalIndustry = macIndustry.signal;
+    const rsiIndustry = this.rsi(closePriceIndustry, 14);
+    const adxIndustry = this.adx(
+      closePriceIndustry,
+      highPriceIndustry,
+      lowPriceIndustry,
+      14,
+    );
+    const cciIndustry = this.cci(
+      closePriceIndustry,
+      highPriceIndustry,
+      lowPriceIndustry,
+      14,
+    );
+    const stochRSIIndustry = this.stochRSI(closePriceIndustry);
+    const stochIndustry = this.stoch(
+      closePriceIndustry,
+      highPriceIndustry,
+      lowPriceIndustry,
+      14,
+    );
+    const dStochIndustry = stochIndustry.dStoch;
+    const kStochIndustry = stochIndustry.kStoch;
 
     //Tính toán thị trường
-    const closePriceAll = data_3.map(item => item.closePrice / 1000)
-    const highPriceAll = data_3.map(item => item.highPrice / 1000)
-    const lowPriceAll = data_3.map(item => item.lowPrice / 1000)
-    const ma5All = this.ma(closePriceAll, 5)
-    const ma10All = this.ma(closePriceAll, 10)
-    const ma20All = this.ma(closePriceAll, 20)
-    const ma50All = this.ma(closePriceAll, 50)
-    const ma100All = this.ma(closePriceAll, 5)
-    const ma200All = this.ma(closePriceAll, 200)
-    const ema5All = this.ema(closePriceAll, 5)
-    const ema10All = this.ema(closePriceAll, 10)
-    const ema20All = this.ema(closePriceAll, 20)
-    const ema50All = this.ema(closePriceAll, 50)
-    const ema100All = this.ema(closePriceAll, 100)
-    const ema200All = this.ema(closePriceAll, 200)
-    const williamRAll = this.williamR(closePriceAll, highPriceAll, lowPriceAll, 14)
-    const macAll = this.macD(closePriceAll)
-    const macdAll = macAll.macd
-    const histogramAll = macAll.histogram
-    const signalAll = macAll.signal
-    const rsiAll = this.rsi(closePriceAll, 14)
-    const adxAll = this.adx(closePriceAll, highPriceAll, lowPriceAll, 14)
-    const cciAll = this.cci(closePriceAll, highPriceAll, lowPriceAll, 14)
-    const stochRSIAll = this.stochRSI(closePriceAll)
-    const stochAll = this.stoch(closePriceAll, highPriceAll, lowPriceAll, 14)
-    const dStochAll = stochAll.dStoch
-    const kStochAll = stochAll.kStoch
+    const closePriceAll = data_3.map((item) => item.closePrice / 1000);
+    const highPriceAll = data_3.map((item) => item.highPrice / 1000);
+    const lowPriceAll = data_3.map((item) => item.lowPrice / 1000);
+    const ma5All = this.ma(closePriceAll, 5);
+    const ma10All = this.ma(closePriceAll, 10);
+    const ma20All = this.ma(closePriceAll, 20);
+    const ma50All = this.ma(closePriceAll, 50);
+    const ma100All = this.ma(closePriceAll, 5);
+    const ma200All = this.ma(closePriceAll, 200);
+    const ema5All = this.ema(closePriceAll, 5);
+    const ema10All = this.ema(closePriceAll, 10);
+    const ema20All = this.ema(closePriceAll, 20);
+    const ema50All = this.ema(closePriceAll, 50);
+    const ema100All = this.ema(closePriceAll, 100);
+    const ema200All = this.ema(closePriceAll, 200);
+    const williamRAll = this.williamR(
+      closePriceAll,
+      highPriceAll,
+      lowPriceAll,
+      14,
+    );
+    const macAll = this.macD(closePriceAll);
+    const macdAll = macAll.macd;
+    const histogramAll = macAll.histogram;
+    const signalAll = macAll.signal;
+    const rsiAll = this.rsi(closePriceAll, 14);
+    const adxAll = this.adx(closePriceAll, highPriceAll, lowPriceAll, 14);
+    const cciAll = this.cci(closePriceAll, highPriceAll, lowPriceAll, 14);
+    const stochRSIAll = this.stochRSI(closePriceAll);
+    const stochAll = this.stoch(closePriceAll, highPriceAll, lowPriceAll, 14);
+    const dStochAll = stochAll.dStoch;
+    const kStochAll = stochAll.kStoch;
 
-    const industry = this.checkStarTechniqueRating(ma5Industry, ma10Industry, ma20Industry, ma50Industry, ma100Industry, ma200Industry, ema5Industry, ema10Industry, ema20Industry, ema50Industry, ema100Industry, ema200Industry, rsiIndustry, williamRIndustry, macdIndustry, histogramIndustry, signalIndustry, adxIndustry, cciIndustry, stochRSIIndustry, dStochIndustry, kStochIndustry, closePriceIndustry[closePriceIndustry.length - 1])
-    const all = this.checkStarTechniqueRating(ma5All, ma10All, ma20All, ma50All, ma100All, ma200All, ema5All, ema10All, ema20All, ema50All, ema100All, ema200All, rsiAll, williamRAll, macdAll, histogramAll, signalAll, adxAll, cciAll, stochRSIAll, dStochAll, kStochAll, closePriceAll[closePriceAll.length - 1])
-    const starIndustry = UtilCommonTemplate.checkStarCommon(industry.reduce((acc, current) => acc + current.value, 0), 2)
-    const starAll = UtilCommonTemplate.checkStarCommon(all.reduce((acc, current) => acc + current.value, 0), 2)
+    const industry = this.checkStarTechniqueRating(
+      ma5Industry,
+      ma10Industry,
+      ma20Industry,
+      ma50Industry,
+      ma100Industry,
+      ma200Industry,
+      ema5Industry,
+      ema10Industry,
+      ema20Industry,
+      ema50Industry,
+      ema100Industry,
+      ema200Industry,
+      rsiIndustry,
+      williamRIndustry,
+      macdIndustry,
+      histogramIndustry,
+      signalIndustry,
+      adxIndustry,
+      cciIndustry,
+      stochRSIIndustry,
+      dStochIndustry,
+      kStochIndustry,
+      closePriceIndustry[closePriceIndustry.length - 1],
+    );
+    const all = this.checkStarTechniqueRating(
+      ma5All,
+      ma10All,
+      ma20All,
+      ma50All,
+      ma100All,
+      ma200All,
+      ema5All,
+      ema10All,
+      ema20All,
+      ema50All,
+      ema100All,
+      ema200All,
+      rsiAll,
+      williamRAll,
+      macdAll,
+      histogramAll,
+      signalAll,
+      adxAll,
+      cciAll,
+      stochRSIAll,
+      dStochAll,
+      kStochAll,
+      closePriceAll[closePriceAll.length - 1],
+    );
+    const starIndustry = UtilCommonTemplate.checkStarCommon(
+      industry.reduce((acc, current) => acc + current.value, 0),
+      2,
+    );
+    const starAll = UtilCommonTemplate.checkStarCommon(
+      all.reduce((acc, current) => acc + current.value, 0),
+      2,
+    );
 
-    const dataMapped = TechniqueRatingResponse.mapToList(this.checkStarTechniqueRating(ma5, ma10, ma20, ma50, ma100, ma200, ema5, ema10, ema20, ema50, ema100, ema200, rsi, williamR, macd, histogram, signal, adx, cci, stochRSI, dStoch, kStoch, closePrice[closePrice.length - 1]), starIndustry, starAll)
-    await this.redis.set(`${RedisKeys.techniqueRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const dataMapped = TechniqueRatingResponse.mapToList(
+      this.checkStarTechniqueRating(
+        ma5,
+        ma10,
+        ma20,
+        ma50,
+        ma100,
+        ma200,
+        ema5,
+        ema10,
+        ema20,
+        ema50,
+        ema100,
+        ema200,
+        rsi,
+        williamR,
+        macd,
+        histogram,
+        signal,
+        adx,
+        cci,
+        stochRSI,
+        dStoch,
+        kStoch,
+        closePrice[closePrice.length - 1],
+      ),
+      starIndustry,
+      starAll,
+    );
+    await this.redis.set(`${RedisKeys.techniqueRating}:${stock}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async valuationRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.valuationRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.valuationRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
     //Cổ phiếu
     const query = `
@@ -2434,7 +2966,7 @@ and yearQuarter = '${prevQuarter}')
       MAX(date)
     FROM marketTrade.dbo.tickerTradeVND
     WHERE code = '${stock}')
-    `
+    `;
 
     //Ngành
     const query_2 = `
@@ -2525,7 +3057,7 @@ and yearQuarter = '${prevQuarter}')
       ON t.code = l.code
     INNER JOIN ty_gia g
       ON g.code = l.code
-    `
+    `;
 
     //Thị trường
     const query_3 = `
@@ -2609,34 +3141,60 @@ and yearQuarter = '${prevQuarter}')
       ON t.code = l.code
     INNER JOIN ty_gia g
       ON g.code = l.code
-    `
-    const promise = this.mssqlService.query<any[]>(query)
-    const promise_2 = this.mssqlService.query<any[]>(query_2)
-    const promise_3 = this.mssqlService.query<any[]>(query_3)
+    `;
+    const promise = this.mssqlService.query<any[]>(query);
+    const promise_2 = this.mssqlService.query<any[]>(query_2);
+    const promise_3 = this.mssqlService.query<any[]>(query_3);
 
-    const [data, data_2, data_3] = await Promise.all([promise, promise_2, promise_3])
-    if (data.length == 0) return []
+    const [data, data_2, data_3] = await Promise.all([
+      promise,
+      promise_2,
+      promise_3,
+    ]);
+    if (data.length == 0) return [];
 
-    const result = this.genStarValuation(data)
-    const resultIndustry = this.genStarValuation(data_2)
-    const resultAll = this.genStarValuation(data_3)
+    const result = this.genStarValuation(data);
+    const resultIndustry = this.genStarValuation(data_2);
+    const resultAll = this.genStarValuation(data_3);
 
-    const dataMapped = ValuationRatingResponse.mapToList(result, resultIndustry, resultAll)
-    await this.redis.set(`${RedisKeys.valuationRating}:${stock}`, dataMapped, { ttl: TimeToLive.FiveMinutes })
-    return dataMapped
+    const dataMapped = ValuationRatingResponse.mapToList(
+      result,
+      resultIndustry,
+      resultAll,
+    );
+    await this.redis.set(`${RedisKeys.valuationRating}:${stock}`, dataMapped, {
+      ttl: TimeToLive.FiveMinutes,
+    });
+    return dataMapped;
   }
 
   async businessRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.businessRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.businessRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const now_quarter = (await this.mssqlService.query(`select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh order by yearQuarter desc`))[0].yearQuarter
-    const prev_quarter = moment(now_quarter, 'YYYYQ').subtract(1, 'quarter').format('YYYYQ')
-    const prev_2_quarter = moment(now_quarter, 'YYYYQ').subtract(2, 'quarter').format('YYYYQ')
-    const prev_4_quarter = moment(now_quarter, 'YYYYQ').subtract(4, 'quarter').format('YYYYQ')
-    const prev_8_quarter = moment(now_quarter, 'YYYYQ').subtract(8, 'quarter').format('YYYYQ')
+    const now_quarter = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh order by yearQuarter desc`,
+      )
+    )[0].yearQuarter;
+    const prev_quarter = moment(now_quarter, 'YYYYQ')
+      .subtract(1, 'quarter')
+      .format('YYYYQ');
+    const prev_2_quarter = moment(now_quarter, 'YYYYQ')
+      .subtract(2, 'quarter')
+      .format('YYYYQ');
+    const prev_4_quarter = moment(now_quarter, 'YYYYQ')
+      .subtract(4, 'quarter')
+      .format('YYYYQ');
+    const prev_8_quarter = moment(now_quarter, 'YYYYQ')
+      .subtract(8, 'quarter')
+      .format('YYYYQ');
 
-    const industry_promise = this.mssqlService.query(`select LV2 from marketInfor.dbo.info where code = '${stock}'`)
+    const industry_promise = this.mssqlService.query(
+      `select LV2 from marketInfor.dbo.info where code = '${stock}'`,
+    );
 
     const query_1 = `
     select
@@ -2648,8 +3206,8 @@ and yearQuarter = '${prevQuarter}')
     from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh
     where yearQuarter = (select max(yearQuarter) from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh)
     and code = '${stock}'
-    `
-    const promise_1 = this.mssqlService.query(query_1)
+    `;
+    const promise_1 = this.mssqlService.query(query_1);
 
     const query_2 = `
     select
@@ -2664,8 +3222,8 @@ and yearQuarter = '${prevQuarter}')
     inner join VISUALIZED_DATA.dbo.rating_gia gia on gia.code = kd.code
     where kd.yearQuarter = (select max(yearQuarter) from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh)
     and gia.code = '${stock}'
-    `
-    const promise_2 = this.mssqlService.query(query_2)
+    `;
+    const promise_2 = this.mssqlService.query(query_2);
 
     //Ngành
     const query_3 = `
@@ -2685,8 +3243,8 @@ and yearQuarter = '${prevQuarter}')
     inner join VISUALIZED_DATA.dbo.rating_gia gia on gia.code = kd.code
     where kd.yearQuarter = (select max(yearQuarter) from VISUALIZED_DATA.dbo.rating_nganh_nghe_kinh_doanh)
     group by LV2
-    `
-    const promise_3 = this.mssqlService.query(query_3)
+    `;
+    const promise_3 = this.mssqlService.query(query_3);
 
     //Toàn thị trường
     const query_4 = `
@@ -2707,36 +3265,140 @@ and yearQuarter = '${prevQuarter}')
     where yearQuarter in ('${now_quarter}', '${prev_quarter}', '${prev_2_quarter}', '${prev_4_quarter}', '${prev_8_quarter}')
     group by yearQuarter
     order by yearQuarter desc
-    `
-    const promise_4 = this.mssqlService.query(query_4)
+    `;
+    const promise_4 = this.mssqlService.query(query_4);
 
-    const [data_1, data_2, data_3, LV2, data_4] = await Promise.all([promise_1, promise_2, promise_3, industry_promise, promise_4]) as any
+    const [data_1, data_2, data_3, LV2, data_4] = (await Promise.all([
+      promise_1,
+      promise_2,
+      promise_3,
+      industry_promise,
+      promise_4,
+    ])) as any;
 
-    const sortDoanhThuIndustry = data_3.map(item => ({ value: item.tang_truong_doanh_thu, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortLoiNhuanIndustry = data_3.map(item => ({ value: item.tang_truong_loi_nhuan_truoc_thue, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortVonHoaIndustry = data_3.map(item => ({ value: item.tang_truong_von_hoa, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTaiSanIndustry = data_3.map(item => ({ value: item.tang_truong_tai_san, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTyTrongVonHoaIndustry: [{ code: string, value: number }] = data_3.map(item => ({ value: item.ty_trong_vh, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTyTrongTaiSanIndustry = data_3.map(item => ({ value: item.ty_trong_ts, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia1ThangIndustry = data_3.map(item => ({ value: item.gia_1_thang, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia3ThangIndustry = data_3.map(item => ({ value: item.gia_3_thang, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia6ThangIndustry = data_3.map(item => ({ value: item.gia_6_thang, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia1NamIndustry = data_3.map(item => ({ value: item.gia_1_nam, code: item.LV2 })).sort((a, b) => (a.value < b.value) ? 1 : -1) as [{ code: string, value: number }]
+    const sortDoanhThuIndustry = data_3
+      .map((item) => ({ value: item.tang_truong_doanh_thu, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortLoiNhuanIndustry = data_3
+      .map((item) => ({
+        value: item.tang_truong_loi_nhuan_truoc_thue,
+        code: item.LV2,
+      }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortVonHoaIndustry = data_3
+      .map((item) => ({ value: item.tang_truong_von_hoa, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTaiSanIndustry = data_3
+      .map((item) => ({ value: item.tang_truong_tai_san, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTyTrongVonHoaIndustry: [{ code: string; value: number }] = data_3
+      .map((item) => ({ value: item.ty_trong_vh, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTyTrongTaiSanIndustry = data_3
+      .map((item) => ({ value: item.ty_trong_ts, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia1ThangIndustry = data_3
+      .map((item) => ({ value: item.gia_1_thang, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia3ThangIndustry = data_3
+      .map((item) => ({ value: item.gia_3_thang, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia6ThangIndustry = data_3
+      .map((item) => ({ value: item.gia_6_thang, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia1NamIndustry = data_3
+      .map((item) => ({ value: item.gia_1_nam, code: item.LV2 }))
+      .sort((a, b) => (a.value < b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
 
-    const sortDoanhThuAll = data_4.map(item => ({ value: item.tang_truong_doanh_thu, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortLoiNhuanAll = data_4.map(item => ({ value: item.tang_truong_loi_nhuan_truoc_thue, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortVonHoaAll = data_4.map(item => ({ value: item.tang_truong_von_hoa, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTaiSanAll = data_4.map(item => ({ value: item.tang_truong_tai_san, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTyTrongVonHoaAll: [{ code: string, value: number }] = data_4.map(item => ({ value: item.ty_trong_vh, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortTyTrongTaiSanAll = data_4.map(item => ({ value: item.ty_trong_ts, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia1ThangAll = data_4.map(item => ({ value: item.gia_1_thang, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia3ThangAll = data_4.map(item => ({ value: item.gia_3_thang, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia6ThangAll = data_4.map(item => ({ value: item.gia_6_thang, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
-    const sortGia1NamAll = data_4.map(item => ({ value: item.gia_1_nam, code: item.yearQuarter })).sort((a, b) => (a.value > b.value) ? 1 : -1) as [{ code: string, value: number }]
+    const sortDoanhThuAll = data_4
+      .map((item) => ({
+        value: item.tang_truong_doanh_thu,
+        code: item.yearQuarter,
+      }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortLoiNhuanAll = data_4
+      .map((item) => ({
+        value: item.tang_truong_loi_nhuan_truoc_thue,
+        code: item.yearQuarter,
+      }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortVonHoaAll = data_4
+      .map((item) => ({
+        value: item.tang_truong_von_hoa,
+        code: item.yearQuarter,
+      }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTaiSanAll = data_4
+      .map((item) => ({
+        value: item.tang_truong_tai_san,
+        code: item.yearQuarter,
+      }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTyTrongVonHoaAll: [{ code: string; value: number }] = data_4
+      .map((item) => ({ value: item.ty_trong_vh, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortTyTrongTaiSanAll = data_4
+      .map((item) => ({ value: item.ty_trong_ts, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia1ThangAll = data_4
+      .map((item) => ({ value: item.gia_1_thang, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia3ThangAll = data_4
+      .map((item) => ({ value: item.gia_3_thang, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia6ThangAll = data_4
+      .map((item) => ({ value: item.gia_6_thang, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
+    const sortGia1NamAll = data_4
+      .map((item) => ({ value: item.gia_1_nam, code: item.yearQuarter }))
+      .sort((a, b) => (a.value > b.value ? 1 : -1)) as [
+      { code: string; value: number },
+    ];
 
     const dataMapped = BusinessRatingResponse.mapToList(
       this.checkStarBusinessRatingV2(data_1[0]?.tang_truong_doanh_thu, 0),
-      this.checkStarBusinessRatingV2(data_1[0]?.tang_truong_loi_nhuan_truoc_thue, 0),
+      this.checkStarBusinessRatingV2(
+        data_1[0]?.tang_truong_loi_nhuan_truoc_thue,
+        0,
+      ),
       this.checkStarBusinessRatingV2(data_1[0]?.tang_truong_von_hoa, 0),
       this.checkStarBusinessRatingV2(data_1[0]?.tang_truong_tai_san, 0),
       this.checkStarBusinessRatingV2(data_2[0]?.ty_trong_vh, 2),
@@ -2757,50 +3419,66 @@ and yearQuarter = '${prevQuarter}')
       this.checkStarBusinessRating(sortGia6ThangIndustry, LV2[0].LV2),
       this.checkStarBusinessRating(sortGia1NamIndustry, LV2[0].LV2),
 
-      sortDoanhThuAll.findIndex(item => item.code == now_quarter) + 1,
-      sortLoiNhuanAll.findIndex(item => item.code == now_quarter) + 1,
-      sortVonHoaAll.findIndex(item => item.code == now_quarter) + 1,
-      sortTaiSanAll.findIndex(item => item.code == now_quarter) + 1,
-      sortTyTrongVonHoaAll.findIndex(item => item.code == now_quarter) + 1,
-      sortTyTrongTaiSanAll.findIndex(item => item.code == now_quarter) + 1,
-      sortGia1ThangAll.findIndex(item => item.code == now_quarter) + 1,
-      sortGia3ThangAll.findIndex(item => item.code == now_quarter) + 1,
-      sortGia6ThangAll.findIndex(item => item.code == now_quarter) + 1,
-      sortGia1NamAll.findIndex(item => item.code == now_quarter) + 1
-    )
+      sortDoanhThuAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortLoiNhuanAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortVonHoaAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortTaiSanAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortTyTrongVonHoaAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortTyTrongTaiSanAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortGia1ThangAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortGia3ThangAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortGia6ThangAll.findIndex((item) => item.code == now_quarter) + 1,
+      sortGia1NamAll.findIndex((item) => item.code == now_quarter) + 1,
+    );
 
-    await this.redis.set(`${RedisKeys.businessRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    await this.redis.set(`${RedisKeys.businessRating}:${stock}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async individualInvestorBenefitsRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.individualInvestorBenefitsRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.individualInvestorBenefitsRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const year = UtilCommonTemplate.getYearQuartersV2(4, TimeTypeEnum.Year)
+    const year = UtilCommonTemplate.getYearQuartersV2(4, TimeTypeEnum.Year);
 
     //Query các ngày hiện tại, 6 tháng, 1 năm, 2 năm, 4 năm
     const date = await this.mssqlService.query(`
     with date_ranges as (
         select
             '${stock}' as code,
-            max(case when date <= '${moment().format('YYYY-MM-DD')}' then date else null end) as now,
-            max(case when date <= '${moment().subtract(6, 'month').format('YYYY-MM-DD')}' then date else null end) as month_6,
-            max(case when date <= '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as year_1,
-            max(case when date <= '${moment().subtract(2, 'year').format('YYYY-MM-DD')}' then date else null end) as year_2,
-            COALESCE(max(case when date <= '${moment().subtract(4, 'year').format('YYYY-MM-DD')}' then date else null end), (select min(date) from marketTrade.dbo.tickerTradeVND where code = 'NAB')) as year_4
+            max(case when date <= '${moment().format(
+              'YYYY-MM-DD',
+            )}' then date else null end) as now,
+            max(case when date <= '${moment()
+              .subtract(6, 'month')
+              .format('YYYY-MM-DD')}' then date else null end) as month_6,
+            max(case when date <= '${moment()
+              .subtract(1, 'year')
+              .format('YYYY-MM-DD')}' then date else null end) as year_1,
+            max(case when date <= '${moment()
+              .subtract(2, 'year')
+              .format('YYYY-MM-DD')}' then date else null end) as year_2,
+            COALESCE(max(case when date <= '${moment()
+              .subtract(4, 'year')
+              .format(
+                'YYYY-MM-DD',
+              )}' then date else null end), (select min(date) from marketTrade.dbo.tickerTradeVND where code = 'NAB')) as year_4
         from marketTrade.dbo.tickerTradeVND
         where code = '${stock}'
     )
     select code, now, month_6, year_1, year_2, year_4
     from date_ranges;
-    `)
+    `);
 
-    const now = UtilCommonTemplate.toDate(date[0].now)
-    const month_6 = UtilCommonTemplate.toDate(date[0].month_6)
-    const year_1 = UtilCommonTemplate.toDate(date[0].year_1)
-    const year_2 = UtilCommonTemplate.toDate(date[0].year_2)
-    const year_4 = UtilCommonTemplate.toDate(date[0].year_4)
+    const now = UtilCommonTemplate.toDate(date[0].now);
+    const month_6 = UtilCommonTemplate.toDate(date[0].month_6);
+    const year_1 = UtilCommonTemplate.toDate(date[0].year_1);
+    const year_2 = UtilCommonTemplate.toDate(date[0].year_2);
+    const year_4 = UtilCommonTemplate.toDate(date[0].year_4);
 
     //Query tăng trưởng giá
     const query = `
@@ -2869,8 +3547,8 @@ and yearQuarter = '${prevQuarter}')
       ON i.code = s.code
     INNER JOIN tt t
       ON t.code = s.code
-    `
-    const promise = this.mssqlService.query(query)
+    `;
+    const promise = this.mssqlService.query(query);
 
     //Query cổ tức tiền mặt ổn định
     const query_2 = `
@@ -2880,8 +3558,8 @@ and yearQuarter = '${prevQuarter}')
     WHERE LoaiSuKien = N'Trả cổ tức bằng tiền mặt'
     AND CHARINDEX('20', NoiDungSuKien) <> 0
     ORDER BY ticker DESC, year DESC
-    `
-    const promise_2 = this.mssqlService.query(query_2)
+    `;
+    const promise_2 = this.mssqlService.query(query_2);
 
     const query_4 = `
     SELECT distinct
@@ -2892,8 +3570,8 @@ and yearQuarter = '${prevQuarter}')
       and CHARINDEX('20', NoiDungSuKien) <> 0
     and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${stock}')
     ORDER BY ticker DESC, year desc
-    `
-    const promise_4 = this.mssqlService.query(query_4)
+    `;
+    const promise_4 = this.mssqlService.query(query_4);
 
     //Query tỷ lệ cổ tức tiền mặt tốt
     const query_3 = `
@@ -2920,7 +3598,7 @@ and yearQuarter = '${prevQuarter}')
       year,
       code
     FROM temp
-    WHERE year IN (${year.map(item => `'${item.substring(0, 4)}'`).join(',')})
+    WHERE year IN (${year.map((item) => `'${item.substring(0, 4)}'`).join(',')})
     AND code = '${stock}'
     GROUP BY year,
             code),
@@ -2932,7 +3610,7 @@ and yearQuarter = '${prevQuarter}')
     FROM temp
     INNER JOIN marketInfor.dbo.info i
       ON i.code = temp.code
-    WHERE year IN (${year.map(item => `'${item.substring(0, 4)}'`).join(',')})
+    WHERE year IN (${year.map((item) => `'${item.substring(0, 4)}'`).join(',')})
     AND i.LV2 = (SELECT
       LV2
     FROM marketInfor.dbo.info
@@ -2946,7 +3624,7 @@ and yearQuarter = '${prevQuarter}')
     FROM temp
     INNER JOIN marketInfor.dbo.info i
       ON i.code = temp.code
-    WHERE year IN (${year.map(item => `'${item.substring(0, 4)}'`).join(',')})
+    WHERE year IN (${year.map((item) => `'${item.substring(0, 4)}'`).join(',')})
     AND i.LV2 NOT IN (N'Ngân hàng', N'Bảo hiểm', N'Dịch vụ tài chính')
     GROUP BY year)
     SELECT
@@ -2960,13 +3638,22 @@ and yearQuarter = '${prevQuarter}')
     LEFT JOIN tt t
       ON t.code = i.code
       AND t.year = i.year
-    `
+    `;
 
-    const redisTyLeCoTucTienMat: any[] = await this.redis.get(RedisKeys.tyLeCoTucTienMat)
-    const data_3: any[] = await this.mssqlService.query(query_3)
-    if (!redisTyLeCoTucTienMat) await this.redis.set(RedisKeys.tyLeCoTucTienMat, data_3, { ttl: TimeToLive.OneWeek })
+    const redisTyLeCoTucTienMat: any[] = await this.redis.get(
+      RedisKeys.tyLeCoTucTienMat,
+    );
+    const data_3: any[] = await this.mssqlService.query(query_3);
+    if (!redisTyLeCoTucTienMat)
+      await this.redis.set(RedisKeys.tyLeCoTucTienMat, data_3, {
+        ttl: TimeToLive.OneWeek,
+      });
 
-    const [data, data_2, data_4] = await Promise.all([promise, promise_2, promise_4]) as any
+    const [data, data_2, data_4] = (await Promise.all([
+      promise,
+      promise_2,
+      promise_4,
+    ])) as any;
 
     const coTucTienMatOnDinhAll = this.checkYearConsecutiveAll(data_2);
     const coTucTienMatOnDinhIndustry = this.checkYearConsecutiveAll(data_4);
@@ -2984,25 +3671,41 @@ and yearQuarter = '${prevQuarter}')
       this.checkStarBusinessRatingV2(data[0]?.tt2nam_nganh, 3),
       this.checkStarBusinessRatingV2(data[0]?.tt4nam_nganh, 3),
       this.checkMostStar(coTucTienMatOnDinhIndustry),
-      this.checkStarBusinessRatingV2(data_3[0].ty_le_co_tuc_tien_mat_industry, 4),
+      this.checkStarBusinessRatingV2(
+        data_3[0].ty_le_co_tuc_tien_mat_industry,
+        4,
+      ),
 
       this.checkStarBusinessRatingV2(data[0]?.tt6thang_tt, 3),
       this.checkStarBusinessRatingV2(data[0]?.tt1nam_tt, 3),
       this.checkStarBusinessRatingV2(data[0]?.tt2nam_tt, 3),
       this.checkStarBusinessRatingV2(data[0]?.tt4nam_tt, 3),
       this.checkMostStar(coTucTienMatOnDinhAll),
-      this.checkStarBusinessRatingV2(data_3[0].ty_le_co_tuc_tien_mat_all, 4)
-    )
-    await this.redis.set(`${RedisKeys.individualInvestorBenefitsRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+      this.checkStarBusinessRatingV2(data_3[0].ty_le_co_tuc_tien_mat_all, 4),
+    );
+    await this.redis.set(
+      `${RedisKeys.individualInvestorBenefitsRating}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async businessPositionRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.businessPositionRating}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.businessPositionRating}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const LV2 = (await this.mssqlService.query(`select LV2 from marketInfor.dbo.info where code = '${stock}'`))[0].LV2
-    const table = LV2 == 'Ngân hàng' ? 'financialReport.dbo.calBCTCNH' : 'financialReport.dbo.calBCTC'
+    const LV2 = (
+      await this.mssqlService.query(
+        `select LV2 from marketInfor.dbo.info where code = '${stock}'`,
+      )
+    )[0].LV2;
+    const table =
+      LV2 == 'Ngân hàng'
+        ? 'financialReport.dbo.calBCTCNH'
+        : 'financialReport.dbo.calBCTC';
     //query Quy mô doanh nghiệp
     const query = `
     WITH temp
@@ -3090,8 +3793,8 @@ and yearQuarter = '${prevQuarter}')
       ON ma.code = s.code
     INNER JOIN marketcap_stock ms
       ON ms.code = s.code
-    `
-    const promise = this.mssqlService.query(query)
+    `;
+    const promise = this.mssqlService.query(query);
 
     //Query Thị trường quan tâm
     const query_4 = `
@@ -3125,12 +3828,29 @@ and yearQuarter = '${prevQuarter}')
     )
     select * from stock s inner join industry i on i.code = s.code
     inner join tt t on t.code = s.code
-    `
-    const promise_4 = this.mssqlService.query(query_4)
+    `;
+    const promise_4 = this.mssqlService.query(query_4);
 
     //Query Giá trị sở hữu khối ngoại
-    const now = UtilCommonTemplate.toDate((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.[foreign] order by date desc`))[0].date)
-    const quarter_4 = UtilCommonTemplate.toDate((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.[foreign] where date <= '${moment(now, 'YYYY/MM/DD').subtract(1, 'year').format('YYYY-MM-DD')}'`))[0].date)
+    const now = UtilCommonTemplate.toDate(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.[foreign] order by date desc`,
+        )
+      )[0].date,
+    );
+    const quarter_4 = UtilCommonTemplate.toDate(
+      (
+        await this.mssqlService.query(
+          `select top 1 date from marketTrade.dbo.[foreign] where date <= '${moment(
+            now,
+            'YYYY/MM/DD',
+          )
+            .subtract(1, 'year')
+            .format('YYYY-MM-DD')}'`,
+        )
+      )[0].date,
+    );
 
     const query_2 = `
     with stock as (SELECT
@@ -3186,13 +3906,19 @@ and yearQuarter = '${prevQuarter}')
       )
   select * from stock s inner join industry i on i.code = s.code
   inner join tt t on t.code = s.code
-    `
+    `;
 
-    const promise_2 = this.mssqlService.query(query_2)
+    const promise_2 = this.mssqlService.query(query_2);
 
     //Query Giá trị tăng trưởng VCSH
-    const now_quarter = (await this.mssqlService.query(`select top 1 yearQuarter as date from financialReport.dbo.calBCTC order by yearQuarter desc`))[0].date
-    const year_1 = moment(now_quarter, 'YYYYQ').subtract(1, 'year').format('YYYYQ')
+    const now_quarter = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter as date from financialReport.dbo.calBCTC order by yearQuarter desc`,
+      )
+    )[0].date;
+    const year_1 = moment(now_quarter, 'YYYYQ')
+      .subtract(1, 'year')
+      .format('YYYYQ');
 
     const query_3 = `
     with stock as (SELECT
@@ -3231,12 +3957,17 @@ tt as (
     )
 select * from stock s inner join industry i on i.code = s.code
 inner join tt t on t.code = s.code
-    `
+    `;
 
-    const promise_3 = this.mssqlService.query(query_3)
+    const promise_3 = this.mssqlService.query(query_3);
 
     // Select
-    const [data, data_2, data_3, data_4]: any[] = await Promise.all([promise, promise_2, promise_3, promise_4])
+    const [data, data_2, data_3, data_4]: any[] = await Promise.all([
+      promise,
+      promise_2,
+      promise_3,
+      promise_4,
+    ]);
 
     const dataMapped = BusinessPositionRatingResponse.mapToList(
       this.checkStarBusinessRatingV2(data[0].doanh_thu, 5),
@@ -3270,15 +4001,21 @@ inner join tt t on t.code = s.code
       this.checkStarBusinessRatingV2(data_4[0].phien_20_all, 6),
       this.checkStarBusinessRatingV2(data_4[0].phien_50_all, 6),
       this.checkStarBusinessRatingV2(data_2[0].tt, 7),
-      this.checkStarBusinessRatingV2(data_3[0].tt, 8)
-    )
+      this.checkStarBusinessRatingV2(data_3[0].tt, 8),
+    );
 
-    await this.redis.set(`${RedisKeys.businessPositionRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    await this.redis.set(
+      `${RedisKeys.businessPositionRating}:${stock}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async headerRating(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.headerRating}:${stock}`)
+    const redisData = await this.redis.get(
+      `${RedisKeys.headerRating}:${stock}`,
+    );
     // if (redisData) return redisData
 
     const query = `
@@ -3329,7 +4066,7 @@ inner join tt t on t.code = s.code
       MAX(date)
     FROM marketTrade.dbo.tickerTradeVND
     WHERE code = '${stock}')
-    `
+    `;
 
     //Ngành
     const query_2 = `
@@ -3414,9 +4151,9 @@ inner join tt t on t.code = s.code
       ON t.code = l.code
     INNER JOIN ty_gia g
       ON g.code = l.code
-    `
-    const promise = this.mssqlService.query(query)
-    const promise_2 = this.mssqlService.query(query_2)
+    `;
+    const promise = this.mssqlService.query(query);
+    const promise_2 = this.mssqlService.query(query_2);
 
     const promise_3: any = this.mssqlService.query(`
     SELECT   [code]
@@ -3429,10 +4166,10 @@ inner join tt t on t.code = s.code
                     ,[value]/1000 as value
                 FROM [marketTrade].[dbo].[historyTicker] where date >='2022-09-01' and code ='${stock}'
             order by date
-    `)
+    `);
 
-    const month_1 = moment().subtract(1, 'month').format('YYYY-MM-DD')
-    const year_star = moment().startOf('year').format('YYYY-MM-DD')
+    const month_1 = moment().subtract(1, 'month').format('YYYY-MM-DD');
+    const year_star = moment().startOf('year').format('YYYY-MM-DD');
 
     const promise_4 = this.mssqlService.query(`
     WITH now
@@ -3468,34 +4205,65 @@ inner join tt t on t.code = s.code
       ON m.code = n.code
     INNER JOIN start_year y
       ON y.code = n.code
-  `)
+  `);
 
-    const [data, data_2, data_3, data_4] = await Promise.all([promise, promise_2, promise_3, promise_4])
+    const [data, data_2, data_3, data_4] = await Promise.all([
+      promise,
+      promise_2,
+      promise_3,
+      promise_4,
+    ]);
 
     const price = {
-      date: data_3.map(item => item.date),
-      highPrice: data_3.map(item => item.highPrice),
-      lowPrice: data_3.map(item => item.lowPrice),
+      date: data_3.map((item) => item.date),
+      highPrice: data_3.map((item) => item.highPrice),
+      lowPrice: data_3.map((item) => item.lowPrice),
     };
 
     const [resistanceLevels, supportLevels] = this.getLevels(price);
     const resistance = resistanceLevels[resistanceLevels.length - 1][1];
     const support = supportLevels[supportLevels.length - 1][1];
-    const rsi_14 = this.rsi(data_3.map(item => item.closePrice), 14)
-    const rsi_200 = this.rsi(data_3.map(item => item.closePrice), 200)
+    const rsi_14 = this.rsi(
+      data_3.map((item) => item.closePrice),
+      14,
+    );
+    const rsi_200 = this.rsi(
+      data_3.map((item) => item.closePrice),
+      200,
+    );
 
-    const dataMapped = HeaderRatingResponse.mapToList(data[0], data_2[0], resistance, support, rsi_14, rsi_200, data_4[0])
-    await this.redis.set(`${RedisKeys.headerRating}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    const dataMapped = HeaderRatingResponse.mapToList(
+      data[0],
+      data_2[0],
+      resistance,
+      support,
+      rsi_14,
+      rsi_200,
+      data_4[0],
+    );
+    await this.redis.set(`${RedisKeys.headerRating}:${stock}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async canslimPrefilter(stock: string) {
-    const redisData = await this.redis.get(`${RedisKeys.canslimPrefilter}:${stock}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.canslimPrefilter}:${stock}`,
+    );
+    if (redisData) return redisData;
 
-    const now_quarter = (await this.mssqlService.query(`select top 1 yearQuarter from RATIO.dbo.ratioInYearQuarter where code = '${stock}' order by yearQuarter desc`))[0].yearQuarter
-    const prev_quarter = moment(now_quarter, 'YYYYQ').subtract(1, 'quarter').format('YYYYQ')
-    const prev_year = moment(now_quarter, 'YYYYQ').subtract(1, 'year').format('YYYYQ')
+    const now_quarter = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter from RATIO.dbo.ratioInYearQuarter where code = '${stock}' order by yearQuarter desc`,
+      )
+    )[0].yearQuarter;
+    const prev_quarter = moment(now_quarter, 'YYYYQ')
+      .subtract(1, 'quarter')
+      .format('YYYYQ');
+    const prev_year = moment(now_quarter, 'YYYYQ')
+      .subtract(1, 'year')
+      .format('YYYYQ');
 
     const query_EPS_co_phieu = `
     WITH temp
@@ -3511,8 +4279,8 @@ inner join tt t on t.code = s.code
     FROM temp
     WHERE yearQuarter IN ('${now_quarter}', '${prev_quarter}', '${prev_year}')
     ORDER BY yearQuarter DESC
-    `
-    const promise = this.mssqlService.query(query_EPS_co_phieu)
+    `;
+    const promise = this.mssqlService.query(query_EPS_co_phieu);
 
     const query_EPS_nganh = `
     WITH temp
@@ -3531,66 +4299,90 @@ inner join tt t on t.code = s.code
     FROM temp
     WHERE yearQuarter = '${now_quarter}'
     ORDER BY yearQuarter DESC
-    `
-    const promise_2 = this.mssqlService.query(query_EPS_nganh)
+    `;
+    const promise_2 = this.mssqlService.query(query_EPS_nganh);
 
     const promise_co_dong_lon = this.mssqlService.query(`
     select co_dong_lon, code from VISUALIZED_DATA.dbo.rating_gia where date = (select max(date) from VISUALIZED_DATA.dbo.rating_gia) and co_dong_lon > 100000000 order by co_dong_lon desc
-    `)
+    `);
 
-    const [data, data_2, chenh_lech, doanh_nghiep, dinh_hinh, co_dong_lon] = await Promise.all([promise, promise_2, this.individualInvestorBenefitsRating(stock), this.businessPositionRating(stock), this.businessRating(stock), promise_co_dong_lon]) as any
+    const [data, data_2, chenh_lech, doanh_nghiep, dinh_hinh, co_dong_lon] =
+      (await Promise.all([
+        promise,
+        promise_2,
+        this.individualInvestorBenefitsRating(stock),
+        this.businessPositionRating(stock),
+        this.businessRating(stock),
+        promise_co_dong_lon,
+      ])) as any;
 
-    const tang_truong_quy = data[0].tt_eps_quy
-    const tang_truong_quy_truoc = data[1].tt_eps_quy
-    const tang_truong_quy_nganh = data_2[0].tt_eps_quy
+    const tang_truong_quy = data[0].tt_eps_quy;
+    const tang_truong_quy_truoc = data[1].tt_eps_quy;
+    const tang_truong_quy_nganh = data_2[0].tt_eps_quy;
 
-    const tang_truong_nam = data[0].tt_eps_nam
-    const tang_truong_nam_truoc = data[2].tt_eps_nam
-    const tang_truong_nam_nganh = data_2[0].tt_eps_nam
+    const tang_truong_nam = data[0].tt_eps_nam;
+    const tang_truong_nam_truoc = data[2].tt_eps_nam;
+    const tang_truong_nam_nganh = data_2[0].tt_eps_nam;
 
     const dataMapped = CanslimResponse.mapToList(
-      this.checkStatusEPSHeaderRating([tang_truong_quy, tang_truong_quy_truoc, tang_truong_quy_nganh], tang_truong_quy),
-      this.checkStatusEPSHeaderRating([tang_truong_nam, tang_truong_nam_truoc, tang_truong_nam_nganh], tang_truong_nam),
+      this.checkStatusEPSHeaderRating(
+        [tang_truong_quy, tang_truong_quy_truoc, tang_truong_quy_nganh],
+        tang_truong_quy,
+      ),
+      this.checkStatusEPSHeaderRating(
+        [tang_truong_nam, tang_truong_nam_truoc, tang_truong_nam_nganh],
+        tang_truong_nam,
+      ),
       this.checkStatusStarHeaderRating(chenh_lech.data[0].value),
       this.checkStatusStarHeaderRating(doanh_nghiep.totalStar),
       this.checkStatusCoDongLon(co_dong_lon, stock),
-      this.checkStatusStarHeaderRating(dinh_hinh.totalStar)
-    )
+      this.checkStatusStarHeaderRating(dinh_hinh.totalStar),
+    );
 
-    await this.redis.set(`${RedisKeys.canslimPrefilter}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    await this.redis.set(`${RedisKeys.canslimPrefilter}:${stock}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   private checkStatusEPSHeaderRating(arr: number[], indx: number) {
     const sort = arr.sort((a, b) => a - b);
-    const index = sort.findIndex(item => item == indx)
-    if (index == 2) return 'Đạt'
-    if (index == 1) return 'Bình thường'
-    if (index == 0) return 'Không đạt'
+    const index = sort.findIndex((item) => item == indx);
+    if (index == 2) return 'Đạt';
+    if (index == 1) return 'Bình thường';
+    if (index == 0) return 'Không đạt';
   }
 
   private checkStatusStarHeaderRating(num: number) {
-    if (num == 4 || num == 5) return 'Đạt'
-    if (num == 3) return 'Bình thường'
-    if (num == 0 || num == 1 || num == 2) return 'Không đạt'
+    if (num == 4 || num == 5) return 'Đạt';
+    if (num == 3) return 'Bình thường';
+    if (num == 0 || num == 1 || num == 2) return 'Không đạt';
   }
 
-  private checkStatusCoDongLon(arr: { code: string, value: number }[], stock: string) {
-    const length = arr.length
-    const indx = arr.findIndex(item => item.code == stock)
-    if (indx == -1) return 'Không đạt'
-    const per = (indx + 1) / length * 100
+  private checkStatusCoDongLon(
+    arr: { code: string; value: number }[],
+    stock: string,
+  ) {
+    const length = arr.length;
+    const indx = arr.findIndex((item) => item.code == stock);
+    if (indx == -1) return 'Không đạt';
+    const per = ((indx + 1) / length) * 100;
 
-    if (per > 66.66) return 'Không đạt'
-    if (per <= 66.66 && per > 33.33) return 'Bình thường'
-    return 'Đạt'
+    if (per > 66.66) return 'Không đạt';
+    if (per <= 66.66 && per > 33.33) return 'Bình thường';
+    return 'Đạt';
   }
 
   private getLevels(data) {
     // Tính giá trị s bằng lodash
     const highPrice = lodash.get(data, 'highPrice');
     const lowPrice = lodash.get(data, 'lowPrice');
-    const s = lodash.mean(lodash.map(lodash.zip(highPrice, lowPrice), ([high, low]) => (high - low) / 3));
+    const s = lodash.mean(
+      lodash.map(
+        lodash.zip(highPrice, lowPrice),
+        ([high, low]) => (high - low) / 3,
+      ),
+    );
 
     const isFarFromLevel = (l) => {
       return lodash.filter(levels, (x) => Math.abs(l - x[1]) < s).length === 0;
@@ -3635,38 +4427,85 @@ inner join tt t on t.code = s.code
       }
     }
 
-    const resistance_levels = lodash.filter(levels, (level) => level[2] === 'Kháng Cự');
-    const support_levels = lodash.filter(levels, (level) => level[2] === 'Hỗ Trợ');
+    const resistance_levels = lodash.filter(
+      levels,
+      (level) => level[2] === 'Kháng Cự',
+    );
+    const support_levels = lodash.filter(
+      levels,
+      (level) => level[2] === 'Hỗ Trợ',
+    );
 
     return [resistance_levels, support_levels];
   }
 
-  private checkStarTechniqueRating(ma5: number, ma10: number, ma20: number, ma50: number, ma100: number, ma200: number, ema5: number, ema10: number, ema20: number, ema50: number, ema100: number, ema200: number, rsi: number, williamR: number, macd: number, histogram: number, signal: number, adx: number, cci: number, stochRSI: number, dStoch: number, kStoch: number, price: number) {
-    let pointTech = 1, pointTrend = 1, starTech = 1, starTrend = 1
+  private checkStarTechniqueRating(
+    ma5: number,
+    ma10: number,
+    ma20: number,
+    ma50: number,
+    ma100: number,
+    ma200: number,
+    ema5: number,
+    ema10: number,
+    ema20: number,
+    ema50: number,
+    ema100: number,
+    ema200: number,
+    rsi: number,
+    williamR: number,
+    macd: number,
+    histogram: number,
+    signal: number,
+    adx: number,
+    cci: number,
+    stochRSI: number,
+    dStoch: number,
+    kStoch: number,
+    price: number,
+  ) {
+    let pointTech = 1,
+      pointTrend = 1,
+      starTech = 1,
+      starTrend = 1;
 
     //Điền kiện kĩ thuật
     const plusConditionTech = [
-      macd > (signal * 1.1), rsi < 30, kStoch < dStoch && kStoch > 80, stochRSI < 20, histogram > 0, adx > 25, williamR > -20, cci > 100
-    ]
+      macd > signal * 1.1,
+      rsi < 30,
+      kStoch < dStoch && kStoch > 80,
+      stochRSI < 20,
+      histogram > 0,
+      adx > 25,
+      williamR > -20,
+      cci > 100,
+    ];
     const subtractConditionTech = [
-      (macd * 1.1) < signal, rsi > 70, kStoch > dStoch && kStoch < 20, stochRSI > 80, histogram < 0, adx < 25, williamR < -80, cci < -100
-    ]
+      macd * 1.1 < signal,
+      rsi > 70,
+      kStoch > dStoch && kStoch < 20,
+      stochRSI > 80,
+      histogram < 0,
+      adx < 25,
+      williamR < -80,
+      cci < -100,
+    ];
 
     //Điều kiện xu hướng
     const plusConditionTrend = [
-      price > (ma5 * 1.05),
-      price > (ma10 * 1.05),
-      price > (ma20 * 1.05),
-      price > (ma50 * 1.05),
-      price > (ma100 * 1.05),
-      price > (ma200 * 1.05),
-      price > (ema5 * 1.05),
-      price > (ema10 * 1.05),
-      price > (ema20 * 1.05),
-      price > (ema50 * 1.05),
-      price > (ema100 * 1.05),
-      price > (ema200 * 1.05),
-    ]
+      price > ma5 * 1.05,
+      price > ma10 * 1.05,
+      price > ma20 * 1.05,
+      price > ma50 * 1.05,
+      price > ma100 * 1.05,
+      price > ma200 * 1.05,
+      price > ema5 * 1.05,
+      price > ema10 * 1.05,
+      price > ema20 * 1.05,
+      price > ema50 * 1.05,
+      price > ema100 * 1.05,
+      price > ema200 * 1.05,
+    ];
     const subtractConditionTrend = [
       price < ma5,
       price < ma10,
@@ -3680,108 +4519,170 @@ inner join tt t on t.code = s.code
       price < ema50,
       price < ema100,
       price < ema200,
-    ]
+    ];
 
     //Map qua các điều kiện tính số điểm
-    plusConditionTech.map(item => {
-      if (item)
-        pointTech++
-    })
-    subtractConditionTech.map(item => {
-      if (item) pointTech--
-    })
-    plusConditionTrend.map(item => {
-      if (item)
-        pointTrend++
-    })
-    subtractConditionTrend.map(item => {
-      if (item) pointTrend--
-    })
+    plusConditionTech.map((item) => {
+      if (item) pointTech++;
+    });
+    subtractConditionTech.map((item) => {
+      if (item) pointTech--;
+    });
+    plusConditionTrend.map((item) => {
+      if (item) pointTrend++;
+    });
+    subtractConditionTrend.map((item) => {
+      if (item) pointTrend--;
+    });
 
     //Tính điểm sao chỉ báo kĩ thuật
-    if (pointTech == 1 || pointTech == 2) starTech = 1
-    if (pointTech == 3 || pointTech == 4) starTech = 2
-    if (pointTech == 5) starTech = 3
-    if (pointTech == 6 || pointTech == 7) starTech = 4
-    if (pointTech == 8) starTech = 5
+    if (pointTech == 1 || pointTech == 2) starTech = 1;
+    if (pointTech == 3 || pointTech == 4) starTech = 2;
+    if (pointTech == 5) starTech = 3;
+    if (pointTech == 6 || pointTech == 7) starTech = 4;
+    if (pointTech == 8) starTech = 5;
 
     //Tính điểm sao xu hướng
-    if (pointTrend == 1 || pointTrend == 2) starTrend = 1
-    if (pointTrend == 3 || pointTrend == 4) starTrend = 2
-    if (pointTrend == 5 || pointTrend == 6 || pointTrend == 7) starTrend = 3
-    if (pointTrend == 8 || pointTrend == 9 || pointTrend == 10) starTrend = 4
-    if (pointTrend == 11 || pointTrend == 12) starTrend = 5
+    if (pointTrend == 1 || pointTrend == 2) starTrend = 1;
+    if (pointTrend == 3 || pointTrend == 4) starTrend = 2;
+    if (pointTrend == 5 || pointTrend == 6 || pointTrend == 7) starTrend = 3;
+    if (pointTrend == 8 || pointTrend == 9 || pointTrend == 10) starTrend = 4;
+    if (pointTrend == 11 || pointTrend == 12) starTrend = 5;
 
     return [
       { name: 'Chỉ báo kỹ thuật', value: starTech },
       { name: 'Xu hướng', value: starTrend },
-    ]
+    ];
   }
 
   private ema(closePrice: number[], period: number) {
-    const ema = new calTech.EMA({ period, values: closePrice }).result
-    return ema[ema.length - 1]
+    const ema = new calTech.EMA({ period, values: closePrice }).result;
+    return ema[ema.length - 1];
   }
 
   private rsi(closePrice: number[], period: number) {
-    const rsi = new calTech.RSI({ period, values: closePrice }).result
-    return rsi[rsi.length - 1]
+    const rsi = new calTech.RSI({ period, values: closePrice }).result;
+    return rsi[rsi.length - 1];
   }
 
-  private williamR(closePrice: number[], highPrice: number[], lowPrice: number[], period: number) {
-    const williamR = new calTech.WilliamsR({ close: closePrice, high: highPrice, low: lowPrice, period }).result
-    return williamR[williamR.length - 1]
+  private williamR(
+    closePrice: number[],
+    highPrice: number[],
+    lowPrice: number[],
+    period: number,
+  ) {
+    const williamR = new calTech.WilliamsR({
+      close: closePrice,
+      high: highPrice,
+      low: lowPrice,
+      period,
+    }).result;
+    return williamR[williamR.length - 1];
   }
 
   private macD(closePrice: number[]) {
-    const macD = new calTech.MACD({ values: closePrice, SimpleMAOscillator: false, SimpleMASignal: false, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9 }).result
-    return { macd: macD[macD.length - 1].MACD, histogram: macD[macD.length - 1].histogram, signal: macD[macD.length - 1].signal }
+    const macD = new calTech.MACD({
+      values: closePrice,
+      SimpleMAOscillator: false,
+      SimpleMASignal: false,
+      fastPeriod: 12,
+      slowPeriod: 26,
+      signalPeriod: 9,
+    }).result;
+    return {
+      macd: macD[macD.length - 1].MACD,
+      histogram: macD[macD.length - 1].histogram,
+      signal: macD[macD.length - 1].signal,
+    };
   }
 
-  private adx(closePrice: number[], highPrice: number[], lowPrice: number[], period: number) {
-    const adx = new calTech.ADX({ close: closePrice, high: highPrice, low: lowPrice, period }).result
-    return adx[adx.length - 1].adx
+  private adx(
+    closePrice: number[],
+    highPrice: number[],
+    lowPrice: number[],
+    period: number,
+  ) {
+    const adx = new calTech.ADX({
+      close: closePrice,
+      high: highPrice,
+      low: lowPrice,
+      period,
+    }).result;
+    return adx[adx.length - 1].adx;
   }
 
-  private cci(closePrice: number[], highPrice: number[], lowPrice: number[], period: number) {
-    const cci = new calTech.CCI({ close: closePrice, high: highPrice, low: lowPrice, period }).result
-    return cci[cci.length - 1]
+  private cci(
+    closePrice: number[],
+    highPrice: number[],
+    lowPrice: number[],
+    period: number,
+  ) {
+    const cci = new calTech.CCI({
+      close: closePrice,
+      high: highPrice,
+      low: lowPrice,
+      period,
+    }).result;
+    return cci[cci.length - 1];
   }
 
   private stochRSI(closePrice: number[]) {
-    const stochRSI = new calTech.StochasticRSI({ rsiPeriod: 14, kPeriod: 3, dPeriod: 3, values: closePrice, stochasticPeriod: 14 }).result
-    return stochRSI[stochRSI.length - 1].stochRSI
+    const stochRSI = new calTech.StochasticRSI({
+      rsiPeriod: 14,
+      kPeriod: 3,
+      dPeriod: 3,
+      values: closePrice,
+      stochasticPeriod: 14,
+    }).result;
+    return stochRSI[stochRSI.length - 1].stochRSI;
   }
 
-  private stoch(closePrice: number[], highPrice: number[], lowPrice: number[], period: number) {
-    const stoch = new calTech.Stochastic({ close: closePrice, high: highPrice, low: lowPrice, period: period, signalPeriod: 3 }).result
-    return { dStoch: stoch[stoch.length - 1].d, kStoch: stoch[stoch.length - 1].k }
+  private stoch(
+    closePrice: number[],
+    highPrice: number[],
+    lowPrice: number[],
+    period: number,
+  ) {
+    const stoch = new calTech.Stochastic({
+      close: closePrice,
+      high: highPrice,
+      low: lowPrice,
+      period: period,
+      signalPeriod: 3,
+    }).result;
+    return {
+      dStoch: stoch[stoch.length - 1].d,
+      kStoch: stoch[stoch.length - 1].k,
+    };
   }
 
   private ma(closePrice: number[], period: number) {
-    const ma = new calTech.SMA({ period, values: closePrice }).result
-    return ma[ma.length - 1]
+    const ma = new calTech.SMA({ period, values: closePrice }).result;
+    return ma[ma.length - 1];
   }
 
   private checkStarValuationRating(value: number) {
-    if (value > 20) return 5
-    if (value < 20 && value >= 10) return 4
-    if (value < 10 && value > -10) return 3
-    if (value <= -10 && value >= -20) return 2
-    if (value < -20) return 1
+    if (value > 20) return 5;
+    if (value < 20 && value >= 10) return 4;
+    if (value < 10 && value > -10) return 3;
+    if (value <= -10 && value >= -20) return 2;
+    if (value < -20) return 1;
   }
 
-  private checkStarBusinessRating(arr: [{ code: string, value: number }], stock: string) {
-    const length = arr.length
-    const indx = arr.findIndex(item => item.code == stock)
-    if (indx == -1) return 1
-    const per = indx / length * 100
+  private checkStarBusinessRating(
+    arr: [{ code: string; value: number }],
+    stock: string,
+  ) {
+    const length = arr.length;
+    const indx = arr.findIndex((item) => item.code == stock);
+    if (indx == -1) return 1;
+    const per = (indx / length) * 100;
 
-    if (per > 80) return 1
-    if (per <= 80 && per > 60) return 2
-    if (per <= 60 && per > 40) return 3
-    if (per <= 40 && per > 20) return 4
-    return 5
+    if (per > 80) return 1;
+    if (per <= 80 && per > 60) return 2;
+    if (per <= 60 && per > 40) return 3;
+    if (per <= 40 && per > 20) return 4;
+    return 5;
   }
 
   private checkStarBusinessRatingV2(value: number, type: number) {
@@ -3798,75 +4699,75 @@ inner join tt t on t.code = s.code
      */
     switch (type) {
       case 0:
-        if (value >= 100) return 5
-        if (50 <= value && value < 100) return 4
-        if (10 <= value && value < 50) return 3
-        if (1 <= value && value < 10) return 2
-        if (0 <= value && value < 1) return 1
-        return 0
+        if (value >= 100) return 5;
+        if (50 <= value && value < 100) return 4;
+        if (10 <= value && value < 50) return 3;
+        if (1 <= value && value < 10) return 2;
+        if (0 <= value && value < 1) return 1;
+        return 0;
         break;
       case 1:
-        if (value >= 0.001) return 5
-        if (0.0001 <= value && value < 0.001) return 4
-        if (0.00001 <= value && value < 0.0001) return 3
-        if (0 < value && value < 0.00001) return 2
-        if (value <= 0 || !value) return 0
-        return 1
-        break
+        if (value >= 0.001) return 5;
+        if (0.0001 <= value && value < 0.001) return 4;
+        if (0.00001 <= value && value < 0.0001) return 3;
+        if (0 < value && value < 0.00001) return 2;
+        if (value <= 0 || !value) return 0;
+        return 1;
+        break;
       case 2:
-        if (value >= 0.5) return 5
-        if (0.1 <= value && value < 0.5) return 4
-        if (0.01 <= value && value < 0.1) return 3
-        if (0.001 <= value && value < 0.01) return 2
-        if (0 < value && value < 0.001) return 1
-        return 0
-        break
+        if (value >= 0.5) return 5;
+        if (0.1 <= value && value < 0.5) return 4;
+        if (0.01 <= value && value < 0.1) return 3;
+        if (0.001 <= value && value < 0.01) return 2;
+        if (0 < value && value < 0.001) return 1;
+        return 0;
+        break;
       case 3:
-        if (value >= 0.5) return 5
-        if (0.1 <= value && value < 0.5) return 4
-        if (value == 0) return 2
-        if (value < 0) return 1
-        if (!value) return 0
-        return 3
-        break
+        if (value >= 0.5) return 5;
+        if (0.1 <= value && value < 0.5) return 4;
+        if (value == 0) return 2;
+        if (value < 0) return 1;
+        if (!value) return 0;
+        return 3;
+        break;
       case 4:
-        if (value >= 0.1) return 5
-        if (0.05 <= value && value < 0.1) return 4
-        if (0.03 <= value && value < 0.05) return 3
-        if (0 <= value && value < 0.03) return 2
-        return 1
+        if (value >= 0.1) return 5;
+        if (0.05 <= value && value < 0.1) return 4;
+        if (0.03 <= value && value < 0.05) return 3;
+        if (0 <= value && value < 0.03) return 2;
+        return 1;
         break;
       case 5:
-        if (value >= 10000000000000) return 5
-        if (1000000000000 <= value && value < 10000000000000) return 4
-        if (100000000000 <= value && value < 1000000000000) return 3
-        if (10000000000 <= value && value < 100000000000) return 2
-        if (!value || value <= 0) return 0
-        return 1
+        if (value >= 10000000000000) return 5;
+        if (1000000000000 <= value && value < 10000000000000) return 4;
+        if (100000000000 <= value && value < 1000000000000) return 3;
+        if (10000000000 <= value && value < 100000000000) return 2;
+        if (!value || value <= 0) return 0;
+        return 1;
         break;
       case 6:
-        if (value >= 1) return 5
-        if (0.1 < value && value < 1) return 4
-        if (0.01 < value && value <= 0.1) return 3
-        if (0.001 < value && value <= 0.01) return 2
-        if (0 < value && value <= 0.001) return 1
-        return 0
+        if (value >= 1) return 5;
+        if (0.1 < value && value < 1) return 4;
+        if (0.01 < value && value <= 0.1) return 3;
+        if (0.001 < value && value <= 0.01) return 2;
+        if (0 < value && value <= 0.001) return 1;
+        return 0;
         break;
       case 7:
-        if (value > 100) return 5
-        if (10 < value && value <= 100) return 4
-        if (0 < value && value <= 10) return 3
-        if (value == 0) return 2
-        if (value < 0) return 1
-        return 0
+        if (value > 100) return 5;
+        if (10 < value && value <= 100) return 4;
+        if (0 < value && value <= 10) return 3;
+        if (value == 0) return 2;
+        if (value < 0) return 1;
+        return 0;
         break;
       case 8:
-        if (value >= 0.5) return 5
-        if (0.2 <= value && value < 0.5) return 4
-        if (0.1 <= value && value < 0.2) return 3
-        if (0 <= value && value < 0.1) return 2
-        if (value < 0) return 1
-        return 0
+        if (value >= 0.5) return 5;
+        if (0.2 <= value && value < 0.5) return 4;
+        if (0.1 <= value && value < 0.2) return 3;
+        if (0 <= value && value < 0.1) return 2;
+        if (value < 0) return 1;
+        return 0;
         break;
       default:
         break;
@@ -3884,14 +4785,14 @@ inner join tt t on t.code = s.code
       }
     }
 
-    if (consecutiveCount == 4) return 5
-    if (consecutiveCount == 3) return 4
-    if (consecutiveCount == 2) return 3
-    if (consecutiveCount == 3) return 2
-    if (consecutiveCount == 1) return 1
+    if (consecutiveCount == 4) return 5;
+    if (consecutiveCount == 3) return 4;
+    if (consecutiveCount == 2) return 3;
+    if (consecutiveCount == 3) return 2;
+    if (consecutiveCount == 1) return 1;
   }
 
-  private checkYearConsecutiveAll(arr: { year: string, ticker: string }[]) {
+  private checkYearConsecutiveAll(arr: { year: string; ticker: string }[]) {
     const consecutiveYears = {};
     for (let i = 0; i < arr.length - 1; i++) {
       const currentStock = arr[i];
@@ -3904,10 +4805,10 @@ inner join tt t on t.code = s.code
       }
     }
     for (const item of Object.keys(consecutiveYears)) {
-      const start = this.checkYearConsecutive(consecutiveYears[item])
-      consecutiveYears[item] = start
-    };
-    return consecutiveYears
+      const start = this.checkYearConsecutive(consecutiveYears[item]);
+      consecutiveYears[item] = start;
+    }
+    return consecutiveYears;
   }
 
   private checkMostStar(obj: any) {
@@ -3934,46 +4835,46 @@ inner join tt t on t.code = s.code
         }
       }
     }
-    return mostFrequentStar
+    return mostFrequentStar;
   }
 
   private checkStarFinancialHealthRating(obj: any) {
     const data = Object.entries(obj).reduce((result: any, [key, value]) => {
       if (key.includes('All')) {
-        if (!result?.all) result.all = {}
-        result.all[key.replace('All', '')] = value
-        return result
+        if (!result?.all) result.all = {};
+        result.all[key.replace('All', '')] = value;
+        return result;
       }
       if (key.includes('Industry')) {
-        if (!result?.industry) result.industry = {}
-        result.industry[key.replace('Industry', '')] = value
-        return result
+        if (!result?.industry) result.industry = {};
+        result.industry[key.replace('Industry', '')] = value;
+        return result;
       }
       if (key.includes('4Quarter')) {
-        if (!result?.quarter) result.quarter = {}
-        result.quarter[key.replace('4Quarter', '')] = value
-        return result
+        if (!result?.quarter) result.quarter = {};
+        result.quarter[key.replace('4Quarter', '')] = value;
+        return result;
       }
       if (key.includes('Prev')) {
-        if (!result?.prev) result.prev = {}
-        result.prev[key.replace('Prev', '')] = value
-        return result
+        if (!result?.prev) result.prev = {};
+        result.prev[key.replace('Prev', '')] = value;
+        return result;
       }
       if (key.includes('4Quy')) {
-        if (!result?.ttt4quy) result.ttt4quy = {}
-        result.ttt4quy[key.replace('4Quy', '')] = value
-        return result
+        if (!result?.ttt4quy) result.ttt4quy = {};
+        result.ttt4quy[key.replace('4Quy', '')] = value;
+        return result;
       }
-      if (!result?.stock) result.stock = {}
-      result.stock[key] = value
-      return result
+      if (!result?.stock) result.stock = {};
+      result.stock[key] = value;
+      return result;
     }, {});
 
     const properties = Object.keys(data.all);
 
-    let star = {}
-    let starIndustry = {}
-    let starAll = {}
+    let star = {};
+    let starIndustry = {};
+    let starAll = {};
 
     for (let property of properties) {
       const stockValue = data.stock && data.stock[property];
@@ -3984,75 +4885,85 @@ inner join tt t on t.code = s.code
       const prevValue = data.prev && data.prev[property];
       //Cổ phiếu
       if (stockValue > industryValue && industryValue > allValue) {
-        star[property] = 5
-      }
-      else if (stockValue > allValue && allValue > industryValue) {
-        star[property] = 4
-      }
-      else if (industryValue > stockValue && stockValue > allValue) {
-        star[property] = 3
-      }
-      else if (allValue > stockValue && stockValue > industryValue) {
-        star[property] = 2
-      }
-      else {
-        star[property] = 1
+        star[property] = 5;
+      } else if (stockValue > allValue && allValue > industryValue) {
+        star[property] = 4;
+      } else if (industryValue > stockValue && stockValue > allValue) {
+        star[property] = 3;
+      } else if (allValue > stockValue && stockValue > industryValue) {
+        star[property] = 2;
+      } else {
+        star[property] = 1;
       }
       //Ngành
       if (industryValue > quarterValue && quarterValue > allValue) {
-        starIndustry[property] = 5
-      }
-      else if (industryValue > allValue && allValue > quarterValue) {
-        starIndustry[property] = 4
-      }
-      else if (quarterValue > industryValue && industryValue > allValue) {
-        starIndustry[property] = 3
-      }
-      else if (allValue > industryValue && industryValue > quarterValue) {
-        starIndustry[property] = 2
-      }
-      else {
-        starIndustry[property] = 1
+        starIndustry[property] = 5;
+      } else if (industryValue > allValue && allValue > quarterValue) {
+        starIndustry[property] = 4;
+      } else if (quarterValue > industryValue && industryValue > allValue) {
+        starIndustry[property] = 3;
+      } else if (allValue > industryValue && industryValue > quarterValue) {
+        starIndustry[property] = 2;
+      } else {
+        starIndustry[property] = 1;
       }
       //Thị trường
       if (allValue > prevValue && prevValue > quarterAllValue) {
-        starAll[property] = 5
-      }
-      else if (allValue > quarterAllValue && quarterValue > prevValue) {
-        starAll[property] = 4
-      }
-      else if (prevValue > allValue && allValue > quarterAllValue) {
-        starAll[property] = 3
-      }
-      else if (quarterAllValue > allValue && allValue > prevValue) {
-        starAll[property] = 2
-      }
-      else {
-        starAll[property] = 1
+        starAll[property] = 5;
+      } else if (allValue > quarterAllValue && quarterValue > prevValue) {
+        starAll[property] = 4;
+      } else if (prevValue > allValue && allValue > quarterAllValue) {
+        starAll[property] = 3;
+      } else if (quarterAllValue > allValue && allValue > prevValue) {
+        starAll[property] = 2;
+      } else {
+        starAll[property] = 1;
       }
     }
 
-    return { star, starIndustry, starAll }
+    return { star, starIndustry, starAll };
   }
 
   private genStarValuation(data: any[]) {
-    let tong = 0, index_graham = 0
+    let tong = 0,
+      index_graham = 0;
     const map = Object.keys(data[0]).reduce((acc, current) => {
-      const index = acc.findIndex(item => item.name == 'graham')
+      const index = acc.findIndex((item) => item.name == 'graham');
 
       if (current.includes('graham') && index == -1) {
-        tong += this.checkStarValuationRating(data[0][current])
-        return [...acc, { name: 'graham', value: 0, child: [{ name: 'Định giá Graham ' + current.split('_')[1], value: this.checkStarValuationRating(data[0][current]) }] }]
+        tong += this.checkStarValuationRating(data[0][current]);
+        return [
+          ...acc,
+          {
+            name: 'graham',
+            value: 0,
+            child: [
+              {
+                name: 'Định giá Graham ' + current.split('_')[1],
+                value: this.checkStarValuationRating(data[0][current]),
+              },
+            ],
+          },
+        ];
       }
       if (current.includes('graham') && index != -1) {
-        index_graham = index
-        tong += this.checkStarValuationRating(data[0][current])
-        acc[index].child.push({ name: 'Định giá Graham ' + current.split('_')[1], value: this.checkStarValuationRating(data[0][current]) })
-        return acc
+        index_graham = index;
+        tong += this.checkStarValuationRating(data[0][current]);
+        acc[index].child.push({
+          name: 'Định giá Graham ' + current.split('_')[1],
+          value: this.checkStarValuationRating(data[0][current]),
+        });
+        return acc;
       }
-      return [...acc, { name: current, value: this.checkStarValuationRating(data[0][current]) }]
-    }, [])
-    map[index_graham].value = UtilCommonTemplate.checkStarCommon(tong, 3)
-    return map
+      return [
+        ...acc,
+        {
+          name: current,
+          value: this.checkStarValuationRating(data[0][current]),
+        },
+      ];
+    }, []);
+    map[index_graham].value = UtilCommonTemplate.checkStarCommon(tong, 3);
+    return map;
   }
 }

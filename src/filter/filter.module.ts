@@ -5,6 +5,6 @@ import { MssqlService } from '../mssql/mssql.service';
 
 @Module({
   controllers: [FilterController],
-  providers: [FilterService, MssqlService]
+  providers: [FilterService, MssqlService],
 })
 export class FilterModule {}

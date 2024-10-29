@@ -13,7 +13,7 @@ import { ISIndsProfitMargins } from './interfaces/inds-profit-margin.interface';
 import { IPayoutRatio } from './interfaces/payout-ratio.interface';
 import {
   IPEIndustry,
-  ISPEPBIndustry
+  ISPEPBIndustry,
 } from './interfaces/pe-pb-industry-interface';
 import { ISRotationRatio } from './interfaces/rotation-ratio.interface';
 import { MarketService } from './market.service';
@@ -39,24 +39,37 @@ export class FinanceHealthService {
     private readonly marketService: MarketService,
   ) {}
 
-  async PBIndustry(ex: string, type: number, order: number, industries: string) {
+  async PBIndustry(
+    ex: string,
+    type: number,
+    order: number,
+    industries: string,
+  ) {
     const floor = ex == 'ALL' ? ` ('ALL') ` : ` ('${ex}') `;
-    const inds: string = industries ? UtilCommonTemplate.getIndustryFilter(industries.split(',')) : '';
+    const inds: string = industries
+      ? UtilCommonTemplate.getIndustryFilter(industries.split(','))
+      : '';
 
     const redisData = await this.redis.get(
       `${RedisKeys.PEPBIndustry}:${floor}:${order}:${type}:${inds}`,
     );
     if (redisData) return redisData;
-    
-    const query_date: any[] = (await this.mssqlService.query(`select distinct top ${type} yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) ${order == 0 ? '<>' : '='} 0 and type = 'INDUSTRY' order by yearQuarter desc`))
-      
+
+    const query_date: any[] = await this.mssqlService.query(
+      `select distinct top ${type} yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) ${
+        order == 0 ? '<>' : '='
+      } 0 and type = 'INDUSTRY' order by yearQuarter desc`,
+    );
+
     const query = `
       select code as industry, yearQuarter as date, PB, PE from RATIO.dbo.ratioInYearQuarter
       where floor IN ${floor}
       and type = 'INDUSTRY'
-      and yearQuarter IN ${`(${query_date.map(item => `'${item.date}'`).join(', ')})`}
-    `
-    
+      and yearQuarter IN ${`(${query_date
+        .map((item) => `'${item.date}'`)
+        .join(', ')})`}
+    `;
+
     const data = await this.mssqlService.query<ISPEPBIndustry[]>(query);
 
     const mappedData = new PEPBIndustryResponse().mapToList(data);
@@ -77,14 +90,20 @@ export class FinanceHealthService {
     );
     if (redisData) return redisData;
 
-    const query_date: any[] = (await this.mssqlService.query(`select distinct top ${type} yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) ${order == 0 ? '<>' : '='} 0 and type = 'INDUSTRY' order by yearQuarter desc`))
-      
+    const query_date: any[] = await this.mssqlService.query(
+      `select distinct top ${type} yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) ${
+        order == 0 ? '<>' : '='
+      } 0 and type = 'INDUSTRY' order by yearQuarter desc`,
+    );
+
     const query = `
       select code as industry, yearQuarter as date, PB, PE from RATIO.dbo.ratioInYearQuarter
       where floor IN ${floor}
       and type = 'INDUSTRY'
-      and yearQuarter IN ${`(${query_date.map(item => `'${item.date}'`).join(', ')})`}
-    `
+      and yearQuarter IN ${`(${query_date
+        .map((item) => `'${item.date}'`)
+        .join(', ')})`}
+    `;
 
     const data = await this.mssqlService.query<IPEIndustry[]>(query);
 
@@ -108,11 +127,25 @@ export class FinanceHealthService {
     );
     if (redisData) return redisData;
 
-    const start_date = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND order by date desc`))[0].date
-    const end_date = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(start_date).subtract(1, 'year').format('YYYY-MM-DD')}' order by date asc`))[0].date
-    const lastYearQuarterRatio = (await this.mssqlService.query(
-      `select top 1 yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 order by yearQuarter desc`,
-    ))[0].date;
+    const start_date = (
+      await this.mssqlService.query(
+        `select top 1 date from marketTrade.dbo.tickerTradeVND order by date desc`,
+      )
+    )[0].date;
+    const end_date = (
+      await this.mssqlService.query(
+        `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+          start_date,
+        )
+          .subtract(1, 'year')
+          .format('YYYY-MM-DD')}' order by date asc`,
+      )
+    )[0].date;
+    const lastYearQuarterRatio = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 order by yearQuarter desc`,
+      )
+    )[0].date;
 
     const query: string = `
     WITH temp
@@ -133,7 +166,9 @@ export class FinanceHealthService {
     AND i.type IN ('STOCK', 'ETF')
     AND i.status = 'listed'
     AND i.LV2 IN ${inds}
-    AND date IN ('${moment(start_date).format('YYYY-MM-DD')}', '${moment(end_date).format('YYYY-MM-DD')}')
+    AND date IN ('${moment(start_date).format('YYYY-MM-DD')}', '${moment(
+      end_date,
+    ).format('YYYY-MM-DD')}')
     ),
     codeData
     AS (SELECT
@@ -189,12 +224,26 @@ export class FinanceHealthService {
     );
     if (redisData) return redisData;
 
-    const start_date = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND order by date desc`))[0].date
-    const end_date = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(start_date).subtract(1, 'year').format('YYYY-MM-DD')}' order by date asc`))[0].date
+    const start_date = (
+      await this.mssqlService.query(
+        `select top 1 date from marketTrade.dbo.tickerTradeVND order by date desc`,
+      )
+    )[0].date;
+    const end_date = (
+      await this.mssqlService.query(
+        `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
+          start_date,
+        )
+          .subtract(1, 'year')
+          .format('YYYY-MM-DD')}' order by date asc`,
+      )
+    )[0].date;
 
-    const lastYearQuarterRatio = (await this.mssqlService.query(
-      `select top 1 yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 order by yearQuarter desc`,
-    ))[0].date;
+    const lastYearQuarterRatio = (
+      await this.mssqlService.query(
+        `select top 1 yearQuarter as date from RATIO.dbo.ratioInYearQuarter where right(yearQuarter, 1) <> 0 order by yearQuarter desc`,
+      )
+    )[0].date;
 
     const query: string = `
     WITH temp
@@ -215,7 +264,9 @@ export class FinanceHealthService {
     AND i.type IN ('STOCK', 'ETF')
     AND i.status = 'listed'
     AND i.LV2 IN ${inds}
-    AND date IN ('${moment(start_date).format('YYYY-MM-DD')}', '${moment(end_date).format('YYYY-MM-DD')}')
+    AND date IN ('${moment(start_date).format('YYYY-MM-DD')}', '${moment(
+      end_date,
+    ).format('YYYY-MM-DD')}')
     ),
     codeData
     AS (SELECT
@@ -249,7 +300,7 @@ export class FinanceHealthService {
     INNER JOIN epsChangeNow e
       ON e.code = c.code
     ORDER BY 2 DESC
-    `
+    `;
 
     const data = await this.mssqlService.query<any[]>(query);
 
@@ -326,9 +377,17 @@ export class FinanceHealthService {
     if (redisData) return redisData;
 
     //Lấy ngày gần nhất trong db
-    const lastDate = (await this.mssqlService.query(`select top 1 year from financialReport.dbo.financialReport where reportName in (N'Tiền và tương đương tiền', N'Nợ ngắn hạn') order by year desc`))[0]?.year
-    
-    const date = UtilCommonTemplate.getYearQuarters(2, order, moment(lastDate, 'YYYYQ').add(1, 'quarter').endOf('quarter').toDate());
+    const lastDate = (
+      await this.mssqlService.query(
+        `select top 1 year from financialReport.dbo.financialReport where reportName in (N'Tiền và tương đương tiền', N'Nợ ngắn hạn') order by year desc`,
+      )
+    )[0]?.year;
+
+    const date = UtilCommonTemplate.getYearQuarters(
+      2,
+      order,
+      moment(lastDate, 'YYYYQ').add(1, 'quarter').endOf('quarter').toDate(),
+    );
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
     const query: string = `
@@ -380,9 +439,17 @@ export class FinanceHealthService {
     if (redisData) return redisData;
 
     //Lấy ngày gần nhất trong db
-    const lastDate = (await this.mssqlService.query(`select top 1 year from financialReport.dbo.financialReport where reportName in (N'Doanh số thuần', N'Thu nhập lãi thuần') order by year desc`))[0]?.year
-    
-    const date = UtilCommonTemplate.getYearQuarters(2, order, moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate());
+    const lastDate = (
+      await this.mssqlService.query(
+        `select top 1 year from financialReport.dbo.financialReport where reportName in (N'Doanh số thuần', N'Thu nhập lãi thuần') order by year desc`,
+      )
+    )[0]?.year;
+
+    const date = UtilCommonTemplate.getYearQuarters(
+      2,
+      order,
+      moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate(),
+    );
 
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
@@ -465,7 +532,9 @@ export class FinanceHealthService {
 
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
-    const lastDate = await this.mssqlService.query(`select top 1 year from financialReport.dbo.financialReport order by year desc`)
+    const lastDate = await this.mssqlService.query(
+      `select top 1 year from financialReport.dbo.financialReport order by year desc`,
+    );
 
     const query: string = `
       with valueData as (select [code],
@@ -481,7 +550,9 @@ export class FinanceHealthService {
                                 N'TỔNG TÀI SẢN', N'TỔNG CỘNG TÀI SẢN',
                                 N'VỐN CHỦ SỞ HỮU'
                                   )
-                          and year in ${order == 0 ? `('${lastDate[0].year}')` : dateFilter}),
+                          and year in ${
+                            order == 0 ? `('${lastDate[0].year}')` : dateFilter
+                          }),
           canculatedData as (select industry,
                                     year,
                                     case industry
@@ -534,7 +605,7 @@ export class FinanceHealthService {
       group by industry, year
       order by year, industry
     `;
-    
+
     const data = await this.mssqlService.query<ISIndsDebtSolvency[]>(query);
 
     const mappedData = new DebtSolvencyResponse().mapToList(data);
@@ -629,8 +700,10 @@ export class FinanceHealthService {
   }
 
   async indsInterestCoverage(ex: string, type: number, order: number) {
-    const redisData = await this.redis.get(`${RedisKeys.IndsInterestCoverage}:${ex}:${order}:${type}`)
-    if(redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.IndsInterestCoverage}:${ex}:${order}:${type}`,
+    );
+    if (redisData) return redisData;
 
     const date = UtilCommonTemplate.getYearQuarters(type, order);
 
@@ -646,17 +719,25 @@ export class FinanceHealthService {
           WHERE floor = '${ex}'
           and date IN ${dateFilter}
         `;
-        
-    const data = await this.mssqlService.query<IndusInterestCoverageResponse[]>(query);
 
-    const dataMapped = IndusInterestCoverageResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.IndsInterestCoverage}:${ex}:${order}:${type}`, dataMapped, {ttl: TimeToLive.OneWeek})
+    const data = await this.mssqlService.query<IndusInterestCoverageResponse[]>(
+      query,
+    );
+
+    const dataMapped = IndusInterestCoverageResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.IndsInterestCoverage}:${ex}:${order}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
     return dataMapped;
   }
 
-  async interestRatesOnLoans(ex: string, type: number, order: number){
-    const redisData = await this.redis.get(`${RedisKeys.interestRatesOnLoans}:${ex}:${order}:${type}`)
-    if(redisData) return redisData
+  async interestRatesOnLoans(ex: string, type: number, order: number) {
+    const redisData = await this.redis.get(
+      `${RedisKeys.interestRatesOnLoans}:${ex}:${order}:${type}`,
+    );
+    if (redisData) return redisData;
 
     const date = UtilCommonTemplate.getYearQuarters(type, order);
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
@@ -671,21 +752,37 @@ export class FinanceHealthService {
           WHERE floor = '${ex}'
           and date IN ${dateFilter}
         `;
-        
-    const data = await this.mssqlService.query<InterestRatesOnLoansResponse[]>(query);
 
-    const dataMapped = InterestRatesOnLoansResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.interestRatesOnLoans}:${ex}:${order}:${type}`, dataMapped, {ttl: TimeToLive.OneWeek})
+    const data = await this.mssqlService.query<InterestRatesOnLoansResponse[]>(
+      query,
+    );
+
+    const dataMapped = InterestRatesOnLoansResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.interestRatesOnLoans}:${ex}:${order}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
     return dataMapped;
   }
 
-  async indsProfitMarginsTable(ex: string, order: number){
-    const redisData = await this.redis.get(`${RedisKeys.indsProfitMarginsTable}:${ex}:${order}`)
+  async indsProfitMarginsTable(ex: string, order: number) {
+    const redisData = await this.redis.get(
+      `${RedisKeys.indsProfitMarginsTable}:${ex}:${order}`,
+    );
     // if(redisData) return redisData
 
-    const lastDate = (await this.mssqlService.query(`select top 1 date from VISUALIZED_DATA.dbo.pb_nganh order by date desc`))[0].date
+    const lastDate = (
+      await this.mssqlService.query(
+        `select top 1 date from VISUALIZED_DATA.dbo.pb_nganh order by date desc`,
+      )
+    )[0].date;
 
-    const date = UtilCommonTemplate.getYearQuarters(1, order, moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate());
+    const date = UtilCommonTemplate.getYearQuarters(
+      1,
+      order,
+      moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate(),
+    );
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
     const query = `
@@ -701,21 +798,37 @@ export class FinanceHealthService {
           WHERE floor = '${ex}'
           and date IN ${dateFilter}
         `;
-        
-    const data = await this.mssqlService.query<IndsProfitMarginsTableResponse[]>(query);
 
-    const dataMapped = IndsProfitMarginsTableResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.indsProfitMarginsTable}:${ex}:${order}`, dataMapped, {ttl: TimeToLive.OneWeek})
+    const data = await this.mssqlService.query<
+      IndsProfitMarginsTableResponse[]
+    >(query);
+
+    const dataMapped = IndsProfitMarginsTableResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.indsProfitMarginsTable}:${ex}:${order}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
     return dataMapped;
   }
 
-  async netProfitMarginByIndustries(ex: string, type: number, order: number){
-    const redisData = await this.redis.get(`${RedisKeys.netProfitMarginByIndustries}:${ex}:${order}:${type}`)
-    if(redisData) return redisData
+  async netProfitMarginByIndustries(ex: string, type: number, order: number) {
+    const redisData = await this.redis.get(
+      `${RedisKeys.netProfitMarginByIndustries}:${ex}:${order}:${type}`,
+    );
+    if (redisData) return redisData;
 
-    const lastDate = (await this.mssqlService.query(`select top 1 date from VISUALIZED_DATA.dbo.pb_nganh order by date desc`))[0].date
+    const lastDate = (
+      await this.mssqlService.query(
+        `select top 1 date from VISUALIZED_DATA.dbo.pb_nganh order by date desc`,
+      )
+    )[0].date;
 
-    const date = UtilCommonTemplate.getYearQuarters(type, order, moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate());
+    const date = UtilCommonTemplate.getYearQuarters(
+      type,
+      order,
+      moment(lastDate, 'YYYYQ').add(1, 'quarter').startOf('quarter').toDate(),
+    );
     const { dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
     const query = `
@@ -728,11 +841,17 @@ export class FinanceHealthService {
           WHERE floor = '${ex}'
           and date IN ${dateFilter}
         `;
-        
-    const data = await this.mssqlService.query<InterestRatesOnLoansResponse[]>(query);
 
-    const dataMapped = InterestRatesOnLoansResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.netProfitMarginByIndustries}:${ex}:${order}:${type}`, dataMapped, {ttl: TimeToLive.OneWeek})
+    const data = await this.mssqlService.query<InterestRatesOnLoansResponse[]>(
+      query,
+    );
+
+    const dataMapped = InterestRatesOnLoansResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.netProfitMarginByIndustries}:${ex}:${order}:${type}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
     return dataMapped;
   }
 }

@@ -31,7 +31,7 @@ import { StockService } from './stock.service';
 @Controller('stock')
 @ApiTags('Stock - Api')
 export class StockController {
-  constructor(private readonly stockService: StockService) { }
+  constructor(private readonly stockService: StockService) {}
 
   @Get('market-volatility')
   @ApiOperation({ summary: 'Danh sách biến động thị trường' })

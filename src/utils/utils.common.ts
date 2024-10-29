@@ -244,7 +244,11 @@ export class UtilCommonTemplate {
     };
   }
 
-  static getPreviousMonth(date: Date = new Date(), order: number, type: number = 0) {
+  static getPreviousMonth(
+    date: Date = new Date(),
+    order: number,
+    type: number = 0,
+  ) {
     const currentMonth = date.getMonth();
     const currentYear = date.getFullYear();
 
@@ -253,7 +257,11 @@ export class UtilCommonTemplate {
     const previousThreeMonths = [];
 
     for (let i = 0; i < order; i++) {
-      type == 0 ? previousThreeMonths.push(moment(threeMonthsAgo).format('YYYY-MM-01')) : previousThreeMonths.push(moment(threeMonthsAgo).endOf('month').format('YYYY-MM-DD'))
+      type == 0
+        ? previousThreeMonths.push(moment(threeMonthsAgo).format('YYYY-MM-01'))
+        : previousThreeMonths.push(
+            moment(threeMonthsAgo).endOf('month').format('YYYY-MM-DD'),
+          );
 
       threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() + 1);
     }
@@ -470,7 +478,6 @@ export class UtilCommonTemplate {
     let currentYear = currentDate.getFullYear(); // Năm hiện tại
     let quarters = [];
 
-
     if (currentMonth == 1 || currentMonth == 2) {
       quarters.push({ quarter: 3, year: currentYear - 1 });
       quarters.push({ quarter: 4, year: currentYear - 1 });
@@ -491,11 +498,16 @@ export class UtilCommonTemplate {
       let startMonth = (quarter.quarter - 1) * 3 + 1;
       let endMonth = quarter.quarter * 3;
       for (let month = startMonth; month <= endMonth; month++) {
-        let monthStr = moment(month + "/" + quarter.year, 'MM/YYYY').format('YYYY/MM/01');
+        let monthStr = moment(month + '/' + quarter.year, 'MM/YYYY').format(
+          'YYYY/MM/01',
+        );
         months.push(monthStr);
       }
     });
-    return { months, quarters: quarters.map(item => `${item.year}${item.quarter}`) };
+    return {
+      months,
+      quarters: quarters.map((item) => `${item.year}${item.quarter}`),
+    };
   }
 
   static normalizedString(value: string) {
@@ -506,94 +518,96 @@ export class UtilCommonTemplate {
       .replace(/ + /g, ' ')
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
+      .replace(/Đ/g, 'D');
     // .replace(/\s/g, '');
   }
 
   static removeVietnameseString(value: string) {
-    return value
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
 
   static checkStarCommon(sum_point: number, quantity: number) {
     switch (quantity) {
       case 4:
-        if (sum_point >= 18) return 5
-        if (sum_point >= 15 && sum_point <= 17) return 4
-        if (sum_point >= 12 && sum_point <= 14) return 3
-        if (sum_point >= 8 && sum_point <= 11) return 2
-        return 1
+        if (sum_point >= 18) return 5;
+        if (sum_point >= 15 && sum_point <= 17) return 4;
+        if (sum_point >= 12 && sum_point <= 14) return 3;
+        if (sum_point >= 8 && sum_point <= 11) return 2;
+        return 1;
       case 3:
-        if (sum_point >= 14) return 5
-        if (sum_point >= 11 && sum_point <= 13) return 4
-        if (sum_point >= 7 && sum_point <= 10) return 3
-        if (sum_point >= 4 && sum_point <= 6) return 2
-        return 1
+        if (sum_point >= 14) return 5;
+        if (sum_point >= 11 && sum_point <= 13) return 4;
+        if (sum_point >= 7 && sum_point <= 10) return 3;
+        if (sum_point >= 4 && sum_point <= 6) return 2;
+        return 1;
       case 2:
-        if (sum_point >= 9) return 5
-        if (sum_point >= 7 && sum_point <= 8) return 4
-        if (sum_point >= 5 && sum_point <= 6) return 3
-        if (sum_point >= 3 && sum_point <= 4) return 2
-        return 1
+        if (sum_point >= 9) return 5;
+        if (sum_point >= 7 && sum_point <= 8) return 4;
+        if (sum_point >= 5 && sum_point <= 6) return 3;
+        if (sum_point >= 3 && sum_point <= 4) return 2;
+        return 1;
       default:
         break;
     }
-
   }
-  
+
   static checkStarCommonV2(sum_point: number, quantity: number) {
     switch (quantity) {
       case 4:
-        if (sum_point >= 18) return 5
-        if (sum_point >= 15 && sum_point <= 17) return 4
-        if (sum_point >= 12 && sum_point <= 14) return 3
-        if (sum_point >= 8 && sum_point <= 11) return 2
-        if (sum_point >= 4 && sum_point <= 7) return 1
-        return 0
+        if (sum_point >= 18) return 5;
+        if (sum_point >= 15 && sum_point <= 17) return 4;
+        if (sum_point >= 12 && sum_point <= 14) return 3;
+        if (sum_point >= 8 && sum_point <= 11) return 2;
+        if (sum_point >= 4 && sum_point <= 7) return 1;
+        return 0;
       case 2:
-        if (sum_point >= 9) return 5
-        if (sum_point >= 7 && sum_point <= 8) return 4
-        if (sum_point >= 5 && sum_point <= 6) return 3
-        if (sum_point >= 3 && sum_point <= 4) return 2
-        if (sum_point >= 1 && sum_point <= 2) return 1
-        return 0
+        if (sum_point >= 9) return 5;
+        if (sum_point >= 7 && sum_point <= 8) return 4;
+        if (sum_point >= 5 && sum_point <= 6) return 3;
+        if (sum_point >= 3 && sum_point <= 4) return 2;
+        if (sum_point >= 1 && sum_point <= 2) return 1;
+        return 0;
       default:
         break;
     }
-
   }
 
-  static changeDateUTC(time: string, is_date?: number){
-    return !is_date ? Date.UTC(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      new Date().getDate(),
-      moment(time, 'HH:mm:ss').hour(),
-      moment(time, 'HH:mm:ss').minute(),
-    ).valueOf() : Date.UTC(
-      new Date(time).getFullYear(),
-      new Date(time).getMonth(),
-      new Date(time).getDate(),
-      moment(time, 'HH:mm:ss').hour(),
-      moment(time, 'HH:mm:ss').minute(),
-    ).valueOf()
+  static changeDateUTC(time: string, is_date?: number) {
+    return !is_date
+      ? Date.UTC(
+          new Date().getFullYear(),
+          new Date().getMonth(),
+          new Date().getDate(),
+          moment(time, 'HH:mm:ss').hour(),
+          moment(time, 'HH:mm:ss').minute(),
+        ).valueOf()
+      : Date.UTC(
+          new Date(time).getFullYear(),
+          new Date(time).getMonth(),
+          new Date(time).getDate(),
+          moment(time, 'HH:mm:ss').hour(),
+          moment(time, 'HH:mm:ss').minute(),
+        ).valueOf();
   }
 
   static checkSameDate(arr: string[]) {
-    let same_day_index = 0
+    let same_day_index = 0;
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
         if (arr[i] == arr[j]) {
-          same_day_index = j
-          break
+          same_day_index = j;
+          break;
         }
       }
     }
-    if(same_day_index != 0) arr.splice(same_day_index, 1)
-    return arr
+    if (same_day_index != 0) arr.splice(same_day_index, 1);
+    return arr;
   }
 
   static generateSortCase(items: string, column: string) {
-    return `CASE ${items.split(',').map((item, index) => `WHEN ${column} = ${item.trim()} THEN ${index}`).join(' ')} END AS row_num`
+    return `CASE ${items
+      .split(',')
+      .map((item, index) => `WHEN ${column} = ${item.trim()} THEN ${index}`)
+      .join(' ')} END AS row_num`;
   }
 }

@@ -1,5 +1,5 @@
-import {ApiProperty, PartialType} from '@nestjs/swagger';
-import {BaseResponse} from '../../utils/utils.response';
+import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { BaseResponse } from '../../utils/utils.response';
 
 export class MarketVolatilityResponse {
   @ApiProperty({
@@ -49,7 +49,7 @@ export class MarketVolatilityResponse {
         this.ticker = 'UPCOM';
         break;
       default:
-        this.ticker = data?.ticker || "";
+        this.ticker = data?.ticker || '';
     }
     this.day_change_percent = data?.day_change_percent ?? 0;
     this.week_change_percent = data?.week_change_percent ?? 0;
