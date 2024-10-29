@@ -11,9 +11,9 @@ import { ReportModule } from '../report/report.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([WatchListEntity], DB_SERVER),
-    ReportModule
+    ReportModule,
   ],
   controllers: [WatchlistController],
-  providers: [WatchlistService, JwtService]
+  providers: [WatchlistService, JwtService],
 })
 export class WatchlistModule {}

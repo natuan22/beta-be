@@ -29,7 +29,7 @@ export class TimeFrameDto extends GetExchangeQuery {
   order: string;
 
   @ApiPropertyOptional({
-    type: String
+    type: String,
   })
-  industry: string
+  industry: string;
 }

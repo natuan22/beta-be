@@ -1,8 +1,8 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class SearchStockDto {
-    @ApiProperty({
-        type: String
-    })
-    key_search: string
+  @ApiProperty({
+    type: String,
+  })
+  key_search: string;
 }

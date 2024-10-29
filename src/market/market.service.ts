@@ -273,8 +273,13 @@ export class MarketService {
 
     const { startDate, dateFilter } = UtilCommonTemplate.getDateFilter(date);
 
-    const dateFilterV2: string[] = dateFilter.replace('(', '').replace(')', '').replace(/'/g, '').replace(/\s/g, '').split(',')
-    
+    const dateFilterV2: string[] = dateFilter
+      .replace('(', '')
+      .replace(')', '')
+      .replace(/'/g, '')
+      .replace(/\s/g, '')
+      .split(',');
+
     const date_v2 = await this.mssqlService.query(`
     SELECT top 1
             [date]
@@ -282,13 +287,17 @@ export class MarketService {
           
             WHERE t.ratioCode = 'MARKETCAP'
           order by date asc  
-    `)
+    `);
 
     const query: string = `
         WITH SelectedDates AS (
-          ${dateFilterV2.map(item => `
+          ${dateFilterV2
+            .map(
+              (item) => `
           select '${item}' as date
-          `).join(`union all`)}
+          `,
+            )
+            .join(`union all`)}
       )
       SELECT
         now.date, now.industry,
@@ -317,7 +326,11 @@ export class MarketService {
           FROM [RATIO].[dbo].[ratio] t
           inner join marketInfor.dbo.info i
           on t.code = i.code
-          WHERE [date] = '${new Date(startDate) > new Date(date_v2[0].date) ? startDate : UtilCommonTemplate.toDate(date_v2[0].date)}'
+          WHERE [date] = '${
+            new Date(startDate) > new Date(date_v2[0].date)
+              ? startDate
+              : UtilCommonTemplate.toDate(date_v2[0].date)
+          }'
             and i.floor in ${floor}
             and i.type in ('STOCK', 'ETF')
             and i.LV2 != ''
@@ -579,9 +592,11 @@ export class MarketService {
 
     // const { startDate, endDate } = UtilCommonTemplate.getDateFilter(date);
 
-    const date = await this.mssqlService.query(`select top 2 year from financialReport.dbo.financialReport group by year ORDER BY year DESC`)
-    const startDate = date[1].year
-    const endDate = date[0].year
+    const date = await this.mssqlService.query(
+      `select top 2 year from financialReport.dbo.financialReport group by year ORDER BY year DESC`,
+    );
+    const startDate = date[1].year;
+    const endDate = date[0].year;
 
     const query: string = `
       SELECT
@@ -663,12 +678,14 @@ export class MarketService {
     if (redisData) return redisData;
 
     // const date = UtilCommonTemplate.getYearQuarters(8);
-    
+
     // const { startDate, endDate } = UtilCommonTemplate.getDateFilter(date);
-    
-    const date = await this.mssqlService.query(`select top 2 year from financialReport.dbo.financialReport group by year ORDER BY year DESC`)
-    const startDate = date[1].year
-    const endDate = date[0].year
+
+    const date = await this.mssqlService.query(
+      `select top 2 year from financialReport.dbo.financialReport group by year ORDER BY year DESC`,
+    );
+    const startDate = date[1].year;
+    const endDate = date[0].year;
 
     const query: string = `
       SELECT
@@ -1026,11 +1043,18 @@ export class MarketService {
       query,
     );
 
-    const mappedData = new IndusLiquidityColResponse().mapToList(
-      _.orderBy(data, 'date').filter(
-        (i) => UtilCommonTemplate.toDate(i.date) != startDate,
-      ),
-    ).map(item => ({...item, date: moment(item.date).year().toString() + moment(item.date).quarter().toString()}));
+    const mappedData = new IndusLiquidityColResponse()
+      .mapToList(
+        _.orderBy(data, 'date').filter(
+          (i) => UtilCommonTemplate.toDate(i.date) != startDate,
+        ),
+      )
+      .map((item) => ({
+        ...item,
+        date:
+          moment(item.date).year().toString() +
+          moment(item.date).quarter().toString(),
+      }));
 
     await this.redis.set(
       `${RedisKeys.CashDividend}:${floor}:${order}:${type}`,

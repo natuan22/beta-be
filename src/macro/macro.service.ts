@@ -8,7 +8,11 @@ import { UtilCommonTemplate } from '../utils/utils.common';
 import { FDIOrderDto } from './dto/fdi-order.dto';
 import { ForeignInvestmentIndexDto } from './dto/foreign-investment-index.dto';
 import { IIndustryGDPValue } from './interfaces/industry-gdp-value.interface';
-import { IPPIndusProductionIndexMapping, IPPIndustyMapping, IPPMostIndustryProductionMapping } from './mapping/ipp-industry.mapping';
+import {
+  IPPIndusProductionIndexMapping,
+  IPPIndustyMapping,
+  IPPMostIndustryProductionMapping,
+} from './mapping/ipp-industry.mapping';
 import { AccumulatedResponse } from './responses/accumulated.response';
 import { CentralExchangeRateResponse } from './responses/central-exchange-rate.response';
 import { CorporateBondsIssuedSuccessfullyResponse } from './responses/corporate-bonds-issued-successfully.response';
@@ -29,13 +33,13 @@ export class MacroService {
     @Inject(CACHE_MANAGER)
     private readonly redis: Cache,
     private readonly mssqlService: MssqlService,
-  ) { }
+  ) {}
 
   async test(email: string) {
     await this.mssqlService.query(`
     insert into test_any.dbo.email (email) values ('${email}')
-    `)
-    return
+    `);
+    return;
   }
 
   async industryGDPValue(): Promise<GDPResponse[]> {
@@ -143,15 +147,21 @@ export class MacroService {
     );
     if (redisData) return redisData;
 
-    const lastDate = (await this.mssqlService.query(`
+    const lastDate = (
+      await this.mssqlService.query(`
     SELECT TOP 1 thoiDiem as date 
     FROM [macroEconomic].[dbo].[DuLieuViMo] 
     WHERE phanBang = 'GDP'
     AND nhomDulieu = N'Tăng trưởng GDP theo giá 2010'
     ORDER BY thoiDiem desc
-    `))[0].date
+    `)
+    )[0].date;
 
-    const date = UtilCommonTemplate.getPastDateV2(2, order, moment(lastDate).add(1, 'quarter'));
+    const date = UtilCommonTemplate.getPastDateV2(
+      2,
+      order,
+      moment(lastDate).add(1, 'quarter'),
+    );
 
     const { dateFilter } = UtilCommonTemplate.getDateFilterV2(date);
 
@@ -168,7 +178,7 @@ export class MacroService {
         ORDER BY [name]
                 ,[date]
     `;
-      
+
     const data = await this.mssqlService.query<IIndustryGDPValue[]>(query);
 
     const mappedData = new GDPResponse().mapToList(data);
@@ -374,22 +384,22 @@ export class MacroService {
   private genIndustry(q: number) {
     switch (q) {
       case 0:
-        return 'Tăng trưởng: Toàn ngành công nghiệp (%)'
+        return 'Tăng trưởng: Toàn ngành công nghiệp (%)';
       case 1:
-        return 'Tăng trưởng: Sản xuất và Phân phối điện (%)'
+        return 'Tăng trưởng: Sản xuất và Phân phối điện (%)';
       case 2:
-        return 'Tăng trưởng: Khai khoáng (%)'
+        return 'Tăng trưởng: Khai khoáng (%)';
       case 3:
-        return 'Tăng trưởng: Cung cấp nước, hoạt động quản lý và xử lý rác thải, nước thải (%)'
+        return 'Tăng trưởng: Cung cấp nước, hoạt động quản lý và xử lý rác thải, nước thải (%)';
       case 4:
-        return 'Tăng trưởng: Công nghiệp chế biến, chế tạo (%)'
+        return 'Tăng trưởng: Công nghiệp chế biến, chế tạo (%)';
       default:
         break;
     }
   }
 
   async industrialIndex(q: number): Promise<GDPResponse[]> {
-    const chiTieu = this.genIndustry(q)
+    const chiTieu = this.genIndustry(q);
     const redisData = await this.redis.get<GDPResponse[]>(
       `${RedisKeys.industrialIndex}:${q}`,
     );
@@ -565,8 +575,8 @@ export class MacroService {
   }
 
   async laborForce() {
-    const redisData = await this.redis.get(RedisKeys.laborForce)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.laborForce);
+    if (redisData) return redisData;
     const query = `
         SELECT
           chiTieu AS name,
@@ -577,16 +587,18 @@ export class MacroService {
         AND phanBang = N'LAO ĐỘNG'
         AND nhomDulieu = N'Chỉ tiêu lao động'
         ORDER BY date ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.laborForce, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.laborForce, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async unemployedRate() {
-    const redisData = await this.redis.get(RedisKeys.unemployedRate)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.unemployedRate);
+    if (redisData) return redisData;
     const query = `
       SELECT
         chiTieu AS name,
@@ -597,16 +609,18 @@ export class MacroService {
         AND phanBang = N'LAO ĐỘNG'
         AND nhomDulieu = N'Chỉ tiêu lao động'
       ORDER BY date ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.unemployedRate, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.unemployedRate, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async laborRate() {
-    const redisData = await this.redis.get(RedisKeys.laborRate)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.laborRate);
+    if (redisData) return redisData;
     const query = `
         SELECT TOP 3
           chiTieu AS name,
@@ -617,16 +631,18 @@ export class MacroService {
           AND phanBang = N'LAO ĐỘNG'
           AND nhomDulieu = N'Chỉ tiêu lao động'
         ORDER BY date desc
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.laborRate, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.laborRate, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async informalLaborRate() {
-    const redisData = await this.redis.get(RedisKeys.informalLaborRate)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.informalLaborRate);
+    if (redisData) return redisData;
     const query = `
         SELECT top 1
           chiTieu AS name,
@@ -637,16 +653,18 @@ export class MacroService {
           AND phanBang = N'LAO ĐỘNG'
           AND nhomDulieu = N'Chỉ tiêu lao động'
         ORDER BY date desc
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.informalLaborRate, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.informalLaborRate, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async averageSalary() {
-    const redisData = await this.redis.get(RedisKeys.averageSalary)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.averageSalary);
+    if (redisData) return redisData;
     const query = `
       SELECT
         chiTieu AS name,
@@ -657,16 +675,18 @@ export class MacroService {
         AND phanBang = N'LAO ĐỘNG'
         AND nhomDulieu = N'Chỉ tiêu lao động'
       ORDER BY date ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.averageSalary, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.averageSalary, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async employmentFluctuations() {
-    const redisData = await this.redis.get(RedisKeys.employmentFluctuations)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.employmentFluctuations);
+    if (redisData) return redisData;
     const query = `
       SELECT top 10
         chiTieu AS name,
@@ -679,16 +699,18 @@ export class MacroService {
         AND phanBang = N'LAO ĐỘNG'
         AND nhomDulieu = N'Chỉ tiêu lao động'
       ORDER BY date desc
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.employmentFluctuations, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.employmentFluctuations, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async totalPayment() {
-    const redisData = await this.redis.get(RedisKeys.totalPayment)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.totalPayment);
+    if (redisData) return redisData;
     const query = `
       SELECT
         chiTieu AS name,
@@ -702,17 +724,19 @@ export class MacroService {
         )
       AND phanBang = N'TÍN DỤNG'
       AND nhomDulieu = N'Chỉ số tín dụng'
-    `
+    `;
 
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.totalPayment, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.totalPayment, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async totalPaymentPercent() {
-    const redisData = await this.redis.get(RedisKeys.totalPaymentPercent)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.totalPaymentPercent);
+    if (redisData) return redisData;
     const query = `
       WITH tindung
       AS (SELECT
@@ -751,17 +775,21 @@ export class MacroService {
         date
       FROM tindung
       ORDER BY date ASC
-    `
+    `;
 
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.totalPaymentPercent, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.totalPaymentPercent, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async balancePaymentInternational() {
-    const redisData = await this.redis.get(RedisKeys.balancePaymentInternational)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      RedisKeys.balancePaymentInternational,
+    );
+    if (redisData) return redisData;
     const query = `
     SELECT
       chiTieu AS name,
@@ -777,16 +805,18 @@ export class MacroService {
       N'Dự trữ (Triệu USD)'
     )
     ORDER BY thoiDiem ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.balancePaymentInternational, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.balancePaymentInternational, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async creditDebt() {
-    const redisData = await this.redis.get(RedisKeys.creditDebt)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.creditDebt);
+    if (redisData) return redisData;
     const query = `
     SELECT
       chiTieu AS name,
@@ -803,16 +833,18 @@ export class MacroService {
       N'Các hoạt động dịch vụ khác (Tỷ đồng)'
       )
     ORDER BY thoiDiem ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.creditDebt, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.creditDebt, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async creditDebtPercent() {
-    const redisData = await this.redis.get(RedisKeys.creditDebtPercent)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.creditDebtPercent);
+    if (redisData) return redisData;
     const query = `
     SELECT
       chiTieu AS name,
@@ -829,16 +861,18 @@ export class MacroService {
       N'Các hoạt động dịch vụ khác (%)'
       )
     ORDER BY thoiDiem ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.creditDebtPercent, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.creditDebtPercent, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async creditInstitution() {
-    const redisData = await this.redis.get(RedisKeys.creditInstitution)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(RedisKeys.creditInstitution);
+    if (redisData) return redisData;
     const query = `
     SELECT
       chiTieu AS name,
@@ -853,32 +887,36 @@ export class MacroService {
       N'NH Liên doanh, nước ngoài (%)'
       )
     ORDER BY thoiDiem ASC
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(RedisKeys.creditInstitution, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(RedisKeys.creditInstitution, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async totalInvestmentProjects(order: number) {
-    const redisData = await this.redis.get(`${RedisKeys.totalInvestmentProjects}:${order}`)
-    if (redisData) return redisData
-    let date = ''
-    let group = ''
+    const redisData = await this.redis.get(
+      `${RedisKeys.totalInvestmentProjects}:${order}`,
+    );
+    if (redisData) return redisData;
+    let date = '';
+    let group = '';
     switch (order) {
       case TimeTypeEnum.Month:
-        date = `thoiDiem as date,`
-        group = `group by thoiDiem, RIGHT(chiTieu, 4)`
-        break
+        date = `thoiDiem as date,`;
+        group = `group by thoiDiem, RIGHT(chiTieu, 4)`;
+        break;
       case TimeTypeEnum.Quarter:
         date = `case datepart(qq, thoiDiem)
         when 1 then cast(datepart(year, thoiDiem) as varchar) + '/03/31'
         when 2 then cast(datepart(year, thoiDiem) as varchar) + '/06/30'
         when 3 then cast(datepart(year, thoiDiem) as varchar) + '/09/30'
         when 4 then cast(datepart(year, thoiDiem) as varchar) + '/12/31'
-        end as date,`
-        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), RIGHT(chiTieu, 4)`
-        break
+        end as date,`;
+        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), RIGHT(chiTieu, 4)`;
+        break;
       default:
     }
     const query = `
@@ -899,32 +937,51 @@ export class MacroService {
       AND nhomDulieu = N'Chỉ số FDI'
     ${group}
     ORDER BY date ASC
-    `
+    `;
 
-    const data = await this.mssqlService.query<TotalInvestmentProjectsResponse[]>(query)
-    const dataMapped = TotalInvestmentProjectsResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.totalInvestmentProjects}:${order}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      TotalInvestmentProjectsResponse[]
+    >(query);
+    const dataMapped = TotalInvestmentProjectsResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.totalInvestmentProjects}:${order}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async foreignInvestmentIndex(q: ForeignInvestmentIndexDto) {
-    const redisData = await this.redis.get(`${RedisKeys.foreignInvestmentIndex}:${q.type}:${q.order}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.foreignInvestmentIndex}:${q.type}:${q.order}`,
+    );
+    if (redisData) return redisData;
 
-    const type = q.type == 1 ? 'Chỉ số' : 'Đối tác'
-    const lastDate = await this.mssqlService.query(`select top 2 thoiDiem as date from macroEconomic.dbo.DuLieuViMo WHERE phanBang = 'FDI'
+    const type = q.type == 1 ? 'Chỉ số' : 'Đối tác';
+    const lastDate = await this.mssqlService
+      .query(`select top 2 thoiDiem as date from macroEconomic.dbo.DuLieuViMo WHERE phanBang = 'FDI'
     AND nhomDulieu = N'${type} FDI'  
     and chiTieu like N'%(CM%'
     group by thoiDiem
-    order by thoiDiem desc `
-    )
+    order by thoiDiem desc `);
 
-    const quarter = UtilCommonTemplate.getLastTwoQuarters(lastDate[0].date)
+    const quarter = UtilCommonTemplate.getLastTwoQuarters(lastDate[0].date);
 
-    const select = +q.order == TimeTypeEnum.Month ? `giaTri AS value,
-    thoiDiem AS date,` : `sum(giaTri) AS value, cast(datepart(year, thoiDiem) as varchar) + cast(datepart(qq, thoiDiem) as varchar) AS date,`
-    const group = +q.order == TimeTypeEnum.Quarter ? `group by datepart(year, thoiDiem), datepart(qq, thoiDiem), LEFT(chiTieu, CHARINDEX('(', chiTieu) - 2), RIGHT(chiTieu, 14), RIGHT(chiTieu, 4)` : ``
-    const date = +q.order == TimeTypeEnum.Month ? `AND thoiDiem IN ('${UtilCommonTemplate.toDate(lastDate[0].date)}', '${UtilCommonTemplate.toDate(lastDate[1].date)}')` : `AND thoiDiem between '${quarter.months[0]}' and '${quarter.months[5]}'`
+    const select =
+      +q.order == TimeTypeEnum.Month
+        ? `giaTri AS value,
+    thoiDiem AS date,`
+        : `sum(giaTri) AS value, cast(datepart(year, thoiDiem) as varchar) + cast(datepart(qq, thoiDiem) as varchar) AS date,`;
+    const group =
+      +q.order == TimeTypeEnum.Quarter
+        ? `group by datepart(year, thoiDiem), datepart(qq, thoiDiem), LEFT(chiTieu, CHARINDEX('(', chiTieu) - 2), RIGHT(chiTieu, 14), RIGHT(chiTieu, 4)`
+        : ``;
+    const date =
+      +q.order == TimeTypeEnum.Month
+        ? `AND thoiDiem IN ('${UtilCommonTemplate.toDate(
+            lastDate[0].date,
+          )}', '${UtilCommonTemplate.toDate(lastDate[1].date)}')`
+        : `AND thoiDiem between '${quarter.months[0]}' and '${quarter.months[5]}'`;
 
     const query = `
     WITH temp
@@ -973,15 +1030,31 @@ export class MacroService {
     AS (SELECT
       name,
       type,
-      [${+q.order == TimeTypeEnum.Month ? UtilCommonTemplate.toDate(lastDate[1].date) : quarter.quarters[1]}] AS now,
-      [${+q.order == TimeTypeEnum.Month ? UtilCommonTemplate.toDate(lastDate[0].date) : quarter.quarters[0]}] AS pre
-    FROM temp AS source PIVOT (SUM(value) FOR date IN ([${+q.order == TimeTypeEnum.Month ? UtilCommonTemplate.toDate(lastDate[1].date) : quarter.quarters[1]}], [${+q.order == TimeTypeEnum.Month ? UtilCommonTemplate.toDate(lastDate[0].date) : quarter.quarters[0]}])) AS bang_chuyen)
+      [${
+        +q.order == TimeTypeEnum.Month
+          ? UtilCommonTemplate.toDate(lastDate[1].date)
+          : quarter.quarters[1]
+      }] AS now,
+      [${
+        +q.order == TimeTypeEnum.Month
+          ? UtilCommonTemplate.toDate(lastDate[0].date)
+          : quarter.quarters[0]
+      }] AS pre
+    FROM temp AS source PIVOT (SUM(value) FOR date IN ([${
+      +q.order == TimeTypeEnum.Month
+        ? UtilCommonTemplate.toDate(lastDate[1].date)
+        : quarter.quarters[1]
+    }], [${
+      +q.order == TimeTypeEnum.Month
+        ? UtilCommonTemplate.toDate(lastDate[0].date)
+        : quarter.quarters[0]
+    }])) AS bang_chuyen)
     SELECT
       *
     FROM pivoted
     where name != ''
-    `
-    const data = await this.mssqlService.query<any[]>(query)
+    `;
+    const data = await this.mssqlService.query<any[]>(query);
 
     const now = {
       1: 'cm_usd',
@@ -990,7 +1063,7 @@ export class MacroService {
       4: 'tv',
       5: 'gv_usd',
       6: 'gv',
-    }
+    };
 
     const pre = {
       1: 'cm_usd_pre',
@@ -999,41 +1072,53 @@ export class MacroService {
       4: 'tv_pre',
       5: 'gv_usd_pre',
       6: 'gv_pre',
-    }
+    };
 
     const data_reduce = data.reduce((acc, item) => {
-      const index = acc.findIndex(child => child.name == item.name)
+      const index = acc.findIndex((child) => child.name == item.name);
 
       if (index != -1) {
-        acc[index][now[item.type]] = item.now
-        acc[index][pre[item.type]] = item.pre
-        acc[index]['total'] = (acc[index]['cm_usd'] || 0) + (acc[index]['tv_usd'] || 0) + (acc[index]['gv_usd'] || 0)
-        acc[index]['total_pre'] = (acc[index]['cm_usd_pre'] || 0) + (acc[index]['tv_usd_pre'] || 0) + (acc[index]['gv_usd_pre'] || 0)
-        return acc
+        acc[index][now[item.type]] = item.now;
+        acc[index][pre[item.type]] = item.pre;
+        acc[index]['total'] =
+          (acc[index]['cm_usd'] || 0) +
+          (acc[index]['tv_usd'] || 0) +
+          (acc[index]['gv_usd'] || 0);
+        acc[index]['total_pre'] =
+          (acc[index]['cm_usd_pre'] || 0) +
+          (acc[index]['tv_usd_pre'] || 0) +
+          (acc[index]['gv_usd_pre'] || 0);
+        return acc;
       }
       acc.push({
         name: item.name,
         [now[item.type]]: item.now,
         [pre[item.type]]: item.pre,
-      })
-      return acc
-    }, [])
+      });
+      return acc;
+    }, []);
 
-    const dataMapped = ForeignInvestmentIndexResponse.mapToList(data_reduce)
-    await this.redis.set(`${RedisKeys.foreignInvestmentIndex}:${q.type}:${q.order}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    const dataMapped = ForeignInvestmentIndexResponse.mapToList(data_reduce);
+    await this.redis.set(
+      `${RedisKeys.foreignInvestmentIndex}:${q.type}:${q.order}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async accumulated(q: FDIOrderDto) {
-    const redisData = await this.redis.get(`${RedisKeys.accumulated}:${q.order}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.accumulated}:${q.order}`,
+    );
+    if (redisData) return redisData;
 
-    let date: string = ''
-    let group: string = ''
+    let date: string = '';
+    let group: string = '';
     switch (+q.order) {
       case TimeTypeEnum.Month:
-        date = `giaTri as value, thoiDiem as date,`
-        break
+        date = `giaTri as value, thoiDiem as date,`;
+        break;
       case TimeTypeEnum.Quarter:
         date = `
         sum(giaTri) as value,
@@ -1042,11 +1127,11 @@ export class MacroService {
         when 2 then cast(datepart(year, thoiDiem) as varchar) + '/06/30'
         when 3 then cast(datepart(year, thoiDiem) as varchar) + '/09/30'
         when 4 then cast(datepart(year, thoiDiem) as varchar) + '/12/31'
-        end as date, `
-        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), LEFT(chiTieu, CHARINDEX('(', chiTieu) - 2)`
-        break
+        end as date, `;
+        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), LEFT(chiTieu, CHARINDEX('(', chiTieu) - 2)`;
+        break;
       default:
-        date = `thoiDiem as date,`
+        date = `thoiDiem as date,`;
     }
     const query = `
     WITH temp
@@ -1082,23 +1167,27 @@ export class MacroService {
       *
     FROM temp) AS source PIVOT (SUM(value) FOR type IN ([1], [2])) AS chuyen
     where name != ''
-`
-    const data = await this.mssqlService.query<AccumulatedResponse[]>(query)
-    const dataMapped = AccumulatedResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.accumulated}:${q.order}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+`;
+    const data = await this.mssqlService.query<AccumulatedResponse[]>(query);
+    const dataMapped = AccumulatedResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.accumulated}:${q.order}`, dataMapped, {
+      ttl: TimeToLive.OneWeek,
+    });
+    return dataMapped;
   }
 
   async totalRegisteredAndDisbursed(q: FDIOrderDto) {
-    const redisData = await this.redis.get(`${RedisKeys.totalRegisteredAndDisbursed}:${+q.order}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.totalRegisteredAndDisbursed}:${+q.order}`,
+    );
+    if (redisData) return redisData;
 
-    let date: string = ''
-    let group: string = ''
+    let date: string = '';
+    let group: string = '';
     switch (+q.order) {
       case TimeTypeEnum.Month:
-        date = `giaTri as value, thoiDiem as date`
-        break
+        date = `giaTri as value, thoiDiem as date`;
+        break;
       case TimeTypeEnum.Quarter:
         date = `
         sum(giaTri) as value,
@@ -1107,14 +1196,13 @@ export class MacroService {
         when 2 then cast(datepart(year, thoiDiem) as varchar) + '/06/30'
         when 3 then cast(datepart(year, thoiDiem) as varchar) + '/09/30'
         when 4 then cast(datepart(year, thoiDiem) as varchar) + '/12/31'
-        end as date`
-        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), chiTieu`
-        break
+        end as date`;
+        group = `group by datepart(qq, thoiDiem), datepart(year, thoiDiem), chiTieu`;
+        break;
       default:
-        date = `thoiDiem as date,`
+        date = `thoiDiem as date,`;
     }
-    const query =
-      `
+    const query = `
     SELECT
       chiTieu AS name,
       ${date}
@@ -1125,15 +1213,21 @@ export class MacroService {
     AND thoiDiem >= '2018-01-01'
     ${group}
     ORDER BY date asc
-    `
-    const data = await this.mssqlService.query<LaborForceResponse[]>(query)
-    const dataMapped = LaborForceResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.totalRegisteredAndDisbursed}:${+q.order}`, dataMapped, { ttl: TimeToLive.OneWeek })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<LaborForceResponse[]>(query);
+    const dataMapped = LaborForceResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.totalRegisteredAndDisbursed}:${+q.order}`,
+      dataMapped,
+      { ttl: TimeToLive.OneWeek },
+    );
+    return dataMapped;
   }
 
   async corporateBondsIssuedSuccessfully() {
-    const redisData = await this.redis.get(`${RedisKeys.corporateBondsIssuedSuccessfully}`)
+    const redisData = await this.redis.get(
+      `${RedisKeys.corporateBondsIssuedSuccessfully}`,
+    );
     // if(redisData) return redisData
 
     const query = `
@@ -1148,22 +1242,34 @@ export class MacroService {
             DATEPART(YEAR, ngayPhatHanh),
             type
             order by DATEPART(YEAR, ngayPhatHanh) asc, DATEPART(MONTH, ngayPhatHanh) asc        
-    `
+    `;
 
-    const data = await this.mssqlService.query<CorporateBondsIssuedSuccessfullyResponse[]>(query)
-    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.corporateBondsIssuedSuccessfully}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      CorporateBondsIssuedSuccessfullyResponse[]
+    >(query);
+    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.corporateBondsIssuedSuccessfully}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async averageDepositInterestRate() {
-    const redisData = await this.redis.get(`${RedisKeys.averageDepositInterestRate}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.averageDepositInterestRate}`,
+    );
+    if (redisData) return redisData;
 
-    const month = UtilCommonTemplate.getAnyToNow(new Date('01/01/2016'), new Date())
-    const date = UtilCommonTemplate.getPreviousMonth(new Date(), month + 1, 1)
+    const month = UtilCommonTemplate.getAnyToNow(
+      new Date('01/01/2016'),
+      new Date(),
+    );
+    const date = UtilCommonTemplate.getPreviousMonth(new Date(), month + 1, 1);
 
-    const query_map = date.map(item => `
+    const query_map = date.map(
+      (item) => `
     SELECT
       type as name,
       SUM(CAST(menhGia AS bigint) * CAST(kLPhatHanh AS int)) AS tt,
@@ -1173,20 +1279,29 @@ export class MacroService {
     FROM marketBonds.dbo.BondsInfor
     WHERE '${item}' BETWEEN ngayPhatHanh AND ngayDaoHan
     GROUP BY type
-    `)
+    `,
+    );
 
-    const data = await this.mssqlService.query<CorporateBondsIssuedSuccessfullyResponse[]>(query_map.join('UNION ALL'))
-    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data)
+    const data = await this.mssqlService.query<
+      CorporateBondsIssuedSuccessfullyResponse[]
+    >(query_map.join('UNION ALL'));
+    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data);
 
-    await this.redis.set(`${RedisKeys.averageDepositInterestRate}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    await this.redis.set(
+      `${RedisKeys.averageDepositInterestRate}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async totalOutstandingBalance() {
-    const redisData = await this.redis.get(`${RedisKeys.totalOutstandingBalance}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.totalOutstandingBalance}`,
+    );
+    if (redisData) return redisData;
 
-    const date = UtilCommonTemplate.getPreviousMonth(new Date(), 1, 1)
+    const date = UtilCommonTemplate.getPreviousMonth(new Date(), 1, 1);
     const query = `
     SELECT TOP 50
       doanhNghiep as name,
@@ -1198,26 +1313,33 @@ export class MacroService {
     WHERE '${date}' BETWEEN ngayPhatHanh AND ngayDaoHan
     GROUP BY doanhNghiep
     ORDER BY interest_rate DESC
-    `
-    const data = await this.mssqlService.query<TotalOutstandingBalanceResponse[]>(query)
-    const dataMapped = TotalOutstandingBalanceResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.totalOutstandingBalance}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      TotalOutstandingBalanceResponse[]
+    >(query);
+    const dataMapped = TotalOutstandingBalanceResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.totalOutstandingBalance}`, dataMapped, {
+      ttl: TimeToLive.HaftHour,
+    });
+    return dataMapped;
   }
 
   async estimatedValueOfCorporateBonds() {
-    const redisData = await this.redis.get(`${RedisKeys.estimatedValueOfCorporateBonds}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.estimatedValueOfCorporateBonds}`,
+    );
+    if (redisData) return redisData;
 
     //Lấy 20 tháng tiếp theo
-    const month = []
-    let now = moment().add(1, 'month')
+    const month = [];
+    let now = moment().add(1, 'month');
     for (let i = 0; i < 20; i++) {
-      month.push({ year: now.year(), month: now.month() + 1 })
-      now = now.add(1, 'month')
+      month.push({ year: now.year(), month: now.month() + 1 });
+      now = now.add(1, 'month');
     }
 
-    const query = month.map(item => `
+    const query = month.map(
+      (item) => `
       SELECT
         type as name,
         SUM((CAST(menhGia AS bigint) * CAST(kLConLuuHanh AS bigint)) * (1 + (laiSuatPhatHanh / 100))) AS value,
@@ -1228,17 +1350,26 @@ export class MacroService {
       GROUP BY DATEPART(MONTH, ngayDaoHan),
               DATEPART(YEAR, ngayDaoHan),
               type
-    `)
+    `,
+    );
 
-    const data = await this.mssqlService.query<CorporateBondsIssuedSuccessfullyResponse[]>(query.join('union all'))
-    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.estimatedValueOfCorporateBonds}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      CorporateBondsIssuedSuccessfullyResponse[]
+    >(query.join('union all'));
+    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.estimatedValueOfCorporateBonds}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async listOfBondsToMaturity() {
-    const redisData = await this.redis.get(`${RedisKeys.listOfBondsToMaturity}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.listOfBondsToMaturity}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     SELECT TOP 50
@@ -1252,18 +1383,24 @@ export class MacroService {
     WHERE kyHanConlai != ''
     AND kLConLuuHanh != 0
     ORDER BY khcl ASC
-    `
-    const data = await this.mssqlService.query<ListOfBondsToMaturityResponse[]>(query)
-    const dataMapped = ListOfBondsToMaturityResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.listOfBondsToMaturity}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<ListOfBondsToMaturityResponse[]>(
+      query,
+    );
+    const dataMapped = ListOfBondsToMaturityResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.listOfBondsToMaturity}`, dataMapped, {
+      ttl: TimeToLive.HaftHour,
+    });
+    return dataMapped;
   }
 
   async listOfEnterprisesWithLateBond() {
-    const redisData = await this.redis.get(`${RedisKeys.listOfEnterprisesWithLateBond}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.listOfEnterprisesWithLateBond}`,
+    );
+    if (redisData) return redisData;
 
-    const date = moment().subtract(1, 'month').format('YYYY-MM-DD') //30 ngày gần nhất
+    const date = moment().subtract(1, 'month').format('YYYY-MM-DD'); //30 ngày gần nhất
 
     const query = `
     WITH temp
@@ -1308,38 +1445,58 @@ export class MacroService {
     INNER JOIN unusual u
       ON c.maTP = u.value
     WHERE u.ngayDangTin >= '${date}'
-    `
+    `;
 
-    const data = await this.mssqlService.query<ListOfEnterprisesWithLateBondResponse[]>(query)
-    const dataMapped = ListOfEnterprisesWithLateBondResponse.mapToList(data)
+    const data = await this.mssqlService.query<
+      ListOfEnterprisesWithLateBondResponse[]
+    >(query);
+    const dataMapped = ListOfEnterprisesWithLateBondResponse.mapToList(data);
 
-    await this.redis.set(`${RedisKeys.listOfEnterprisesWithLateBond}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    await this.redis.set(
+      `${RedisKeys.listOfEnterprisesWithLateBond}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async structureOfOutstandingDebt() {
-    const redisData = await this.redis.get(`${RedisKeys.structureOfOutstandingDebt}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.structureOfOutstandingDebt}`,
+    );
+    if (redisData) return redisData;
 
-    const query_all = await this.mssqlService.query(`select sum(cast(menhGia as bigint) * kLConLuuHanh) as value from marketBonds.dbo.BondsInfor`)
+    const query_all = await this.mssqlService.query(
+      `select sum(cast(menhGia as bigint) * kLConLuuHanh) as value from marketBonds.dbo.BondsInfor`,
+    );
     const query = `
     SELECT
       type as name,
       (SUM(CAST(menhGia AS bigint) * kLConLuuHanh) / ${query_all[0].value}) * 100 AS value
     FROM marketBonds.dbo.BondsInfor
     GROUP BY type
-    `
-    const data = await this.mssqlService.query<CorporateBondsIssuedSuccessfullyResponse[]>(query)
-    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.structureOfOutstandingDebt}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      CorporateBondsIssuedSuccessfullyResponse[]
+    >(query);
+    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.structureOfOutstandingDebt}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async proportionOfOutstandingLoansOfEnterprises() {
-    const redisData = await this.redis.get(`${RedisKeys.proportionOfOutstandingLoansOfEnterprises}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.proportionOfOutstandingLoansOfEnterprises}`,
+    );
+    if (redisData) return redisData;
 
-    const query_all = await this.mssqlService.query(`select sum(cast(menhGia as bigint) * kLConLuuHanh) as value from marketBonds.dbo.BondsInfor`)
+    const query_all = await this.mssqlService.query(
+      `select sum(cast(menhGia as bigint) * kLConLuuHanh) as value from marketBonds.dbo.BondsInfor`,
+    );
     const query = `
     WITH unusual
     AS (SELECT
@@ -1353,18 +1510,24 @@ export class MacroService {
     INNER JOIN marketBonds.dbo.BondsInfor b
       ON u.value = b.maTP
     WHERE u.tieuDeTin LIKE N'%chậm%'
-    `
+    `;
 
-    const data = await this.mssqlService.query<CorporateBondsIssuedSuccessfullyResponse[]>(query)
-    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.proportionOfOutstandingLoansOfEnterprises}`, dataMapped, { ttl: TimeToLive.HaftHour })
-    return dataMapped
+    const data = await this.mssqlService.query<
+      CorporateBondsIssuedSuccessfullyResponse[]
+    >(query);
+    const dataMapped = CorporateBondsIssuedSuccessfullyResponse.mapToList(data);
+    await this.redis.set(
+      `${RedisKeys.proportionOfOutstandingLoansOfEnterprises}`,
+      dataMapped,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return dataMapped;
   }
 
   async centralExchangeRate() {
-    const redisData = await this.redis.get(`${RedisKeys.centralExchangeRate}`)
-    if (redisData) return redisData
-    
+    const redisData = await this.redis.get(`${RedisKeys.centralExchangeRate}`);
+    if (redisData) return redisData;
+
     const query = `
     with temp as (select top 30 giaTri as value, thoiDiem as date from macroEconomic.dbo.DuLieuViMo
     where phanBang = N'TỶ GIÁ'
@@ -1372,16 +1535,22 @@ export class MacroService {
     and chiTieu = N'Tỷ giá trung tâm (từ 04/01/2016) (VNĐ/USD)'
     order by thoiDiem desc)
     select * from temp order by date asc
-    `
-    const data = await this.mssqlService.query<CentralExchangeRateResponse[]>(query)
-    const dataMapped = CentralExchangeRateResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.centralExchangeRate}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<CentralExchangeRateResponse[]>(
+      query,
+    );
+    const dataMapped = CentralExchangeRateResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.centralExchangeRate}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async exchangeRateIndexTable() {
-    const redisData = await this.redis.get(`${RedisKeys.exchangeRateIndexTable}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.exchangeRateIndexTable}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     WITH max_date
@@ -1461,16 +1630,22 @@ export class MacroService {
       ON q.name = t.name
     INNER JOIN year y
       ON y.name = t.name
-    `
-    const data = await this.mssqlService.query<ExchangeRateIndexTableResponse[]>(query)
-    const dataMapped = ExchangeRateIndexTableResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.exchangeRateIndexTable}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<
+      ExchangeRateIndexTableResponse[]
+    >(query);
+    const dataMapped = ExchangeRateIndexTableResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.exchangeRateIndexTable}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 
   async exchangeRateAndInterestRate(type: number, category: number) {
-    const redisData = await this.redis.get(`${RedisKeys.exchangeRateAndInterestRate}:${type}:${category}`)
-    if(redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.exchangeRateAndInterestRate}:${type}:${category}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     WITH temp
@@ -1485,13 +1660,17 @@ export class MacroService {
     FROM macroEconomic.dbo.DuLieuViMo
     WHERE phanBang = N'${category ? 'LÃI SUẤT' : 'TỶ GIÁ'}'
     AND nhomDulieu = N'${category ? 'CHỈ SỐ LÃI SUẤT' : 'CHỈ SỐ TỶ GIÁ'}'
-    ${category ? `AND chiTieu = N'Lãi suất % (Qua đêm)'`: ``}
+    ${category ? `AND chiTieu = N'Lãi suất % (Qua đêm)'` : ``}
     ),
     vnindex
     AS (SELECT
       m.date,
-      ${type ? `(closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY m.date DESC)) /
-      LEAD(closePrice) OVER (PARTITION BY code ORDER BY m.date DESC) * 100`: `closePrice`} AS value,
+      ${
+        type
+          ? `(closePrice - LEAD(closePrice) OVER (PARTITION BY code ORDER BY m.date DESC)) /
+      LEAD(closePrice) OVER (PARTITION BY code ORDER BY m.date DESC) * 100`
+          : `closePrice`
+      } AS value,
       'VNINDEX' AS name
     FROM marketTrade.dbo.indexTradeVND m
     INNER JOIN temp t
@@ -1518,17 +1697,25 @@ export class MacroService {
     GROUP BY date
     HAVING COUNT(date) = 2)
     ORDER BY date DESC
-    `
-    
-    const data = await this.mssqlService.query<ExchangeRateAndInterestRateResponse[]>(query)
-    const dataMapped = ExchangeRateAndInterestRateResponse.mapToList(data.reverse())
-    await this.redis.set(`${RedisKeys.exchangeRateAndInterestRate}:${type}:${category}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    `;
+
+    const data = await this.mssqlService.query<
+      ExchangeRateAndInterestRateResponse[]
+    >(query);
+    const dataMapped = ExchangeRateAndInterestRateResponse.mapToList(
+      data.reverse(),
+    );
+    await this.redis.set(
+      `${RedisKeys.exchangeRateAndInterestRate}:${type}:${category}`,
+      dataMapped,
+      { ttl: TimeToLive.OneDay },
+    );
+    return dataMapped;
   }
 
   async interestRate() {
-    const redisData = await this.redis.get(`${RedisKeys.interestRate}`)
-    if (redisData) return redisData
+    const redisData = await this.redis.get(`${RedisKeys.interestRate}`);
+    if (redisData) return redisData;
 
     const query = `
     WITH temp
@@ -1545,10 +1732,12 @@ export class MacroService {
       thoiDiem AS date
     FROM temp
     ORDER BY thoiDiem ASC
-    `
-    const data = await this.mssqlService.query<InterestRateResponse[]>(query)
-    const dataMapped = InterestRateResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.interestRate}`, dataMapped, { ttl: TimeToLive.OneDay })
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<InterestRateResponse[]>(query);
+    const dataMapped = InterestRateResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.interestRate}`, dataMapped, {
+      ttl: TimeToLive.OneDay,
+    });
+    return dataMapped;
   }
 }

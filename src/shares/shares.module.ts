@@ -5,6 +5,6 @@ import { MssqlService } from '../mssql/mssql.service';
 
 @Module({
   controllers: [SharesController],
-  providers: [SharesService, MssqlService]
+  providers: [SharesService, MssqlService],
 })
 export class SharesModule {}

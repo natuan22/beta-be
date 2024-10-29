@@ -5,6 +5,6 @@ import { MssqlService } from '../mssql/mssql.service';
 
 @Module({
   controllers: [RetailController],
-  providers: [RetailService, MssqlService]
+  providers: [RetailService, MssqlService],
 })
 export class RetailModule {}

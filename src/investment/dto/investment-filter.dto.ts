@@ -1,50 +1,50 @@
-import { ApiProperty } from "@nestjs/swagger"
+import { ApiProperty } from '@nestjs/swagger';
 
 class InvestmentFilterBodyDto {
-    @ApiProperty({
-        type: String
-    })
-    key: string
+  @ApiProperty({
+    type: String,
+  })
+  key: string;
 
-    @ApiProperty({
-        type: Number
-    })
-    from: number
+  @ApiProperty({
+    type: Number,
+  })
+  from: number;
 
-    @ApiProperty({
-        type: Number
-    })
-    to: number
+  @ApiProperty({
+    type: Number,
+  })
+  to: number;
 }
 
 export class InvestmentFilterDto {
-    @ApiProperty({
-        type: InvestmentFilterBodyDto,
-        isArray: true
-    })
-    filter: InvestmentFilterBodyDto[]
+  @ApiProperty({
+    type: InvestmentFilterBodyDto,
+    isArray: true,
+  })
+  filter: InvestmentFilterBodyDto[];
 
-    @ApiProperty({
-        type: Number
-    })
-    limit: number
+  @ApiProperty({
+    type: Number,
+  })
+  limit: number;
 
-    @ApiProperty({
-        type: Number
-    })
-    page: number
+  @ApiProperty({
+    type: Number,
+  })
+  page: number;
 
-    @ApiProperty({
-        type: String,
-        description: `Nếu lấy tất cả truyền lên 'ALL'`,
-        example: 'HNX, UPCOM, HOSE'
-    })
-    exchange: string
+  @ApiProperty({
+    type: String,
+    description: `Nếu lấy tất cả truyền lên 'ALL'`,
+    example: 'HNX, UPCOM, HOSE',
+  })
+  exchange: string;
 
-    @ApiProperty({
-        type: String,
-        example: 'banLe,baoHiem,batDongSan,nganHang, ...',
-        description: `
+  @ApiProperty({
+    type: String,
+    example: 'banLe,baoHiem,batDongSan,nganHang, ...',
+    description: `
         baoHiem: 'Bảo hiểm',
         batDongSan: 'Bất động sản',
         congNghe: 'Công nghệ',
@@ -64,6 +64,6 @@ export class InvestmentFilterDto {
         xayDung: 'Xây dựng & Vật liệu',
         taiNguyen: 'Tài nguyên',
         yTe: 'Y tế',`,
-      })
-      industry: string;
+  })
+  industry: string;
 }

@@ -27,7 +27,6 @@ export class PEIndustryResponse {
   })
   PE: number;
 
-
   constructor(data?: IPEIndustry, type: number = 0) {
     this.industry = data?.industry || '';
     switch (this.industry) {

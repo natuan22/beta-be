@@ -1,37 +1,39 @@
-import {DomesticIndexKafkaInterface} from "../interfaces/domestic-index-kafka.interface";
-import {UtilCommonTemplate} from "../../utils/utils.common";
+import { DomesticIndexKafkaInterface } from '../interfaces/domestic-index-kafka.interface';
+import { UtilCommonTemplate } from '../../utils/utils.common';
 
 export class DomesticIndexKafkaResponse {
-    ticker: string;
+  ticker: string;
 
-    price: number;
+  price: number;
 
-    change_price: number;
+  change_price: number;
 
-    percent_d: number;
+  percent_d: number;
 
-    lastUpdated: Date | string
-    constructor(data?: DomesticIndexKafkaInterface) {
-        switch (data?.name) {
-            case 'VNXALLSHARE':
-                this.ticker = 'VNXALL';
-                break;
-            case 'HNX':
-                this.ticker = 'HNXINDEX';
-                break;
-            case 'UPCOM':
-                this.ticker = 'UPINDEX';
-                break;
-            default:
-                this.ticker = data?.name || "";
-        }
-        this.price = data?.price || 0;
-        this.change_price = data?.["1D"]|| 0;
-        this.percent_d = data?.["%1D"] ? +data?.["%1D"].slice(0, data?.["%1D"].length - 1) : 0;
-        this.lastUpdated = UtilCommonTemplate.toDateTime(data?.lastUpdated) || "";
+  lastUpdated: Date | string;
+  constructor(data?: DomesticIndexKafkaInterface) {
+    switch (data?.name) {
+      case 'VNXALLSHARE':
+        this.ticker = 'VNXALL';
+        break;
+      case 'HNX':
+        this.ticker = 'HNXINDEX';
+        break;
+      case 'UPCOM':
+        this.ticker = 'UPINDEX';
+        break;
+      default:
+        this.ticker = data?.name || '';
     }
+    this.price = data?.price || 0;
+    this.change_price = data?.['1D'] || 0;
+    this.percent_d = data?.['%1D']
+      ? +data?.['%1D'].slice(0, data?.['%1D'].length - 1)
+      : 0;
+    this.lastUpdated = UtilCommonTemplate.toDateTime(data?.lastUpdated) || '';
+  }
 
-    public mapToList(data?: DomesticIndexKafkaInterface[] | any[]) {
-        return data.map(i => new DomesticIndexKafkaResponse(i))
-    }
+  public mapToList(data?: DomesticIndexKafkaInterface[] | any[]) {
+    return data.map((i) => new DomesticIndexKafkaResponse(i));
+  }
 }

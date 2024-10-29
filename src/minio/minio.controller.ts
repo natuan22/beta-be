@@ -13,6 +13,4 @@ export class MinioController {
   // @Get('todo')
   // async listTodo(){
   // }
-
-
 }

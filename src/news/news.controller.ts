@@ -18,87 +18,87 @@ import { NewsFilterResponse } from './response/news-filter.response';
 export class NewsController {
   constructor(private readonly newsService: NewsService) {}
 
-  @ApiOperation({summary: 'Tin doanh nghiệp - Lịch sự kiện'})
-  @ApiOkResponse({type: NewsEventResponse})
+  @ApiOperation({ summary: 'Tin doanh nghiệp - Lịch sự kiện' })
+  @ApiOkResponse({ type: NewsEventResponse })
   @Get('event')
-  async event(@Query() q: EventDto,@Res() res: Response){
+  async event(@Query() q: EventDto, @Res() res: Response) {
     try {
-      const data = await this.newsService.getEvent(q)
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      const data = await this.newsService.getEvent(q);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
 
-  @ApiOperation({summary: 'Tin doanh nghiệp - Tin tức doanh nghiệp'})
-  @ApiOkResponse({type: NewsEnterpriseResponse})
+  @ApiOperation({ summary: 'Tin doanh nghiệp - Tin tức doanh nghiệp' })
+  @ApiOkResponse({ type: NewsEnterpriseResponse })
   @Get('tin-tuc-doanh-nghiep')
-  async newsEnterprise(@Res() res: Response){
+  async newsEnterprise(@Res() res: Response) {
     try {
-      const data = await this.newsService.newsEnterprise()
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      const data = await this.newsService.newsEnterprise();
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
 
-  @ApiOperation({summary: 'Tin vĩ mô trong nước'})
-  @ApiOkResponse({type: MacroDomesticResponse})
+  @ApiOperation({ summary: 'Tin vĩ mô trong nước' })
+  @ApiOkResponse({ type: MacroDomesticResponse })
   @Get('vi-mo-trong-nuoc')
-  async macroDomestic(@Res() res: Response, @Query() q: PageLimitDto){
+  async macroDomestic(@Res() res: Response, @Query() q: PageLimitDto) {
     try {
-      const data = await this.newsService.macroDomestic(q)
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      const data = await this.newsService.macroDomestic(q);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
-  
-  @ApiOperation({summary: 'Tin vĩ mô quốc tế'})
-  @ApiOkResponse({type: MacroDomesticResponse})
+
+  @ApiOperation({ summary: 'Tin vĩ mô quốc tế' })
+  @ApiOkResponse({ type: MacroDomesticResponse })
   @Get('vi-mo-quoc-te')
-  async macroInternational(@Res() res: Response, @Query() q: PageLimitDto){
+  async macroInternational(@Res() res: Response, @Query() q: PageLimitDto) {
     try {
-      const data = await this.newsService.macroInternational(q)
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      const data = await this.newsService.macroInternational(q);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
 
   @Get('filter')
-  @ApiOperation({summary: 'Bộ lọc'})
-  @ApiOkResponse({type: FilterResponse})
-  async filter(@Res() res: Response){
+  @ApiOperation({ summary: 'Bộ lọc' })
+  @ApiOkResponse({ type: FilterResponse })
+  async filter(@Res() res: Response) {
     try {
       const data = await this.newsService.filter();
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
   @Get('info-stock')
-  @ApiOperation({summary: 'Thông tin cổ phiếu'})
-  @ApiOkResponse({type: InfoStockResponse})
-  async getInfoStock(@Res() res: Response){
+  @ApiOperation({ summary: 'Thông tin cổ phiếu' })
+  @ApiOkResponse({ type: InfoStockResponse })
+  async getInfoStock(@Res() res: Response) {
     try {
       const data = await this.newsService.getInfoStock();
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
-      throw new CatchException(e)
+      throw new CatchException(e);
     }
   }
 
-  @ApiOperation({summary: 'Bộ lọc tin tức'})
-  @ApiOkResponse({type: NewsFilterResponse})
+  @ApiOperation({ summary: 'Bộ lọc tin tức' })
+  @ApiOkResponse({ type: NewsFilterResponse })
   @Get('bo-loc-tin-tuc')
-  async newsFilter(@Res() res: Response, @Query() q: NewsFilterDto){
+  async newsFilter(@Res() res: Response, @Query() q: NewsFilterDto) {
     try {
-      const data = await this.newsService.newsFilter(q)
-      return res.status(HttpStatus.OK).send(new BaseResponse({data}))
+      const data = await this.newsService.newsFilter(q);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
-      throw new CatchException(error)
+      throw new CatchException(error);
     }
   }
 }

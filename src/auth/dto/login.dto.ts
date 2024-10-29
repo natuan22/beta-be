@@ -1,5 +1,5 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsPhoneNumber, IsString} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsPhoneNumber, IsString } from 'class-validator';
 
 export class LoginDto {
   @IsPhoneNumber('VN')
@@ -9,7 +9,7 @@ export class LoginDto {
   })
   phone: string;
 
-  @IsString({message: 'password not found'})
+  @IsString({ message: 'password not found' })
   @ApiProperty({
     type: String,
     example: '123beta456',

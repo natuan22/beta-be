@@ -17,7 +17,7 @@ import {
   isEqual,
   isHigh,
   isIncrease,
-  isLow
+  isLow,
 } from '../stock/processes/industry-data-child';
 import { IndustryResponse } from '../stock/responses/Industry.response';
 import { MarketBreadthResponse } from '../stock/responses/MarketBreadth.response';
@@ -706,7 +706,7 @@ export class KafkaService {
 
   handleChartNen(payload: ChartNenInterface[]) {
     this.send(`${SocketEmit.CoPhieu}-${payload[0].code}`, {
-      ...payload[0],  
+      ...payload[0],
       totalVal: payload[0]?.totalVal / 1000000000 || 0,
       time: Date.UTC(
         new Date().getFullYear(),
@@ -723,14 +723,21 @@ export class KafkaService {
       const data: any[] = (await this.redis.get('beta-watch-list')) || [];
       const item = data.find((item) => item.code == payload[0].code);
       if (item) {
-        const res = await this.investmentService.test(
+        const res: any = await this.investmentService.test(
           [{ code: item.code, ma: item.ma }],
           moment().subtract(2, 'year').format('YYYY-MM-DD'),
           moment().format('YYYY-MM-DD'),
           1,
           payload[0].closePrice,
         );
-        this.send(`${SocketEmit.MA}`, res);
+        this.send(
+          `${SocketEmit.MA}`,
+          res.map((item, index) => ({
+            ...item,
+            price_2024: data[index].price_2024 || 0,
+            price_2025: data[index].price_2025 || 0,
+          })),
+        );
       }
     } catch (e) {
       console.error(e);
@@ -738,39 +745,44 @@ export class KafkaService {
   }
 
   async handleGiaoDichCoPhieu(payload: TickerTransInterface[]) {
-    const { code, action, matchPrice, volume, priceChangeReference, time } = payload[0]
+    const { code, action, matchPrice, volume, priceChangeReference, time } =
+      payload[0];
 
     const query = `
         select closePrice from marketTrade.dbo.tickerTradeVND
         where date = (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday where date < (select max(date) from tradeIntraday.dbo.tickerTradeVNDIntraday)
         ) and code = '${code}'
-      `
+      `;
     const prevClosePrice = await this.dbServer.query(query);
 
-    const value = matchPrice * volume
-    const type = value < 100_000_000 
-                    ? "small"
-                    : value < 1_000_000_000
-                    ? "medium"
-                    : "large"
-                    
+    const value = matchPrice * volume;
+    const type =
+      value < 100_000_000
+        ? 'small'
+        : value < 1_000_000_000
+        ? 'medium'
+        : 'large';
+
     // Định dạng lại giá trị time về định dạng ISO
-    const formattedTime = moment(time, 'HH:mm:ss').utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'); 
+    const formattedTime = moment(time, 'HH:mm:ss')
+      .utc()
+      .format('YYYY-MM-DDTHH:mm:ss.SSS[Z]');
 
     const timestamp = Date.UTC(
-                        new Date().getFullYear(),
-                        new Date().getMonth(),
-                        new Date().getDate(),
-                        moment(formattedTime).utcOffset('+00:00').hour(),
-                        moment(formattedTime).utcOffset('+00:00').minute(),
-                        moment(formattedTime).utcOffset('+00:00').second(),
-                    ).valueOf()
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      new Date().getDate(),
+      moment(formattedTime).utcOffset('+00:00').hour(),
+      moment(formattedTime).utcOffset('+00:00').minute(),
+      moment(formattedTime).utcOffset('+00:00').second(),
+    ).valueOf();
 
     this.send(`${SocketEmit.TransCoPhieu}-${code}`, {
       action,
       highlight: value > 1_000_000_000,
       matchPrice: matchPrice / 1_000,
-      perChangeReference: (priceChangeReference / 1000 / prevClosePrice[0].closePrice) * 100,
+      perChangeReference:
+        (priceChangeReference / 1000 / prevClosePrice[0].closePrice) * 100,
       priceChangeReference: priceChangeReference / 1_000,
       time,
       timestamp,
@@ -779,7 +791,7 @@ export class KafkaService {
       volume: +volume,
     });
   }
-  
+
   public async getSessionDate(
     table: string,
     column: string = 'date_time',
@@ -828,6 +840,4 @@ export class KafkaService {
     await this.redis.set(`${RedisKeys.SessionDate}:${table}:${column}`, result);
     return result;
   }
-
-  
 }

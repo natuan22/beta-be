@@ -1,20 +1,19 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty } from '@nestjs/swagger';
 
 export class SaveMarketMovementsDto {
-    @ApiProperty({
-        type: String
-    })
-    text: string
+  @ApiProperty({
+    type: String,
+  })
+  text: string;
 }
 
 export class SaveMarketCommentDto {
-    @ApiProperty({
-        type: String,
-        isArray: true
-    })
-    text: string[]
+  @ApiProperty({
+    type: String,
+    isArray: true,
+  })
+  text: string[];
 
-    @ApiProperty({
-    })
-    img: any
+  @ApiProperty({})
+  img: any;
 }

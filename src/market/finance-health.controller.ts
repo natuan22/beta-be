@@ -33,7 +33,7 @@ export class FinanceHealthController {
       q.exchange.toUpperCase(),
       parseInt(q.type),
       parseInt(q.order),
-      q.industry
+      q.industry,
     );
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
@@ -165,10 +165,7 @@ export class FinanceHealthController {
     `,
   })
   @ApiOkResponse({ type: IndusInterestCoverageResponse })
-  async indsInterestCoverage(
-    @Query() q: TimeFrameDto,
-    @Res() res: Response,
-  ) {
+  async indsInterestCoverage(@Query() q: TimeFrameDto, @Res() res: Response) {
     const data = await this.fHealthService.indsInterestCoverage(
       q.exchange.toUpperCase(),
       parseInt(q.type),
@@ -184,10 +181,7 @@ export class FinanceHealthController {
     `,
   })
   @ApiOkResponse({ type: IndusInterestCoverageResponse })
-  async interestRatesOnLoans(
-    @Query() q: TimeFrameDto,
-    @Res() res: Response,
-  ) {
+  async interestRatesOnLoans(@Query() q: TimeFrameDto, @Res() res: Response) {
     const data = await this.fHealthService.interestRatesOnLoans(
       q.exchange.toUpperCase(),
       parseInt(q.type),
@@ -203,14 +197,16 @@ export class FinanceHealthController {
     `,
   })
   @ApiOkResponse({ type: IndsProfitMarginsTableResponse })
-  async indsProfitMarginsTable(@Query() q: ExchangeOrderDto, @Res() res: Response) {
+  async indsProfitMarginsTable(
+    @Query() q: ExchangeOrderDto,
+    @Res() res: Response,
+  ) {
     const data = await this.fHealthService.indsProfitMarginsTable(
       q.exchange.toUpperCase(),
       parseInt(q.order),
     );
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
-
 
   @Get('ty-suat-loi-nhuan-rong-cac-nganh')
   @ApiOperation({

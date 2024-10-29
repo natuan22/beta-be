@@ -18,17 +18,27 @@ export class NewsService {
   constructor(
     private readonly mssqlService: MssqlService,
     @Inject(CACHE_MANAGER)
-    private readonly redis: Cache
-  ){}
-  private newsEventType = [`N'Trả cổ tức bằng tiền mặt'`, `N'Trả cổ tức bằng cổ phiếu'`, `N'Thưởng cổ phiếu'`, `N'Phát hành thêm'`]
-  async getEvent(q: EventDto){
-    const limit = +q.limit || 20
-    const page = +q.page || 1
+    private readonly redis: Cache,
+  ) {}
+  private newsEventType = [
+    `N'Trả cổ tức bằng tiền mặt'`,
+    `N'Trả cổ tức bằng cổ phiếu'`,
+    `N'Thưởng cổ phiếu'`,
+    `N'Phát hành thêm'`,
+  ];
+  async getEvent(q: EventDto) {
+    const limit = +q.limit || 20;
+    const page = +q.page || 1;
 
-    const exchange = q.exchange.toLowerCase() != 'all' ? `('${q.exchange}')` : `('HOSE', 'UPCOM', 'HNX')` 
+    const exchange =
+      q.exchange.toLowerCase() != 'all'
+        ? `('${q.exchange}')`
+        : `('HOSE', 'UPCOM', 'HNX')`;
 
-    const redisData = await this.redis.get(`${RedisKeys.newsEvent}:${page}:${limit}:${exchange}:${q.type}`)
-    if(redisData) return redisData
+    const redisData = await this.redis.get(
+      `${RedisKeys.newsEvent}:${page}:${limit}:${exchange}:${q.type}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     SELECT 
@@ -41,34 +51,44 @@ export class NewsService {
       NoiDungSuKien AS content,
       LoaiSuKien AS type
     FROM PHANTICH.dbo.LichSukien
-    WHERE ${!q.type || +q.type == 0 ? `LoaiSuKien IN (
+    WHERE ${
+      !q.type || +q.type == 0
+        ? `LoaiSuKien IN (
       N'Trả cổ tức bằng tiền mặt',
       N'Trả cổ tức bằng cổ phiếu',
       N'Thưởng cổ phiếu',
       N'Phát hành thêm'
-  )` : `LoaiSuKien = ${this.newsEventType[+q.type - 1]}`} 
+  )`
+        : `LoaiSuKien = ${this.newsEventType[+q.type - 1]}`
+    } 
     and san IN ${exchange}
     ORDER BY NgayDKCC desc
     OFFSET ${(page - 1) * limit} ROWS
     FETCH NEXT ${limit} ROWS ONLY;
-    `
-    const data = await this.mssqlService.query<NewsEventResponse[]>(query)
-    
-    const dataMapped = NewsEventResponse.mapToList(data)
+    `;
+    const data = await this.mssqlService.query<NewsEventResponse[]>(query);
+
+    const dataMapped = NewsEventResponse.mapToList(data);
     const res = {
       limit,
       total_record: data[0]?.total_record || 0,
-      list: dataMapped
-    }
-    await this.redis.set(`${RedisKeys.newsEvent}:${page}:${limit}:${exchange}:${q.type}`, res, {ttl: TimeToLive.OneHour})
-    return res
+      list: dataMapped,
+    };
+    await this.redis.set(
+      `${RedisKeys.newsEvent}:${page}:${limit}:${exchange}:${q.type}`,
+      res,
+      { ttl: TimeToLive.OneHour },
+    );
+    return res;
   }
 
-  async newsEnterprise(){
-    const redisData = await this.redis.get(`${RedisKeys.newsEnterprise}`)
-    if(redisData) return redisData
-    const date = await this.mssqlService.query(`select top 1 Date as date from marketTrade.dbo.tickerTradeVND order by Date desc`)
-    
+  async newsEnterprise() {
+    const redisData = await this.redis.get(`${RedisKeys.newsEnterprise}`);
+    if (redisData) return redisData;
+    const date = await this.mssqlService.query(
+      `select top 1 Date as date from marketTrade.dbo.tickerTradeVND order by Date desc`,
+    );
+
     const query = `
     SELECT
         n.Date as date,
@@ -85,17 +105,19 @@ export class NewsService {
     WHERE Href NOT LIKE 'https://cafef.vn%'  
     AND Href NOT LIKE 'https://ndh.vn%'
     ORDER BY n.date DESC
-    `
-    
-    const data = await this.mssqlService.query<NewsEnterpriseResponse[]>(query)
-    const dataMapped = NewsEnterpriseResponse.mapToList(data)
-    await this.redis.set(`${RedisKeys.newsEnterprise}`, dataMapped, {ttl: TimeToLive.OneHour})
-    return dataMapped
+    `;
+
+    const data = await this.mssqlService.query<NewsEnterpriseResponse[]>(query);
+    const dataMapped = NewsEnterpriseResponse.mapToList(data);
+    await this.redis.set(`${RedisKeys.newsEnterprise}`, dataMapped, {
+      ttl: TimeToLive.OneHour,
+    });
+    return dataMapped;
   }
 
-  async macroDomestic(q: PageLimitDto){
-    const limit = +q.limit || 20
-    const page = +q.page || 1
+  async macroDomestic(q: PageLimitDto) {
+    const limit = +q.limit || 20;
+    const page = +q.page || 1;
 
     const query = `
     SELECT distinct
@@ -110,15 +132,15 @@ export class NewsService {
     ORDER BY Date DESC
     OFFSET ${(page - 1) * limit} ROWS
     FETCH NEXT ${limit} ROWS ONLY;
-    `
-    const data = await this.mssqlService.query<MacroDomesticResponse[]>(query)
-    const dataMapped = MacroDomesticResponse.mapToList(data)
-    return dataMapped
+    `;
+    const data = await this.mssqlService.query<MacroDomesticResponse[]>(query);
+    const dataMapped = MacroDomesticResponse.mapToList(data);
+    return dataMapped;
   }
 
-  async macroInternational(q: PageLimitDto){
-    const limit = +q.limit || 20
-    const page = +q.page || 1
+  async macroInternational(q: PageLimitDto) {
+    const limit = +q.limit || 20;
+    const page = +q.page || 1;
 
     const query = `
     SELECT distinct
@@ -133,16 +155,16 @@ export class NewsService {
     ORDER BY Date DESC
     OFFSET ${(page - 1) * limit} ROWS
     FETCH NEXT ${limit} ROWS ONLY;
-    `
+    `;
 
-    const data = await this.mssqlService.query<MacroDomesticResponse[]>(query)
-    const dataMapped = MacroDomesticResponse.mapToList(data)
-    return dataMapped
+    const data = await this.mssqlService.query<MacroDomesticResponse[]>(query);
+    const dataMapped = MacroDomesticResponse.mapToList(data);
+    return dataMapped;
   }
 
-  async filter(){
-    const redisData = await this.redis.get(RedisKeys.filter)
-    if(redisData) return redisData
+  async filter() {
+    const redisData = await this.redis.get(RedisKeys.filter);
+    if (redisData) return redisData;
 
     const query = `
       select code, floor, LV2, LV4 from marketInfor.dbo.info
@@ -152,71 +174,93 @@ export class NewsService {
       and LV4 != ''
       and LV2 != ''
       order by floor desc, LV2 asc
-    `
-    const data = await this.mssqlService.query<any[]>(query)
+    `;
+    const data = await this.mssqlService.query<any[]>(query);
 
     const result = data.reduce((acc, cur) => {
-      const index_floor = acc.findIndex(item => item.name == cur.floor)
-      
-      if(acc.length == 0 || index_floor == -1){
-        acc.push({name: cur.floor, LV2: [{name: cur.LV2, LV4: [{name: cur.LV4, code: [cur.code]}]}]})
-        return acc
-      }
-      const index_lv2 = acc[index_floor].LV2.findIndex(item => item.name == cur.LV2)
-      
-      if(index_lv2 == -1){
-         acc[index_floor].LV2.push({name: cur.LV2, LV4: [{name: cur.LV4, code: [cur.code]}]})
-         return acc
-      }
-      
-      const index_lv4 = acc[index_floor].LV2[index_lv2].LV4.findIndex(item => item.name == cur.LV4)
-      if(index_lv4 == -1){
-        acc[index_floor].LV2[index_lv2].LV4.push({name: cur.LV4, code: [cur.code]})
-        return acc
-      }
-      acc[index_floor].LV2[index_lv2].LV4[index_lv4].code.push(cur.code)
+      const index_floor = acc.findIndex((item) => item.name == cur.floor);
 
-      return acc
-    }, [])
+      if (acc.length == 0 || index_floor == -1) {
+        acc.push({
+          name: cur.floor,
+          LV2: [{ name: cur.LV2, LV4: [{ name: cur.LV4, code: [cur.code] }] }],
+        });
+        return acc;
+      }
+      const index_lv2 = acc[index_floor].LV2.findIndex(
+        (item) => item.name == cur.LV2,
+      );
 
-    await this.redis.set(RedisKeys.filter, result, {ttl: TimeToLive.OneWeek})
-    return result
+      if (index_lv2 == -1) {
+        acc[index_floor].LV2.push({
+          name: cur.LV2,
+          LV4: [{ name: cur.LV4, code: [cur.code] }],
+        });
+        return acc;
+      }
+
+      const index_lv4 = acc[index_floor].LV2[index_lv2].LV4.findIndex(
+        (item) => item.name == cur.LV4,
+      );
+      if (index_lv4 == -1) {
+        acc[index_floor].LV2[index_lv2].LV4.push({
+          name: cur.LV4,
+          code: [cur.code],
+        });
+        return acc;
+      }
+      acc[index_floor].LV2[index_lv2].LV4[index_lv4].code.push(cur.code);
+
+      return acc;
+    }, []);
+
+    await this.redis.set(RedisKeys.filter, result, { ttl: TimeToLive.OneWeek });
+    return result;
   }
 
-  async newsFilter(q: NewsFilterDto){
-    const limit = +q.limit || 20
-    const page = +q.page || 1
-    const code = q.code != 'all' ? q.code.split(',') : ''
-    
-    const redisData = await this.redis.get(`${RedisKeys.newsFilter}:${page}:${limit}:${code}`)
-    if(redisData) return redisData
+  async newsFilter(q: NewsFilterDto) {
+    const limit = +q.limit || 20;
+    const page = +q.page || 1;
+    const code = q.code != 'all' ? q.code.split(',') : '';
+
+    const redisData = await this.redis.get(
+      `${RedisKeys.newsFilter}:${page}:${limit}:${code}`,
+    );
+    if (redisData) return redisData;
 
     const query = `
     select distinct Title as title, Href as href, Date as date, Img as img, TickerTitle as code, count(*) over (  ) as total_record from macroEconomic.dbo.TinTuc
-    ${code ? `where TickerTitle in (${code.map(item => `'${item}'`).join(',')})` : `where TickerTitle != ''`}
+    ${
+      code
+        ? `where TickerTitle in (${code.map((item) => `'${item}'`).join(',')})`
+        : `where TickerTitle != ''`
+    }
     AND Href NOT LIKE 'https://cafef.vn%'
     AND Href NOT LIKE 'https://ndh.vn%'
     AND Img != ''
     ORDER BY Date DESC
     OFFSET ${(page - 1) * limit} ROWS
     FETCH NEXT ${limit} ROWS ONLY;
-    `
+    `;
 
-    const data = await this.mssqlService.query<NewsFilterResponse[]>(query)
-    const dataMapped = NewsFilterResponse.mapToList(data)
+    const data = await this.mssqlService.query<NewsFilterResponse[]>(query);
+    const dataMapped = NewsFilterResponse.mapToList(data);
     const res = {
       limit,
       total_record: data[0]?.total_record,
-      list: dataMapped
-    }
-    await this.redis.set(`${RedisKeys.newsFilter}:${page}:${limit}:${code}`, res, {ttl: TimeToLive.HaftHour})
-    return res
+      list: dataMapped,
+    };
+    await this.redis.set(
+      `${RedisKeys.newsFilter}:${page}:${limit}:${code}`,
+      res,
+      { ttl: TimeToLive.HaftHour },
+    );
+    return res;
   }
-  
 
-  async getInfoStock(){
-    const redisData = await this.redis.get(RedisKeys.infoStock)
-    if(redisData) return redisData
+  async getInfoStock() {
+    const redisData = await this.redis.get(RedisKeys.infoStock);
+    if (redisData) return redisData;
     const query = `
     SELECT    
       code,
@@ -231,10 +275,9 @@ export class NewsService {
       END AS name
     FROM marketInfor.dbo.info
     WHERE shortName != ''
-    `
-    const data = await this.mssqlService.query(query)
-    await this.redis.set(RedisKeys.infoStock, data, {ttl: TimeToLive.OneDay})
-    return data
+    `;
+    const data = await this.mssqlService.query(query);
+    await this.redis.set(RedisKeys.infoStock, data, { ttl: TimeToLive.OneDay });
+    return data;
   }
 }
-

@@ -1,6 +1,12 @@
-import {Column, Entity, Index, OneToMany, PrimaryGeneratedColumn} from 'typeorm';
-import {BaseModel} from '../../models/base.entity';
-import {DeviceEntity} from "../../auth/entities/device.entity";
+import {
+  Column,
+  Entity,
+  Index,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { BaseModel } from '../../models/base.entity';
+import { DeviceEntity } from '../../auth/entities/device.entity';
 
 @Entity({
   database: 'AUTH',
@@ -35,7 +41,7 @@ export class UserEntity extends BaseModel {
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: ''
+    default: '',
   })
   avatar: string;
 
@@ -79,7 +85,7 @@ export class UserEntity extends BaseModel {
   @Column({
     type: 'nvarchar',
     length: '255',
-    default: ''
+    default: '',
   })
   address: string;
 

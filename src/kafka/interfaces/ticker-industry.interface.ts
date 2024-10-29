@@ -1,4 +1,4 @@
 export interface TickerIndustryInterface {
-    ticker: string;
-    industry: string;
+  ticker: string;
+  industry: string;
 }

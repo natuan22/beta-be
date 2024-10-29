@@ -1,10 +1,9 @@
-import { ApiProperty } from "@nestjs/swagger";
-
+import { ApiProperty } from '@nestjs/swagger';
 
 export class IPPIndustryDto {
-    @ApiProperty({
-        type: String,
-        description: `
+  @ApiProperty({
+    type: String,
+    description: `
         cheBienGo : 'Chế biến gỗ và sản xuất sản phẩm từ gỗ, tre, nứa (trừ giường, tủ, bàn ghế); sản xuất sản phẩm từ rơm, rạ và vật liệu tết bện',
         cheBienKhac : 'Công nghiệp chế biến, chế tạo khác',
         det : 'Dệt',
@@ -29,9 +28,9 @@ export class IPPIndustryDto {
         dongCo : 'Sản xuất xe có động cơ, rơ moóc',
         thucPham : 'Sản xuất, chế biến thực phẩm',
         all : 'TOÀN NGÀNH CHẾ BIẾN, CHẾ TẠO',
-    `
-    })
-    industry: string;
+    `,
+  })
+  industry: string;
 }
 
 export class IPPProductionIndexDto {

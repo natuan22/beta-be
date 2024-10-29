@@ -38,7 +38,7 @@ export class ConfigServiceProvider {
       synchronize: false,
       // logging: true,
       options: { encrypt: false },
-      requestTimeout: 30000
+      requestTimeout: 30000,
     };
   }
 
@@ -98,13 +98,13 @@ export class ConfigServiceProvider {
     };
   }
 
-  minioConfig(){
+  minioConfig() {
     return {
       endPoint: process.env.MINIO_ENDPOINT,
       port: +process.env.MINIO_PORT,
       useSSL: false,
       accessKey: process.env.MINIO_ACCESS_KEY,
       secretKey: process.env.MINIO_SECRET_KEY,
-    }
+    };
   }
 }

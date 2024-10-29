@@ -15,7 +15,7 @@ export enum TimeToLive {
   OneDay = 86400,
   OneDayMilliSeconds = 86400000,
   OneWeek = 604800,
-  OneWeekMilliSeconds = 604800000,   
+  OneWeekMilliSeconds = 604800000,
   OneYear = 31556926,
   OneYearMilliSeconds = 31536000000, //365 * 24 * 60 * 60 * 1000
   Forever = -1,

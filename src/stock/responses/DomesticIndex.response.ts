@@ -51,22 +51,22 @@ export class DomesticIndexResponse {
   // })
   // lastUpdated: Date | string;
 
-  code: string
-  timeInday: string
-  closePrice: number
-  change: number
-  totalVol: number
-  totalVal: number
-  perChange: number
+  code: string;
+  timeInday: string;
+  closePrice: number;
+  change: number;
+  totalVol: number;
+  totalVal: number;
+  perChange: number;
 
   constructor(data?: any) {
-    this.code = data?.code || ''
-    this.timeInday = data?.timeInday || ''
-    this.closePrice = data?.closePrice || 0
-    this.change = data?.change || 0
-    this.totalVol = data?.totalVol || 0
-    this.totalVal = data?.totalVal || 0
-    this.perChange = data?.perChange || 0
+    this.code = data?.code || '';
+    this.timeInday = data?.timeInday || '';
+    this.closePrice = data?.closePrice || 0;
+    this.change = data?.change || 0;
+    this.totalVol = data?.totalVol || 0;
+    this.totalVal = data?.totalVal || 0;
+    this.perChange = data?.perChange || 0;
   }
 
   public mapToList(data?: LineChartInterface[] | any[]) {
