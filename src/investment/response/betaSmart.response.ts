@@ -83,8 +83,20 @@ export class BetaSmartResponse {
   })
   ROE: number;
 
+  @ApiProperty({
+    type: Number,
+    description: 'Giá cao nhất 52 tuần',
+  })
+  PRICE_HIGHEST_CR_52W: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Giá thấp nhất 52 tuần',
+  })
+  PRICE_LOWEST_CR_52W: number;
+
   constructor(data?: BetaSmartResponse) {
-    this.signal = data?.signal || 0;
+    this.signal = data?.signal;
     this.code = data?.code || '';
     this.closePrice = data?.closePrice || 0;
     this.totalVol = data?.totalVol || 0;
@@ -99,6 +111,8 @@ export class BetaSmartResponse {
     this.PB = data?.PB || 0;
     this.ROA = data?.ROA || 0;
     this.ROE = data?.ROE || 0;
+    this.PRICE_HIGHEST_CR_52W = data?.PRICE_HIGHEST_CR_52W || 0;
+    this.PRICE_LOWEST_CR_52W = data?.PRICE_LOWEST_CR_52W || 0;
   }
 
   static mapToList(data?: BetaSmartResponse[]) {

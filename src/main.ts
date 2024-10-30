@@ -25,11 +25,11 @@ async function bootstrap() {
   // });
   // 'http://localhost:3000', 'http://192.168.9.146:3000', 'http://192.168.17.24:3001', 'https://morning-new-beta.vercel.app', 'http://resource1.bsi.com.vn'
 
-  // app.enableCors({
-  //   origin: '*', // Chấp nhận mọi nguồn yêu cầu (không an toàn cho production)
-  // });
+  app.enableCors({
+    origin: '*', // Chấp nhận mọi nguồn yêu cầu (không an toàn cho production)
+  });
 
-  app.enableCors({ origin: process.env.WHITELIST_IPS.split(','), credentials: true});
+  // app.enableCors({ origin: process.env.WHITELIST_IPS.split(','), credentials: true});
   app.use(cookieParser());
   app.setGlobalPrefix(process.env.API_PREFIX);
   app.useGlobalInterceptors(new HttpLoggerInterceptor());
@@ -59,18 +59,18 @@ async function bootstrap() {
 
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
-  app.connectMicroservice(app.get(CONFIG_SERVICE).createKafkaConfig());
-  await app.startAllMicroservices().catch((e) => console.log(e));
+  // app.connectMicroservice(app.get(CONFIG_SERVICE).createKafkaConfig());
+  // await app.startAllMicroservices().catch((e) => console.log(e));
 
-  await app.listen(parseInt(process.env.SERVER_PORT)).then(() => {
-    console.log(
-      `Server is running at ${process.env.SERVER_HOST}:${process.env.SERVER_PORT} --version: 0.1.17`,
-    );
-  });
-
-  // await app.listen(parseInt(process.env.SERVER_PORT), '192.168.9.146').then(() => {
-  //   console.log(`Server is running at 192.168.9.146:${process.env.SERVER_PORT} --version: 0.1.17`);
+  // await app.listen(parseInt(process.env.SERVER_PORT)).then(() => {
+  //   console.log(
+  //     `Server is running at ${process.env.SERVER_HOST}:${process.env.SERVER_PORT} --version: 0.1.17`,
+  //   );
   // });
+
+  await app.listen(parseInt(process.env.SERVER_PORT), '192.168.9.146').then(() => {
+    console.log(`Server is running at 192.168.9.146:${process.env.SERVER_PORT} --version: 0.1.17`);
+  });
 }
 
 bootstrap();
