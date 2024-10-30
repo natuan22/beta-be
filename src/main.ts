@@ -66,7 +66,7 @@ async function bootstrap() {
     console.log(
       `Server is running at ${process.env.SERVER_HOST}:${process.env.SERVER_PORT} --version: 0.1.17`,
     );
-  // });
+  });
 
   // await app.listen(parseInt(process.env.SERVER_PORT), '192.168.9.146').then(() => {
   //   console.log(`Server is running at 192.168.9.146:${process.env.SERVER_PORT} --version: 0.1.17`);
