@@ -1170,7 +1170,7 @@ export class InvestmentService {
     const hour = now.hour();
     const minute = now.minute();
     const isWeekday = !['Saturday', 'Sunday'].includes(now.format('dddd'));
-  
+
     return (isWeekday && ((hour === 8 && minute >= 59) || (hour > 8 && hour < 15) || (hour === 15 && minute <= 5)));
   }
 
@@ -1181,31 +1181,51 @@ export class InvestmentService {
   }
 
   queryDataBasic(code: string | string[]) {
+    const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD');
     const codeCondition = InvestmentService.arrOrSingle('f.code', code);
-    return `SELECT f.code, t.closePrice, f.volume AS totalVol, f.value AS totalVal, t.perChange, f.perChange1M AS perChangeM, 
-                   f.perChangeYTD AS perChangeYtD, f.perChange1Y AS perChangeY, f.EPS, f.PE, f.BVPS, f.PB
-            FROM VISUALIZED_DATA.dbo.filterResource f
-            JOIN marketTrade.dbo.tickerTradeVND t ON t.code = f.code AND t.date = (SELECT MAX(date) FROM VISUALIZED_DATA.dbo.filterResource)
-            WHERE ${codeCondition} AND f.date = (SELECT MAX(date) FROM VISUALIZED_DATA.dbo.filterResource);
+    const codeConditionMinMax = InvestmentService.arrOrSingle('code', code);
+
+    return `
+      WITH min_max AS (
+        SELECT code, min(closePrice) AS PRICE_LOWEST_CR_52W, max(closePrice) AS PRICE_HIGHEST_CR_52W 
+        FROM marketTrade.dbo.tickerTradeVND 
+        WHERE ${codeConditionMinMax} AND date >= '${day_52_week}'
+        GROUP BY code
+      ),
+      LatestDate AS (
+        SELECT code, MAX(date) AS maxDate
+        FROM VISUALIZED_DATA.dbo.filterResource
+        WHERE ${codeConditionMinMax}
+        GROUP BY code
+      )
+      SELECT f.code, t.closePrice, f.volume AS totalVol, f.value AS totalVal, 
+             t.perChange, f.perChange1M AS perChangeM, f.perChangeYTD AS perChangeYtD, f.perChange1Y AS perChangeY, 
+             f.EPS, f.PE, f.BVPS, f.PB, l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
+      FROM VISUALIZED_DATA.dbo.filterResource f
+      OUTER APPLY (SELECT TOP 1 closePrice, perChange FROM marketTrade.dbo.tickerTradeVND WHERE code = f.code AND type = 'STOCK' ORDER BY date DESC) AS t
+      LEFT JOIN min_max l ON l.code = f.code
+      LEFT JOIN LatestDate ld ON ld.code = f.code
+      WHERE ${codeCondition} AND f.date = ld.maxDate;
     `;
   }
 
   queryDataRoaRoe(code: string | string[]) {
     const codeCondition = InvestmentService.arrOrSingle('code', code);
-    return `WITH filtered_roae AS (
-                SELECT code, ROE AS roae, ROA AS roaa, yearQuarter, 
-                       ROW_NUMBER() OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS rn
-                FROM RATIO.dbo.ratioInYearQuarter
-                WHERE RIGHT(yearQuarter, 1) <> '0' and ${codeCondition}
-            ),
-            sum_roaa AS (
-                SELECT code, SUM(roaa) AS roaa, SUM(roae) AS roae
-                FROM filtered_roae
-                WHERE rn <= 4
-                GROUP BY code
-            )
-            SELECT code, roaa AS ROA, roae AS ROE
-            FROM sum_roaa;
+
+    return `
+      WITH filtered_roae AS (
+          SELECT code, ROE AS roae, ROA AS roaa, yearQuarter, ROW_NUMBER() OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS rn
+          FROM RATIO.dbo.ratioInYearQuarter
+          WHERE RIGHT(yearQuarter, 1) <> '0' and ${codeCondition}
+      ),
+      sum_roaa AS (
+          SELECT code, SUM(roaa) AS roaa, SUM(roae) AS roae
+          FROM filtered_roae
+          WHERE rn <= 4
+          GROUP BY code
+      )
+      SELECT code, roaa AS ROA, roae AS ROE
+      FROM sum_roaa;
     `;
   }
 
@@ -1216,18 +1236,21 @@ export class InvestmentService {
 
   async getDataBetaSmartOutsideTrading() {
     try {
-      const query_signal = `SELECT [code], [signal]
-                            FROM [PHANTICH].[dbo].[BuySellSignals] bs
-                            WHERE (([signal] = 0 AND [perChange_2024] >= 7 AND [perChange_2025] >= 25) OR [signal] = 1) 
-                                  AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals] WHERE code = bs.code)
+      const query_signal = `
+          SELECT [code], [signal]
+          FROM [PHANTICH].[dbo].[BuySellSignals] bs
+          WHERE (([signal] = 0 AND [perChange_2024] >= 7 AND [perChange_2025] >= 25) OR [signal] = 1) 
+                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals] WHERE code = bs.code)
       `;
-      const data_signal = await this.mssqlService.query(query_signal) as any;
-      const uniqueCodes: string[] = Array.from(new Set(data_signal.map((item) => item.code))) as string[];
+      const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
-      const [data_basic, data_roa_roe] = await Promise.all([
+      const uniqueCodes: string[] = Array.from(new Set(data_signal.map((item) => item.code))) as string[];
+      if (uniqueCodes.length === 0) return [];
+
+      const [data_basic, data_roa_roe] = (await Promise.all([
         this.mssqlService.query<BetaSmartResponse[]>(this.queryDataBasic(uniqueCodes)),
         this.mssqlService.query(this.queryDataRoaRoe(uniqueCodes)),
-      ]) as any;
+      ])) as [BetaSmartResponse[], any];
 
       return BetaSmartResponse.mapToList(
         data_basic.map((item) => ({
@@ -1237,7 +1260,7 @@ export class InvestmentService {
         })),
       );
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
   }
 
@@ -1252,20 +1275,22 @@ export class InvestmentService {
       );
 
       const filteredResults = result.filter((item, index) => {
-        const isSignalOne = item.signal === 1;
-        const isSignalZeroWithConditions = 
-            item.signal === 0 && 
-            this.calculatePriceChange(data[index].price_2024, item.closePrice) >= 7 && 
+          const isSignalOne = item.signal === 1;
+          const isSignalZeroWithConditions =
+            item.signal === 0 &&
+            this.calculatePriceChange(data[index].price_2024, item.closePrice) >= 7 &&
             this.calculatePriceChange(data[index].price_2025, item.closePrice) >= 25;
 
-        return isSignalOne || isSignalZeroWithConditions;
-      }).map((item) => ({ code: item.code, signal: item.signal }));
+          return isSignalOne || isSignalZeroWithConditions;
+        }).map((item) => ({ code: item.code, signal: item.signal }));
 
       const uniqueCodes: string[] = Array.from(new Set(filteredResults.map((item) => item.code))) as string[];
-      const [data_basic, data_roa_roe] = await Promise.all([
+      if (uniqueCodes.length === 0) return [];
+
+      const [data_basic, data_roa_roe] = (await Promise.all([
         this.mssqlService.query<BetaSmartResponse[]>(this.queryDataBasic(uniqueCodes)),
         this.mssqlService.query(this.queryDataRoaRoe(uniqueCodes)),
-      ]) as any;
+      ])) as [BetaSmartResponse[], any];
 
       return BetaSmartResponse.mapToList(
         data_basic.map((item) => ({
@@ -1288,17 +1313,16 @@ export class InvestmentService {
       const redisData = await this.redis.get(`${RedisKeys.dataStockBasic}:${code}`);
       if (redisData) return redisData;
 
-      const [data_basic, data_roa_roe] = await Promise.all([
+      const [data_basic, data_roa_roe] = (await Promise.all([
         this.mssqlService.query<BetaSmartResponse[]>(this.queryDataBasic(code)),
         this.mssqlService.query(this.queryDataRoaRoe(code)),
-      ]) as any;
+      ])) as [BetaSmartResponse[], any];
 
       const mappedData = { ...data_basic[0], ...data_roa_roe[0] };
       const dataMapped = new BetaSmartResponse(mappedData);
 
       await this.redis.set(`${RedisKeys.dataStockBasic}:${code}`, dataMapped, { ttl: TimeToLive.Minute });
       return dataMapped;
-      
     } catch (error) {
       console.error(error);
     }
