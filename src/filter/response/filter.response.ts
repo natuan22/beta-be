@@ -175,9 +175,7 @@ export class FilterResponse {
   constructor(data?: FilterResponse) {
     this.code = data?.code || '';
     this.floor = data?.floor || '';
-    this.TyleNDTNNdangnamgiu = data?.TyleNDTNNdangnamgiu
-      ? data?.TyleNDTNNdangnamgiu / 0.01
-      : 0;
+    this.TyleNDTNNdangnamgiu = data?.TyleNDTNNdangnamgiu ? data?.TyleNDTNNdangnamgiu / 0.01 : 0;
     this.closePrice = data?.closePrice || 0;
     this.buyVol = data?.buyVol || 0;
     this.buyVal = data?.buyVal / 1000000000 || 0;
@@ -229,49 +227,34 @@ export class FilterResponse {
     this.PS = data?.PS || 0;
     this.marketCap = data?.marketCap ? data?.marketCap / 1000000000 : 0;
     this.LV4 = data?.LV4 || '';
-    this.gia_thoat_ra_bien_tren_bollinger_band =
-      data?.gia_thoat_ra_bien_tren_bollinger_band || 0;
-    this.gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band =
-      data?.gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band || 0;
-    this.gia_dang_o_ngoai_bien_tren_bollinger_band =
-      data?.gia_dang_o_ngoai_bien_tren_bollinger_band || 0;
-    this.gia_thoat_ra_bien_duoi_bollinger_band =
-      data?.gia_thoat_ra_bien_duoi_bollinger_band || 0;
-    this.gia_cat_len_tu_ngoai_bien_duoi_bollinger_band =
-      data?.gia_cat_len_tu_ngoai_bien_duoi_bollinger_band || 0;
-    this.gia_dang_o_ngoai_bien_duoi_bollinger_band =
-      data?.gia_dang_o_ngoai_bien_duoi_bollinger_band || 0;
+    this.gia_thoat_ra_bien_tren_bollinger_band = data?.gia_thoat_ra_bien_tren_bollinger_band || 0;
+    this.gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band = data?.gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band || 0;
+    this.gia_dang_o_ngoai_bien_tren_bollinger_band = data?.gia_dang_o_ngoai_bien_tren_bollinger_band || 0;
+    this.gia_thoat_ra_bien_duoi_bollinger_band = data?.gia_thoat_ra_bien_duoi_bollinger_band || 0;
+    this.gia_cat_len_tu_ngoai_bien_duoi_bollinger_band = data?.gia_cat_len_tu_ngoai_bien_duoi_bollinger_band || 0;
+    this.gia_dang_o_ngoai_bien_duoi_bollinger_band = data?.gia_dang_o_ngoai_bien_duoi_bollinger_band || 0;
     this.gia_hien_tai_cat_len_ma = data?.gia_hien_tai_cat_len_ma || {};
     this.gia_hien_tai_cat_xuong_ma = data?.gia_hien_tai_cat_xuong_ma || {};
     this.gia_hien_tai_cat_len_ema = data?.gia_hien_tai_cat_len_ema || {};
     this.gia_hien_tai_cat_xuong_ema = data?.gia_hien_tai_cat_xuong_ema || {};
-    this.sma_ngan_han_cat_len_sma_dai_han =
-      data?.sma_ngan_han_cat_len_sma_dai_han || {};
-    this.sma_ngan_han_cat_xuong_sma_dai_han =
-      data?.sma_ngan_han_cat_xuong_sma_dai_han || {};
+    this.sma_ngan_han_cat_len_sma_dai_han = data?.sma_ngan_han_cat_len_sma_dai_han || {};
+    this.sma_ngan_han_cat_xuong_sma_dai_han = data?.sma_ngan_han_cat_xuong_sma_dai_han || {};
     this.rsi_di_vao_vung_qua_mua_70 = data?.rsi_di_vao_vung_qua_mua_70 || 0;
     this.rsi_di_vao_vung_qua_mua_80 = data?.rsi_di_vao_vung_qua_mua_80 || 0;
-    this.rsi_thoat_khoi_vung_qua_mua_70 =
-      data?.rsi_thoat_khoi_vung_qua_mua_70 || 0;
-    this.rsi_thoat_khoi_vung_qua_mua_80 =
-      data?.rsi_thoat_khoi_vung_qua_mua_80 || 0;
+    this.rsi_thoat_khoi_vung_qua_mua_70 = data?.rsi_thoat_khoi_vung_qua_mua_70 || 0;
+    this.rsi_thoat_khoi_vung_qua_mua_80 = data?.rsi_thoat_khoi_vung_qua_mua_80 || 0;
     this.rsi_dang_o_vung_qua_mua_70 = data?.rsi_dang_o_vung_qua_mua_70 || 0;
     this.rsi_dang_o_vung_qua_mua_80 = data?.rsi_dang_o_vung_qua_mua_80 || 0;
     this.rsi_di_vao_vung_qua_ban_20 = data?.rsi_di_vao_vung_qua_ban_20 || 0;
     this.rsi_di_vao_vung_qua_ban_30 = data?.rsi_di_vao_vung_qua_ban_30 || 0;
-    this.rsi_thoat_khoi_vung_qua_ban_20 =
-      data?.rsi_thoat_khoi_vung_qua_ban_20 || 0;
-    this.rsi_thoat_khoi_vung_qua_ban_30 =
-      data?.rsi_thoat_khoi_vung_qua_ban_30 || 0;
+    this.rsi_thoat_khoi_vung_qua_ban_20 = data?.rsi_thoat_khoi_vung_qua_ban_20 || 0;
+    this.rsi_thoat_khoi_vung_qua_ban_30 = data?.rsi_thoat_khoi_vung_qua_ban_30 || 0;
     this.rsi_dang_o_vung_qua_ban_20 = data?.rsi_dang_o_vung_qua_ban_20 || 0;
     this.rsi_dang_o_vung_qua_ban_30 = data?.rsi_dang_o_vung_qua_ban_30 || 0;
     this.macd_cat_len_duong_tin_hieu = data?.macd_cat_len_duong_tin_hieu || 0;
-    this.macd_dang_o_tren_duong_tin_hieu =
-      data?.macd_dang_o_tren_duong_tin_hieu || 0;
-    this.macd_cat_xuong_duong_tin_hieu =
-      data?.macd_cat_xuong_duong_tin_hieu || 0;
-    this.macd_dang_o_duoi_duong_tin_hieu =
-      data?.macd_dang_o_duoi_duong_tin_hieu || 0;
+    this.macd_dang_o_tren_duong_tin_hieu = data?.macd_dang_o_tren_duong_tin_hieu || 0;
+    this.macd_cat_xuong_duong_tin_hieu = data?.macd_cat_xuong_duong_tin_hieu || 0;
+    this.macd_dang_o_duoi_duong_tin_hieu = data?.macd_dang_o_duoi_duong_tin_hieu || 0;
     this.macd_cat_len_duong_0 = data?.macd_cat_len_duong_0 || 0;
     this.macd_dang_o_tren_duong_0 = data?.macd_dang_o_tren_duong_0 || 0;
     this.macd_cat_xuong_duong_0 = data?.macd_cat_xuong_duong_0 || 0;
@@ -301,19 +284,9 @@ export class FilterResponse {
     this.technicalSignal = this.genStar(data?.tech);
     this.trendSignal = this.genStar(data?.trend);
     this.generalSignal = this.genStar(data?.overview);
-    this.changeStatusTech = this.calChangeStatus(
-      this.calculateChartValues(this.genStar(data?.tech)),
-      this.calculateChartValues(this.genStar(data?.tech_pre)),
-    );
-    this.changeStatusTrend = this.calChangeStatus(
-      this.calculateChartValues(this.genStar(data?.trend)),
-      this.calculateChartValues(this.genStar(data?.trend_pre)),
-    );
-    this.changeStatusGeneral = this.calChangeStatus(
-      this.calculateChartValues(this.genStar(data?.overview)),
-      this.calculateChartValues(this.genStar(data?.overview_pre)),
-    );
-
+    this.changeStatusTech = this.calChangeStatus(this.calculateChartValues(this.genStar(data?.tech)), this.calculateChartValues(this.genStar(data?.tech_pre)));
+    this.changeStatusTrend = this.calChangeStatus(this.calculateChartValues(this.genStar(data?.trend)), this.calculateChartValues(this.genStar(data?.trend_pre)));
+    this.changeStatusGeneral = this.calChangeStatus(this.calculateChartValues(this.genStar(data?.overview)), this.calculateChartValues(this.genStar(data?.overview_pre)));
     this.VongQuayTaiSanNganHan = data?.VongQuayTaiSanNganHan || 0;
     this.VongQuayCacKhoanPhaiThu = data?.VongQuayCacKhoanPhaiThu || 0;
     this.VongQuayHangTonKho = data?.VongQuayHangTonKho || 0;

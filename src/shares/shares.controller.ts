@@ -289,11 +289,7 @@ export class SharesController {
   @ApiOkResponse({ type: CastFlowDetailResponse })
   async castFlowDetail(@Query() q: CastFlowDto, @Res() res: Response) {
     try {
-      const data = await this.sharesService.castFlowDetail(
-        q.stock,
-        +q.order,
-        +q.is_chart,
-      );
+      const data = await this.sharesService.castFlowDetail(q.stock, +q.order, +q.is_chart);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
@@ -305,11 +301,7 @@ export class SharesController {
   @ApiOkResponse({ type: BusinessResultDetailResponse })
   async businessResultDetail(@Query() q: CastFlowDto, @Res() res: Response) {
     try {
-      const data = await this.sharesService.businessResultDetail(
-        q.stock,
-        +q.order,
-        +q.is_chart,
-      );
+      const data = await this.sharesService.businessResultDetail(q.stock, +q.order, +q.is_chart);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
@@ -321,11 +313,7 @@ export class SharesController {
   @ApiOkResponse({ type: BalanceSheetDetailResponse })
   async balanceSheetDetail(@Query() q: CastFlowDto, @Res() res: Response) {
     try {
-      const data = await this.sharesService.balanceSheetDetail(
-        q.stock,
-        +q.order,
-        +q.is_chart,
-      );
+      const data = await this.sharesService.balanceSheetDetail(q.stock, +q.order, +q.is_chart);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
@@ -340,10 +328,7 @@ export class SharesController {
     @Res() res: Response,
   ) {
     try {
-      const data = await this.sharesService.balanceSheetDetailCircle(
-        q.stock,
-        +q.order,
-      );
+      const data = await this.sharesService.balanceSheetDetailCircle(q.stock, +q.order);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
@@ -358,11 +343,7 @@ export class SharesController {
     @Res() res: Response,
   ) {
     try {
-      const data = await this.sharesService.financialIndicatorsDetail(
-        q.stock,
-        +q.order,
-        +q.is_chart,
-      );
+      const data = await this.sharesService.financialIndicatorsDetail(q.stock, +q.order, +q.is_chart);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);

@@ -29,8 +29,8 @@ export class FilterService {
             ORDER BY date DESC
         ),
         max_dates AS (
-            SELECT MAX(Ngay) AS max_ngay
-            FROM PHANTICH.dbo.MBChuDong
+            SELECT MAX(date) AS max_ngay
+            FROM tradeIntraday.dbo.tickerTransVNDIntraday
         ),
         max_foreign_date AS (
             SELECT MAX(date) AS max_foreign_date
@@ -42,6 +42,15 @@ export class FilterService {
             FROM marketTrade.dbo.tickerTradeVND
             WHERE date >= '${day_52_week}'
             GROUP BY code
+        ),
+        MBChuDong AS (
+          SELECT code, SUM(CASE WHEN action = 'B' THEN volume ELSE 0 END) AS Mua, SUM(CASE WHEN action = 'S' THEN volume ELSE 0 END) AS Ban,
+                 CASE WHEN SUM(CASE WHEN action = 'S' THEN volume ELSE 0 END) = 0 THEN NULL
+                    ELSE SUM(CASE WHEN action = 'B' THEN volume ELSE 0 END) / NULLIF(SUM(CASE WHEN action = 'S' THEN volume ELSE 0 END), 0) 
+                 END AS MB
+          FROM tradeIntraday.dbo.tickerTransVNDIntraday
+          WHERE date = (SELECT max_ngay FROM max_dates)
+          GROUP BY code
         ),
         temp AS (
             SELECT
@@ -73,16 +82,12 @@ export class FilterService {
             FROM VISUALIZED_DATA.dbo.filterResource f
             WHERE f.date IN (SELECT date FROM latest_dates)
         )
-        SELECT
-            t.*, m.totalVal, i.LV4,
-            r.netVal AS buyVal, r.netVol AS buyVol,
-            b.MB, b.Mua, b.Ban,
-            l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
+        SELECT t.*, m.totalVal, i.LV4, r.netVal AS buyVal, r.netVol AS buyVol, b.MB, b.Mua, b.Ban, l.PRICE_HIGHEST_CR_52W, l.PRICE_LOWEST_CR_52W
         FROM temp t
         INNER JOIN marketInfor.dbo.info i ON i.code = t.code
         INNER JOIN marketTrade.dbo.tickerTradeVND m ON m.code = t.code AND m.date = t.date
-        INNER JOIN PHANTICH.dbo.MBChuDong b ON b.MCK = t.code AND b.Ngay = (SELECT max_ngay FROM max_dates)
         INNER JOIN marketTrade.dbo.[foreign] r ON r.code = t.code AND r.date = (SELECT max_foreign_date FROM max_foreign_date)
+        LEFT JOIN MBChuDong b ON t.code = b.code
         LEFT JOIN min_max l ON l.code = t.code
         WHERE t.date = (SELECT MAX(date) FROM latest_dates)
         AND i.status = 'listed';

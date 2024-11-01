@@ -1427,9 +1427,7 @@ export class ReportService {
         GROUP BY marketTotalVal, [date]
         ORDER BY [date]
       `;
-      const data = await this.mssqlService.query<
-        InvestorTransactionRatioResponse[]
-      >(query);
+      const data = await this.mssqlService.query<InvestorTransactionRatioResponse[]>(query);
       const dataMapped = new InvestorTransactionRatioResponse().mapToList(data);
       return dataMapped;
     } catch (e) {
@@ -2556,21 +2554,30 @@ select * from temp where date = (select max(date) from temp)
       // `
 
       const query = `
-      select Mua as buy, Ban as sell, MB as buy_sell, Ngay as date from [PHANTICH].[dbo].[MBChuDong] where MCK = '${code}'
-      and Ngay BETWEEN DATEADD(MONTH, -1, (SELECT
-        MAX(Ngay)
-      FROM [PHANTICH].[dbo].[MBChuDong]
-      WHERE MCK = '${code}')
-      ) and (SELECT
-        MAX(Ngay)
-      FROM [PHANTICH].[dbo].[MBChuDong]
-      WHERE MCK = '${code}')
-      order by Ngay
+        WITH LatestDate AS (
+            SELECT MAX(date) AS max_date
+            FROM tradeIntraday.dbo.tickerTransVNDIntraday
+        ),
+        DateRange AS (
+            SELECT DISTINCT date
+            FROM marketTrade.dbo.tickerTradeVND
+            WHERE date BETWEEN DATEADD(MONTH, -1, (SELECT max_date FROM LatestDate)) AND (SELECT max_date FROM LatestDate)
+        ),
+        AggregatedData AS (
+            SELECT t.date, 
+                   SUM(CASE WHEN action = 'B' THEN volume ELSE 0 END) AS buy, 
+                   SUM(CASE WHEN action = 'S' THEN volume ELSE 0 END) AS sell, 
+                   SUM(CASE WHEN action = 'B' THEN volume ELSE 0 END) * 1.0 / NULLIF(SUM(CASE WHEN action = 'S' THEN volume ELSE 0 END), 0) AS buy_sell
+            FROM tradeIntraday.dbo.tickerTransVNDIntraday t 
+            WHERE code = '${code}' GROUP BY t.date
+        )
+        SELECT dr.date, COALESCE(ad.buy, 0) AS buy, 
+                        COALESCE(ad.sell, 0) AS sell, 
+                        COALESCE(ad.buy_sell, 0) AS buy_sell
+        FROM DateRange dr LEFT JOIN AggregatedData ad ON dr.date = ad.date ORDER BY dr.date ASC;
       `;
 
-      const data = await this.mssqlService.query<
-        BuyingAndSellingStatisticsResponse[]
-      >(query);
+      const data = await this.mssqlService.query<BuyingAndSellingStatisticsResponse[]>(query);
       return BuyingAndSellingStatisticsResponse.mapToList(data);
     } catch (e) {
       throw new CatchException(e);

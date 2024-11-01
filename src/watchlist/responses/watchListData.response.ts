@@ -278,11 +278,7 @@ export class WatchListDataResponse {
   }
 
   static mapToList(data?: WatchListDataResponse[]) {
-    return _.orderBy(
-      data.map((item) => new WatchListDataResponse(item)),
-      ['code'],
-      ['asc'],
-    );
+    return _.orderBy(data.map((item) => new WatchListDataResponse(item)), ['code'], ['asc']);
   }
 
   private genStar(str?: string): ISignal {
