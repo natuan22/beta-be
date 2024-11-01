@@ -1142,245 +1142,221 @@ export class SharesService {
       switch (type) {
         case 'Ngân hàng':
           chiTieu = `N' - Thu nhập lãi và các khoản thu nhập tương tự nhận được',
-          N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-          N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-          N'LƯU CHUYỂN TIỀN THUẦN TRONG KỲ',
-          N'Tiền và tương đương tiền đầu kỳ',
-          N'Tiền và tương đương tiền cuối kỳ'`;
+                     N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                     N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                     N'LƯU CHUYỂN TIỀN THUẦN TRONG KỲ',
+                     N'Tiền và tương đương tiền đầu kỳ',
+                     N'Tiền và tương đương tiền cuối kỳ'`;
           top = 48;
           cate = `LCTT`;
           break;
         case 'Bảo hiểm':
           chiTieu = `N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-            N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-            N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-            N'Lưu chuyển tiền thuần trong kỳ',
-            N'Tiền và tương đương tiền đầu kỳ',
-            N'Tiền và tương đương tiền cuối kỳ'`;
+                     N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                     N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                     N'Lưu chuyển tiền thuần trong kỳ',
+                     N'Tiền và tương đương tiền đầu kỳ',
+                     N'Tiền và tương đương tiền cuối kỳ'`;
           top = 48;
           cate = `LCGT`;
           break;
         case 'Dịch vụ tài chính':
-          chiTieu = `
-          N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-        N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-        N'V. Tiền và các khoản tương đương tiền đầu kỳ',
-        N'VI. Tiền và các khoản tương đương tiền cuối kỳ'
-        `;
+          chiTieu = `N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                     N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                     N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                     N'V. Tiền và các khoản tương đương tiền đầu kỳ',
+                     N'VI. Tiền và các khoản tương đương tiền cuối kỳ'`;
           top = 40;
           cate = `LCGT`;
           break;
         default:
-          chiTieu = `
-          N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-          N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-          N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-          N'Lưu chuyển tiền thuần trong kỳ',
-          N'Tiền và tương đương tiền đầu kỳ',
-          N'Tiền và tương đương tiền cuối kỳ'
-          `;
+          chiTieu = `N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                     N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                     N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                     N'Lưu chuyển tiền thuần trong kỳ',
+                     N'Tiền và tương đương tiền đầu kỳ',
+                     N'Tiền và tương đương tiền cuối kỳ'`;
           top = 48;
           cate = `LCGT`;
           break;
       }
-      const sort = `case ${chiTieu
-        .split(',')
-        .map(
-          (item, index) =>
-            `when name = ${item.replace(/\n/g, '').trim()} then ${index}`,
-        )
-        .join(' ')} end as row_num`;
+      const sort = `case ${chiTieu.split(',').map((item, index) => `when name = ${item.replace(/\n/g, '').trim()} then ${index}`).join(' ')} end as row_num`;
       return { chiTieu, top, cate, sort };
     }
+
     switch (type) {
       case 'Ngân hàng':
         chiTieu = `N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
-        N' - Thu nhập lãi và các khoản thu nhập tương tự nhận được',
-        N'- Chi phí lãi và các chi phí tương tự đã trả',
-        N' - Thu nhập từ hoạt động dịch vụ nhận được',
-        N'- Chênh lệch số tiền thực thu/ thực chi từ hoạt động kinh doanh (ngoại tệ, vàng bạc, chứng khoán)',
-        N'- Thu nhập khác',
-        N'- Tiền thu các khoản nợ đã được xử lý xóa, bù đắp bằng nguồn rủi ro',
-        N'- Tiền chi trả cho nhân viên và hoạt động quản lý, công vụ',
-        N'- Tiền thuế thu nhập thực nộp trong kỳ',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh trước những thay đổi về tài sản và vốn lưu động',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-        N'II. Lưu chuyển tiền từ hoạt động đầu tư',
-        N'- Mua sắm TSCĐ',
-        N'- Tiền thu từ thanh lý, nhượng bán TSCĐ',
-        N'- Tiền chi từ thanh lý, nhượng bán TSCĐ',
-        N'- Tiền thu cổ tức và lợi nhuận được chia từ các khoản đầu tư, góp vốn dài hạn',
-        N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-        N'Lưu chuyển tiền thuần trong kỳ',
-        N'Tiền và tương đương tiền đầu kỳ',
-        N'Tiền và tương đương tiền cuối kỳ'`;
+                   N' - Thu nhập lãi và các khoản thu nhập tương tự nhận được',
+                   N'- Chi phí lãi và các chi phí tương tự đã trả',
+                   N' - Thu nhập từ hoạt động dịch vụ nhận được',
+                   N'- Chênh lệch số tiền thực thu/ thực chi từ hoạt động kinh doanh (ngoại tệ, vàng bạc, chứng khoán)',
+                   N'- Thu nhập khác',
+                   N'- Tiền thu các khoản nợ đã được xử lý xóa, bù đắp bằng nguồn rủi ro',
+                   N'- Tiền chi trả cho nhân viên và hoạt động quản lý, công vụ',
+                   N'- Tiền thuế thu nhập thực nộp trong kỳ',
+                   N'Lưu chuyển tiền thuần từ hoạt động kinh doanh trước những thay đổi về tài sản và vốn lưu động',
+                   N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                   N'II. Lưu chuyển tiền từ hoạt động đầu tư',
+                   N'- Mua sắm TSCĐ',
+                   N'- Tiền thu từ thanh lý, nhượng bán TSCĐ',
+                   N'- Tiền chi từ thanh lý, nhượng bán TSCĐ',
+                   N'- Tiền thu cổ tức và lợi nhuận được chia từ các khoản đầu tư, góp vốn dài hạn',
+                   N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                   N'Lưu chuyển tiền thuần trong kỳ',
+                   N'Tiền và tương đương tiền đầu kỳ',
+                   N'Tiền và tương đương tiền cuối kỳ'`;
         top = 160;
         cate = `LCTT`;
         break;
       case 'Bảo hiểm':
-        chiTieu = `
-        N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
-        N'1. Lợi nhuận trước thuế',
-        N'2. Điều chỉnh qua các khoản',
-        N'3. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-        N'II. Lưu chuyển tiền từ hoạt động đầu tư',
-        N'1. Tiền chi để mua sắm, xây dựng TSCĐ và các TS dài hạn khác',
-        N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ và các TS dài hạn khác',
-        N'3. Tiền chi cho vay, mua các công cụ nợ của các đơn vị khác ',
-        N'4. Tiền thu hồi cho vay, bán lại các công cụ nợ của đơn vị khác',
-        N'5. Tiền chi đầu tư góp vốn vào đơn vị khác',
-        N'6. Tiền thu hồi đầu tư góp vốn vào đơn vị khác',
-        N'7. Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia',
-        N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-        N'III. Lưu chuyển tiền từ hoạt động tài chính',
-        N'1. Tiền thu từ phát hành cổ phiếu',
-        N'2. Tiền chi trả vốn góp cho các chủ sở hữu, mua lại cổ phiếu của doanh nghiệp đã phát hành',
-        N'3. Tiền vay ngắn hạn, dài hạn nhận được',
-        N'4. Tiền chi trả nợ gốc vay',
-        N'5. Tiền chi trả nợ thuê tài chính',
-        N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
-        N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-        N'Lưu chuyển tiền thuần trong kỳ',
-        N'Tiền và tương đương tiền đầu kỳ',
-        N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
-        N'Tiền và tương đương tiền cuối kỳ'`;
+        chiTieu = `N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
+                   N'1. Lợi nhuận trước thuế',
+                   N'2. Điều chỉnh qua các khoản',
+                   N'3. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
+                   N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                   N'II. Lưu chuyển tiền từ hoạt động đầu tư',
+                   N'1. Tiền chi để mua sắm, xây dựng TSCĐ và các TS dài hạn khác',
+                   N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ và các TS dài hạn khác',
+                   N'3. Tiền chi cho vay, mua các công cụ nợ của các đơn vị khác ',
+                   N'4. Tiền thu hồi cho vay, bán lại các công cụ nợ của đơn vị khác',
+                   N'5. Tiền chi đầu tư góp vốn vào đơn vị khác',
+                   N'6. Tiền thu hồi đầu tư góp vốn vào đơn vị khác',
+                   N'7. Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia',
+                   N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                   N'III. Lưu chuyển tiền từ hoạt động tài chính',
+                   N'1. Tiền thu từ phát hành cổ phiếu',
+                   N'2. Tiền chi trả vốn góp cho các chủ sở hữu, mua lại cổ phiếu của doanh nghiệp đã phát hành',
+                   N'3. Tiền vay ngắn hạn, dài hạn nhận được',
+                   N'4. Tiền chi trả nợ gốc vay',
+                   N'5. Tiền chi trả nợ thuê tài chính',
+                   N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
+                   N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                   N'Lưu chuyển tiền thuần trong kỳ',
+                   N'Tiền và tương đương tiền đầu kỳ',
+                   N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
+                   N'Tiền và tương đương tiền cuối kỳ'`;
         top = 208;
         cate = 'LCGT';
         break;
       case 'Dịch vụ tài chính':
-        chiTieu = `
-          N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH',
-        N'1. Lợi nhuận trước Thuế Thu nhập doanh nghiệp',
-        N'- Khấu hao TSCĐ',
-        N'3. Tăng các chi phí phi tiền tệ',
-        N'4. Giảm các doanh thu phi tiền tệ',
-        N'5. Thay đổi tài sản và nợ phải trả hoạt động',
-        N'6. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-        N'II. Lưu chuyển tiền từ hoạt động đầu tư',
-        N'1. Tiền chi để mua sắm, xây dựng TSCĐ, BĐSĐT và các tài sản khác',
-        N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ, BĐSĐT và các tài sản khác',
-        N'3. Tiền chi đầu tư vốn vào công ty con, công ty liên doanh, liên kết và đầu tư khác',
-        N'4. Tiền thanh lý các khoản đầu tư vào công ty con, công ty liên doanh, liên kết và đầu tư khác',
-        N'5.Tiền thu về cổ tức và lợi nhuận được chia',
-        N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-        N'III. Lưu chuyển tiền từ hoạt động tài chính',
-        N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu',
-        N'2. Tiền chi trả vốn góp cho chủ sở hữu, mua lại cổ phiếu quỹ',
-        N'3. Tiền vay gốc',
-        N'4. Tiền chi trả nợ gốc vay',
-        N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
-        N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-        N'IV. Tăng/giảm tiền thuần trong kỳ',
-        N'V. Tiền và các khoản tương đương tiền đầu kỳ',
-        N'Tiền gửi ngân hàng đầu kỳ',
-        N'Các khoản tương đương tiền',
-        N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
-        N'VI. Tiền và các khoản tương đương tiền cuối kỳ',
-        N'Tiền gửi ngân hàng cuối kỳ'
-          `;
+        chiTieu = `N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH',
+                   N'1. Lợi nhuận trước Thuế Thu nhập doanh nghiệp',
+                   N'- Khấu hao TSCĐ',
+                   N'3. Tăng các chi phí phi tiền tệ',
+                   N'4. Giảm các doanh thu phi tiền tệ',
+                   N'5. Thay đổi tài sản và nợ phải trả hoạt động',
+                   N'6. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
+                   N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                   N'II. Lưu chuyển tiền từ hoạt động đầu tư',
+                   N'1. Tiền chi để mua sắm, xây dựng TSCĐ, BĐSĐT và các tài sản khác',
+                   N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ, BĐSĐT và các tài sản khác',
+                   N'3. Tiền chi đầu tư vốn vào công ty con, công ty liên doanh, liên kết và đầu tư khác',
+                   N'4. Tiền thanh lý các khoản đầu tư vào công ty con, công ty liên doanh, liên kết và đầu tư khác',
+                   N'5.Tiền thu về cổ tức và lợi nhuận được chia',
+                   N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                   N'III. Lưu chuyển tiền từ hoạt động tài chính',
+                   N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu',
+                   N'2. Tiền chi trả vốn góp cho chủ sở hữu, mua lại cổ phiếu quỹ',
+                   N'3. Tiền vay gốc',
+                   N'4. Tiền chi trả nợ gốc vay',
+                   N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
+                   N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                   N'IV. Tăng/giảm tiền thuần trong kỳ',
+                   N'V. Tiền và các khoản tương đương tiền đầu kỳ',
+                   N'Tiền gửi ngân hàng đầu kỳ',
+                   N'Các khoản tương đương tiền',
+                   N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
+                   N'VI. Tiền và các khoản tương đương tiền cuối kỳ',
+                   N'Tiền gửi ngân hàng cuối kỳ'`;
         top = 248;
         cate = `LCGT`;
         break;
       default:
-        chiTieu = `
-        N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
-        N'1. Lợi nhuận trước thuế',
-        N'- Khấu hao TSCĐ',
-        N'- Các khoản dự phòng',
-        N'- Lãi, lỗ từ hoạt động đầu tư',
-        N'- Chi phí lãi vay',
-        N'3. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
-        N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
-        N'II. Lưu chuyển tiền từ hoạt động đầu tư',
-        N'1. Tiền chi để mua sắm, xây dựng TSCĐ và các tài sản dài hạn khác',
-        N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ và các tài sản dài hạn khác',
-        N'3. Tiền chi cho vay, mua các công cụ nợ của đơn vị khác',
-        N'4. Tiền thu hồi cho vay, bán lại các công cụ nợ của các đơn vị khác',
-        N'5. Đầu tư góp vốn vào công ty liên doanh liên kết',
-        N'6. Chi đầu tư ngắn hạn',
-        N'7. Tiền chi đầu tư góp vốn vào đơn vị khác',
-        N'8. Tiền thu hồi đầu tư góp vốn vào đơn vị khác',
-        N'9. Lãi tiền gửi đã thu',
-        N'10. Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia',
-        N'11. Tiền chi mua lại phần vốn góp của các cổ đông thiểu số',
-        N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
-        N'III. Lưu chuyển tiền từ hoạt động tài chính',
-        N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu',
-        N'3. Tiền vay ngắn hạn, dài hạn nhận được',
-        N'4. Tiền chi trả nợ gốc vay',
-        N'8. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
-        N'Lưu chuyển tiền thuần từ hoạt động tài chính',
-        N'Lưu chuyển tiền thuần trong kỳ',
-        N'Tiền và tương đương tiền đầu kỳ',
-        N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
-        N'Tiền và tương đương tiền cuối kỳ'
-        `;
+        chiTieu = `N'I. Lưu chuyển tiền từ hoạt động kinh doanh',
+                   N'1. Lợi nhuận trước thuế',
+                   N'- Khấu hao TSCĐ',
+                   N'- Các khoản dự phòng',
+                   N'- Lãi, lỗ từ hoạt động đầu tư',
+                   N'- Chi phí lãi vay',
+                   N'3. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động',
+                   N'Lưu chuyển tiền thuần từ hoạt động kinh doanh',
+                   N'II. Lưu chuyển tiền từ hoạt động đầu tư',
+                   N'1. Tiền chi để mua sắm, xây dựng TSCĐ và các tài sản dài hạn khác',
+                   N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ và các tài sản dài hạn khác',
+                   N'3. Tiền chi cho vay, mua các công cụ nợ của đơn vị khác',
+                   N'4. Tiền thu hồi cho vay, bán lại các công cụ nợ của các đơn vị khác',
+                   N'5. Đầu tư góp vốn vào công ty liên doanh liên kết',
+                   N'6. Chi đầu tư ngắn hạn',
+                   N'7. Tiền chi đầu tư góp vốn vào đơn vị khác',
+                   N'8. Tiền thu hồi đầu tư góp vốn vào đơn vị khác',
+                   N'9. Lãi tiền gửi đã thu',
+                   N'10. Tiền thu lãi cho vay, cổ tức và lợi nhuận được chia',
+                   N'11. Tiền chi mua lại phần vốn góp của các cổ đông thiểu số',
+                   N'Lưu chuyển tiền thuần từ hoạt động đầu tư',
+                   N'III. Lưu chuyển tiền từ hoạt động tài chính',
+                   N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu',
+                   N'3. Tiền vay ngắn hạn, dài hạn nhận được',
+                   N'4. Tiền chi trả nợ gốc vay',
+                   N'8. Cổ tức, lợi nhuận đã trả cho chủ sở hữu',
+                   N'Lưu chuyển tiền thuần từ hoạt động tài chính',
+                   N'Lưu chuyển tiền thuần trong kỳ',
+                   N'Tiền và tương đương tiền đầu kỳ',
+                   N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ',
+                   N'Tiền và tương đương tiền cuối kỳ'`;
         cate = `LCGT`;
         top = 248;
         break;
     }
+
     const sort =
-      type != 'Dịch vụ tài chính'
-        ? `case ${chiTieu
-            .split(`',`)
-            .map((item, index) =>
-              index !== chiTieu.split(`',`).length - 1
-                ? `when name = ${item.replace(/\n/g, '').trim()}' then ${index}`
-                : `when name = ${item.replace(/\n/g, '').trim()} then ${index}`,
-            )
-            .join(' ')} end as row_num`
-        : `CASE
-    WHEN name = N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH' THEN 0
-    WHEN name = N'1. Lợi nhuận trước Thuế Thu nhập doanh nghiệp' THEN 1
-    WHEN name = N'- Khấu hao TSCĐ' THEN 2
-    WHEN name = N'3. Tăng các chi phí phi tiền tệ' THEN 3
-    WHEN name = N'4. Giảm các doanh thu phi tiền tệ' THEN 4
-    WHEN name = N'5. Thay đổi tài sản và nợ phải trả hoạt động' THEN 5
-    WHEN name = N'6. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động' THEN 6
-    WHEN name = N'Lưu chuyển tiền thuần từ hoạt động kinh doanh' THEN 7
-    WHEN name = N'II. Lưu chuyển tiền từ hoạt động đầu tư' THEN 8
-    WHEN name = N'1. Tiền chi để mua sắm, xây dựng TSCĐ, BĐSĐT và các tài sản khác' THEN 9
-    WHEN name = N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ, BĐSĐT và các tài sản khác' THEN 10
-    WHEN name = N'3. Tiền chi đầu tư vốn vào công ty con, công ty liên doanh, liên kết và đầu tư khác' THEN 11
-    WHEN name = N'4. Tiền thanh lý các khoản đầu tư vào công ty con, công ty liên doanh, liên kết và đầu tư khác' THEN 12
-    WHEN name = N'5.Tiền thu về cổ tức và lợi nhuận được chia' THEN 13
-    WHEN name = N'Lưu chuyển tiền thuần từ hoạt động đầu tư' THEN 14
-    WHEN name = N'III. Lưu chuyển tiền từ hoạt động tài chính' THEN 15
-    WHEN name = N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu' THEN 16
-    WHEN name = N'2. Tiền chi trả vốn góp cho chủ sở hữu, mua lại cổ phiếu quỹ' THEN 17
-    WHEN name = N'3. Tiền vay gốc' THEN 18
-    WHEN name = N'4. Tiền chi trả nợ gốc vay' THEN 19
-    WHEN name = N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu' THEN 20
-    WHEN name = N'Lưu chuyển tiền thuần từ hoạt động tài chính' THEN 21
-    WHEN name = N'IV. Tăng/giảm tiền thuần trong kỳ' THEN 22
-    WHEN name = N'V. Tiền và các khoản tương đương tiền đầu kỳ' THEN 23
-    WHEN name = N'Tiền gửi ngân hàng đầu kỳ' THEN 24
-    WHEN name = N'Các khoản tương đương tiền' and id = 502 then 25
-    WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 503 then 26
-    WHEN name = N'VI. Tiền và các khoản tương đương tiền cuối kỳ' THEN 27
-    WHEN name = N'Tiền gửi ngân hàng cuối kỳ' THEN 28
-    WHEN name = N'Các khoản tương đương tiền' and id = 602 then 29
-     WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 30
-  END AS row_num`;
+      type != 'Dịch vụ tài chính' ? `case ${chiTieu.split(`',`).map((item, index) => index !== chiTieu.split(`',`).length - 1 
+        ? `when name = ${item.replace(/\n/g, '').trim()}' then ${index}` 
+        : `when name = ${item.replace(/\n/g, '').trim()} then ${index}`
+      ).join(' ')} end as row_num` 
+      : `CASE
+            WHEN name = N'I. LƯU CHUYỂN TIỀN TỪ HOẠT ĐỘNG KINH DOANH' THEN 0
+            WHEN name = N'1. Lợi nhuận trước Thuế Thu nhập doanh nghiệp' THEN 1
+            WHEN name = N'- Khấu hao TSCĐ' THEN 2
+            WHEN name = N'3. Tăng các chi phí phi tiền tệ' THEN 3
+            WHEN name = N'4. Giảm các doanh thu phi tiền tệ' THEN 4
+            WHEN name = N'5. Thay đổi tài sản và nợ phải trả hoạt động' THEN 5
+            WHEN name = N'6. Lợi nhuận từ hoạt động kinh doanh trước thay đổi vốn lưu động' THEN 6
+            WHEN name = N'Lưu chuyển tiền thuần từ hoạt động kinh doanh' THEN 7
+            WHEN name = N'II. Lưu chuyển tiền từ hoạt động đầu tư' THEN 8
+            WHEN name = N'1. Tiền chi để mua sắm, xây dựng TSCĐ, BĐSĐT và các tài sản khác' THEN 9
+            WHEN name = N'2. Tiền thu từ thanh lý, nhượng bán TSCĐ, BĐSĐT và các tài sản khác' THEN 10
+            WHEN name = N'3. Tiền chi đầu tư vốn vào công ty con, công ty liên doanh, liên kết và đầu tư khác' THEN 11
+            WHEN name = N'4. Tiền thanh lý các khoản đầu tư vào công ty con, công ty liên doanh, liên kết và đầu tư khác' THEN 12
+            WHEN name = N'5.Tiền thu về cổ tức và lợi nhuận được chia' THEN 13
+            WHEN name = N'Lưu chuyển tiền thuần từ hoạt động đầu tư' THEN 14
+            WHEN name = N'III. Lưu chuyển tiền từ hoạt động tài chính' THEN 15
+            WHEN name = N'1. Tiền thu từ phát hành cổ phiếu, nhận vốn góp của chủ sở hữu' THEN 16
+            WHEN name = N'2. Tiền chi trả vốn góp cho chủ sở hữu, mua lại cổ phiếu quỹ' THEN 17
+            WHEN name = N'3. Tiền vay gốc' THEN 18
+            WHEN name = N'4. Tiền chi trả nợ gốc vay' THEN 19
+            WHEN name = N'6. Cổ tức, lợi nhuận đã trả cho chủ sở hữu' THEN 20
+            WHEN name = N'Lưu chuyển tiền thuần từ hoạt động tài chính' THEN 21
+            WHEN name = N'IV. Tăng/giảm tiền thuần trong kỳ' THEN 22
+            WHEN name = N'V. Tiền và các khoản tương đương tiền đầu kỳ' THEN 23
+            WHEN name = N'Tiền gửi ngân hàng đầu kỳ' THEN 24
+            WHEN name = N'Các khoản tương đương tiền' and id = 502 then 25
+            WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 503 then 26
+            WHEN name = N'VI. Tiền và các khoản tương đương tiền cuối kỳ' THEN 27
+            WHEN name = N'Tiền gửi ngân hàng cuối kỳ' THEN 28
+            WHEN name = N'Các khoản tương đương tiền' and id = 602 then 29
+            WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 30
+          END AS row_num
+        `;
     return { chiTieu, top, cate, sort };
   }
 
   async castFlowDetail(stock: string, order: number, is_chart: number) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`);
     if (redisData) return redisData;
 
-    const LV2 = await this.mssqlService.query(
-      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
-    );
-    const { chiTieu, top, cate, sort } = this.getChiTieuLCTT(
-      LV2[0].LV2,
-      is_chart,
-    );
+    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    const { chiTieu, top, cate, sort } = this.getChiTieuLCTT(LV2[0].LV2, is_chart);
 
     let group = ``;
     let select = ``;
@@ -1390,7 +1366,7 @@ export class SharesService {
         select = `name, value, yearQuarter as date, id`;
         break;
       case TimeTypeEnum.Year:
-        group = `group by name, id, year order by year desc`;
+        group = `group by name, id, year having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
         select = `year as date, name, sum(value) as value, id`;
         break;
       default:
@@ -1398,37 +1374,26 @@ export class SharesService {
     }
 
     const query = `
-    with temp as (SELECT TOP ${top} ${select}
-    FROM financialReport.dbo.financialReportV2
-    WHERE code = '${stock}'
-    AND name IN (${chiTieu})
-    AND yearQuarter NOT LIKE '%0'
-    AND type = '${cate}'
-    ${group})
-    select
-    case when CHARINDEX('-', name) != 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-    when name = N'Các khoản tương đương tiền' and id = 502 then 'Cac khoan tuong duong tien dau ky'
-    when name = N'Các khoản tương đương tiền' and id = 602 then 'Cac khoan tuong duong tien cuoi ky'
-    when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 503 then 'Anh huong dau ky'
-    when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 'Anh huong cuoi ky'
-    else LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) end as name,
-    value,
-    date,
-    ${sort}
-    from temp
-    order by date asc, row_num asc
+      with temp as (
+          SELECT TOP ${top} ${select}
+          FROM financialReport.dbo.financialReportV2
+          WHERE code = '${stock}' AND name IN (${chiTieu}) AND yearQuarter NOT LIKE '%0' AND type = '${cate}'
+          ${group}
+      )
+      select case when CHARINDEX('-', name) != 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+                  when name = N'Các khoản tương đương tiền' and id = 502 then 'Cac khoan tuong duong tien dau ky'
+                  when name = N'Các khoản tương đương tiền' and id = 602 then 'Cac khoan tuong duong tien cuoi ky'
+                  when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 503 then 'Anh huong dau ky'
+                  when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 'Anh huong cuoi ky'
+             else LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) end as name, value, date,
+             ${sort}
+      from temp order by date asc, row_num asc
     `;
+
     const data = await this.mssqlService.query<CastFlowDetailResponse[]>(query);
-    const dataMapped = CastFlowDetailResponse.mapToList(
-      data,
-      is_chart,
-      LV2[0].LV2,
-    );
-    await this.redis.set(
-      `${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`,
-      dataMapped,
-      { ttl: TimeToLive.OneWeek },
-    );
+    const dataMapped = CastFlowDetailResponse.mapToList(data, is_chart, LV2[0].LV2);
+    
+    await this.redis.set(`${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek });
     return dataMapped;
   }
 
@@ -1454,25 +1419,19 @@ export class SharesService {
           top = 32;
           break;
       }
-      const sort = `case ${chiTieu
-        .split(',')
-        .map((item, index) => `when id = ${+item} then ${index}`)
-        .join(' ')} end as row_num`;
+      const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`;
       return { chiTieu, top, sort };
     }
     switch (type) {
       case 'Ngân hàng':
-        chiTieu =
-          '1,101,102,2,201,202,3,4,5,6,601,602,7,8,9,10,11,12,1201,1202,13,14,15';
+        chiTieu ='1,101,102,2,201,202,3,4,5,6,601,602,7,8,9,10,11,12,1201,1202,13,14,15';
         top = 184;
         break;
       case 'Bảo hiểm':
-        chiTieu =
-          '1,2,3,4,5,7,8,9,305,11,13,14,15,16,17,18,20,21,22,23,24,25,28,29,31,33,34,35,36,37';
+        chiTieu ='1,2,3,4,5,7,8,9,305,11,13,14,15,16,17,18,20,21,22,23,24,25,28,29,31,33,34,35,36,37';
         top = 240;
       case 'Dịch vụ tài chính':
-        chiTieu =
-          '1,101,102,103,104,106,108,110,111,112,2,201,206,207,209,211,212,214,3,301,302,304,4,401,402,404,405,6,7,9,901,902,10,1001,1002,11,1101';
+        chiTieu ='1,101,102,103,104,106,108,110,111,112,2,201,206,207,209,211,212,214,3,301,302,304,4,401,402,404,405,6,7,9,901,902,10,1001,1002,11,1101';
         top = 296;
         break;
       default:
@@ -1480,28 +1439,20 @@ export class SharesService {
         top = 168;
         break;
     }
-    const sort = `case ${chiTieu
-      .split(',')
-      .map((item, index) => `when id = ${+item} then ${index}`)
-      .join(' ')} end as row_num`;
+    const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`;
     return { chiTieu, top, sort };
   }
 
   async businessResultDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(
-      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
-    );
+    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
     if (!LV2[0]) return [];
 
-    const redisData = await this.redis.get(
-      `${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`);
     if (redisData) return redisData;
 
     const { chiTieu, top, sort } = this.getChiTieuKQKD(LV2[0].LV2, is_chart);
 
-    let select = ``,
-      group = ``;
+    let select = ``, group = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
         select = `value, case when LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC) <> 0 then ((value - LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) / LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) * 100 else 0 end AS per, yearQuarter AS date,`;
@@ -1509,57 +1460,39 @@ export class SharesService {
         break;
       case TimeTypeEnum.Year:
         select = `sum(value) as value, case when (lead(sum(value), 1) over ( partition by name order by year desc)) <> 0 then ((sum(value) - lead(sum(value), 1) over ( partition by name order by year desc)) / (lead(sum(value), 1) over ( partition by name order by year desc))) * 100 else 0 end as per, year as date,`;
-        group = `group by year, name, id order by year desc`;
+        group = `group by year, name, id having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
         break;
       default:
         break;
     }
+
     const query = `
-    WITH temp
-    AS (SELECT TOP ${top}
-      ${select}
-      CASE
-      WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-      WHEN CHARINDEX('(', name) = 0 AND
-        CHARINDEX('.', name) = 0 THEN name
-      WHEN CHARINDEX('(', name) = 0 AND
-        CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
-      WHEN CHARINDEX('(', name) <> 0 AND
-        CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
-      ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)),
-        CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
-      END AS name,
-      ${sort}
-    FROM financialReport.dbo.financialReportV2
-    WHERE code = '${stock}'
-    AND type = 'KQKD'
-    AND id IN (${chiTieu})
-    AND RIGHT(yearQuarter, 1) <> 0
-    ${group})
-    SELECT
-      *
-    FROM temp
-    ORDER BY date ASC, row_num ASC
+      WITH temp AS (
+          SELECT TOP ${top} ${select}
+                CASE
+                  WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
+                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+                  WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
+                ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2)) END AS name,
+                ${sort}
+          FROM financialReport.dbo.financialReportV2
+          WHERE code = '${stock}' AND type = 'KQKD' AND id IN (${chiTieu}) AND RIGHT(yearQuarter, 1) <> 0
+          ${group}
+      )
+      SELECT * FROM temp
+      ORDER BY date ASC, row_num ASC
     `;
-    const data = await this.mssqlService.query<BusinessResultDetailResponse[]>(
-      query,
-    );
-    const dataMapped = BusinessResultDetailResponse.mapToList(
-      data,
-      is_chart,
-      LV2[0].LV2,
-    );
-    await this.redis.set(
-      `${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`,
-      dataMapped,
-      { ttl: TimeToLive.OneWeek },
-    );
+
+    const data = await this.mssqlService.query<BusinessResultDetailResponse[]>(query);
+    const dataMapped = BusinessResultDetailResponse.mapToList(data, is_chart, LV2[0].LV2);
+
+    await this.redis.set(`${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek });
     return dataMapped;
   }
 
   private getChiTieuCDKT(type: string, is_chart: number) {
-    let chiTieu = '',
-      top = 0;
+    let chiTieu = '', top = 0;
     if (is_chart) {
       switch (type) {
         case 'Ngân hàng':
@@ -1579,56 +1512,42 @@ export class SharesService {
           top = 32;
           break;
       }
-      const sort = `case ${chiTieu
-        .split(',')
-        .map((item, index) => `when id = ${+item} then ${index}`)
-        .join(' ')} end as row_num`;
+      const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`;
       return { chiTieu, top, sort };
     }
+
     switch (type) {
       case 'Ngân hàng':
-        chiTieu =
-          '1,101,102,104,105,106,108,109,110,111,112,2,301,302,303,304,305,306,307,308,309,4';
+        chiTieu = '1,101,102,104,105,106,108,109,110,111,112,2,301,302,303,304,305,306,307,308,309,4';
         top = 176;
         break;
       case 'Bảo hiểm':
-        chiTieu =
-          '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,2,301,30101,30102,30103,30104,302,30201,30202,303,304';
+        chiTieu = '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,2,301,30101,30102,30103,30104,302,30201,30202,303,304';
         top = 192;
         break;
       case 'Dịch vụ tài chính':
-        chiTieu =
-          '1,10101,10102,10201,10202,10205,2,3,30101,30103,30106,30109,30110,30111,30113,30117,302,30204,4,40101,40107,5';
+        chiTieu = '1,10101,10102,10201,10202,10205,2,3,30101,30103,30106,30109,30110,30111,30113,30117,302,30204,4,40101,40107,5';
         top = 176;
         break;
       default:
-        chiTieu =
-          '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,10207,2,301,30101,30102,302,30201,30202,4';
+        chiTieu = '101,10101,10102,10103,10104,10105,102,10201,10202,10203,10204,10205,10206,10207,2,301,30101,30102,302,30201,30202,4';
         top = 176;
         break;
     }
-    const sort = `case ${chiTieu
-      .split(',')
-      .map((item, index) => `when id = ${+item} then ${index}`)
-      .join(' ')} end as row_num`;
+    const sort = `case ${chiTieu.split(',').map((item, index) => `when id = ${+item} then ${index}`).join(' ')} end as row_num`;
     return { chiTieu, top, sort };
   }
 
   async balanceSheetDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(
-      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
-    );
+    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
     if (!LV2[0]) return [];
 
-    const redisData = await this.redis.get(
-      `${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`);
     if (redisData) return redisData;
 
     const { chiTieu, top, sort } = this.getChiTieuCDKT(LV2[0].LV2, is_chart);
 
-    let select = ``,
-      group = ``;
+    let select = ``, group = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
         select = `value, yearQuarter AS date,`;
@@ -1636,69 +1555,45 @@ export class SharesService {
         break;
       case TimeTypeEnum.Year:
         select = `sum(value) as value, year as date,`;
-        group = `group by year, name, id order by year desc`;
+        group = `group by year, name, id having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
         break;
       default:
         break;
     }
+
     let query = `
-    WITH temp
-    AS (SELECT TOP ${top}
-      ${select}
-      CASE
-      WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-      WHEN CHARINDEX('(', name) = 0 AND
-        CHARINDEX('.', name) = 0 THEN name
-      WHEN CHARINDEX('(', name) = 0 AND
-        CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
-      WHEN CHARINDEX('(', name) <> 0 AND
-        CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
-      ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)),
-        CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
-      END AS name,
-      ${sort}
-    FROM financialReport.dbo.financialReportV2
-    WHERE code = '${stock}'
-    AND type = 'CDKT'
-    AND id IN (${chiTieu})
-    AND RIGHT(yearQuarter, 1) <> 0
-    ${group})
-    SELECT
-      *
-    FROM temp
-    ORDER BY date ASC, row_num ASC
+      WITH temp AS (
+          SELECT TOP ${top} ${select}
+                CASE
+                  WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
+                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+                  WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
+                  ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
+                END AS name,
+                ${sort}
+        FROM financialReport.dbo.financialReportV2
+        WHERE code = '${stock}' AND type = 'CDKT' AND id IN (${chiTieu}) AND RIGHT(yearQuarter, 1) <> 0
+        ${group}
+      )
+      SELECT * FROM temp ORDER BY date ASC, row_num ASC
     `;
 
-    const data = await this.mssqlService.query<BalanceSheetDetailResponse[]>(
-      query,
-    );
-    const dataMapped = BalanceSheetDetailResponse.mapToList(
-      data,
-      is_chart,
-      LV2[0].LV2,
-    );
-    await this.redis.set(
-      `${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`,
-      dataMapped,
-      { ttl: TimeToLive.OneWeek },
-    );
+    const data = await this.mssqlService.query<BalanceSheetDetailResponse[]>(query);
+    const dataMapped = BalanceSheetDetailResponse.mapToList(data, is_chart, LV2[0].LV2);
+
+    await this.redis.set(`${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneWeek });
     return dataMapped;
   }
 
   async balanceSheetDetailCircle(stock: string, order: number) {
-    const LV2 = await this.mssqlService.query(
-      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
-    );
+    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
     if (!LV2[0]?.LV2) return [];
 
-    const redisData = await this.redis.get(
-      `${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`);
     if (redisData) return redisData;
 
-    let select = ``,
-      group = ``,
-      query = ``;
+    let select = ``, group = ``, query = ``;
     switch (order) {
       case TimeTypeEnum.Quarter:
         select = `value, yearQuarter as date, id`;
@@ -1712,25 +1607,27 @@ export class SharesService {
     }
     if (LV2[0]?.LV2 == 'Dịch vụ tài chính') {
       query = `
-      with temp as (select top 6 ${select}
-        from financialReport.dbo.financialReportV2
-          where code = '${stock}'
-          and id IN (10101, 10201, 3, 4, 2, 5)
-          and type = 'CDKT'
-          AND RIGHT(yearQuarter, 1) <> 0
-          ${group}
-          ),
+        with temp as (
+            select top 6 ${select}
+            from financialReport.dbo.financialReportV2
+            where code = '${stock}' and id IN (10101, 10201, 3, 4, 2, 5) and type = 'CDKT' AND RIGHT(yearQuarter, 1) <> 0
+            ${group}
+        ),
         ngan_han as (
-            select 'ngan han' as name, [10101] / [2] * 100 as value, date from temp as source pivot ( sum(value) for id in([10101], [2])) as chuyen
+            select 'ngan han' as name, [10101] / [2] * 100 as value, date 
+            from temp as source pivot ( sum(value) for id in([10101], [2])) as chuyen
         ),
         dai_han as (
-            select 'dai han' as name, [10201] / [2] * 100 as value, date from temp as source pivot ( sum(value) for id in([10201], [2])) as chuyen
+            select 'dai han' as name, [10201] / [2] * 100 as value, date 
+            from temp as source pivot ( sum(value) for id in([10201], [2])) as chuyen
         ),
-            no_phai_tra as (
-            select 'no phai tra' as name, [3] / [5] * 100 as value, date from temp as source pivot ( sum(value) for id in([3], [5])) as chuyen
+        no_phai_tra as (
+            select 'no phai tra' as name, [3] / [5] * 100 as value, date 
+            from temp as source pivot ( sum(value) for id in([3], [5])) as chuyen
         ),
-            von_so_huu as (
-            select 'von chu so huu' as name, [4] / [5] * 100 as value, date from temp as source pivot ( sum(value) for id in([4], [5])) as chuyen
+        von_so_huu as (
+            select 'von chu so huu' as name, [4] / [5] * 100 as value, date 
+            from temp as source pivot ( sum(value) for id in([4], [5])) as chuyen
         )
         select * from ngan_han
         union all
@@ -1742,193 +1639,186 @@ export class SharesService {
       `;
     } else {
       query = `
-      with temp as (select top 3 ${select}
-              from financialReport.dbo.financialReportV2
-                where code = '${stock}'
-                and id IN (301, 302, 4)
-                and type = 'CDKT'
-                AND RIGHT(yearQuarter, 1) <> 0
-              ${group}),
-     no_phai_tra as (select 'no phai tra' as name, [301] / [4] * 100 as value, date
-                     from temp as source pivot ( sum(value) for id in ([301], [4])) as chuyen),
-     von_so_huu as (select 'von chu so huu' as name, [302] / [4] * 100 as value, date
-                    from temp as source pivot ( sum(value) for id in ([302], [4])) as chuyen),
-     tong_von as (select 'tong nguon von' as name, value, date
-                  from temp
-                  where id = 4)
-      select *
-      from no_phai_tra
-      union all
-      select *
-      from von_so_huu
-      union all
-      select *
-      from tong_von
+        with temp as (
+            select top 3 ${select}
+            from financialReport.dbo.financialReportV2
+            where code = '${stock}' and id IN (301, 302, 4) and type = 'CDKT' AND RIGHT(yearQuarter, 1) <> 0
+            ${group}
+        ),
+        no_phai_tra as (
+            select 'no phai tra' as name, [301] / [4] * 100 as value, date
+            from temp as source pivot ( sum(value) for id in ([301], [4])) as chuyen),
+        von_so_huu as (
+            select 'von chu so huu' as name, [302] / [4] * 100 as value, date
+            from temp as source pivot ( sum(value) for id in ([302], [4])) as chuyen),
+        tong_von as (
+            select 'tong nguon von' as name, value, date
+            from temp
+            where id = 4
+        )
+        select * from no_phai_tra
+        union all
+        select * from von_so_huu
+        union all
+        select * from tong_von
       `;
     }
 
-    const data = await this.mssqlService.query<
-      BalanceSheetDetailCircleResponse[]
-    >(query);
+    const data = await this.mssqlService.query<BalanceSheetDetailCircleResponse[]>(query);
     const dataMapped = BalanceSheetDetailCircleResponse.mapToList(data);
-    await this.redis.set(
-      `${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`,
-      dataMapped,
-      { ttl: TimeToLive.OneWeek },
-    );
+
+    await this.redis.set(`${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneWeek });
     return dataMapped;
   }
 
-  private getChiTieuCSTC(industry: string, stock: string): string {
-    if (industry == 'Ngân hàng') {
-      return [
-        { name: 'Chi so danh gia', value: 0 },
-        { name: 'P/E', value: 'PE' },
-        { name: 'P/B', value: 'PB' },
-        { name: 'EPS', value: 'EPS' },
-        { name: 'BVPS', value: 'BVPS' },
-        { name: 'Hieu qua hoat dong', value: 0 },
-        { name: 'ROE', value: 'roae' },
-        { name: 'ROA', value: 'roaa' },
-        { name: 'NIM', value: 'NIM' },
-        { name: 'YOEA', value: 'YOEA' },
-        { name: 'Co cau tai san', value: 0 },
-        { name: 'LAR_EAA', value: 'LAR_EAA' },
-        { name: 'LAR_TR', value: 'LAR_TR' },
-        { name: 'DDA_EAA', value: 'DDA_EAA' },
-        { name: 'LDR', value: 'LDR' },
-        { name: 'Thanh khoan', value: 0 },
-        { name: 'LFR', value: 'LFR' },
-        { name: 'LTR', value: 'LTR' },
-        { name: 'CAR', value: 'CAR' },
-        { name: 'LAR_AR', value: 'LAR_AR' },
-        { name: 'Chat luong tin dung', value: 0 },
-        { name: 'NPLR', value: 'NPLR' },
-        { name: 'NDR', value: 'NDR' },
-        { name: 'LLP_NPL', value: 'LLP_NPL' },
-        { name: 'NPL_TR', value: 'NPL_TR' },
-      ]
-        .map((item, index) =>
-          item.name != 'ROA' && item.name != 'ROE'
-            ? `
-      select '${item.name}' as name, ${item.value} as value, cast(year as varchar) + cast(quarter as varchar) as date, ${index} as row from financialReport.dbo.calBCTCNH where code = '${stock}'
-      `
-            : `
-      select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `,
-        )
-        .join(`union all`);
-    } else {
-      return [
-        { name: 'Chi so danh gia', value: 0 },
-        { name: 'P/E', value: 'PE' },
-        { name: 'P/B', value: 'PB' },
-        { name: 'EPS', value: 'EPS' },
-        { name: 'BVPS', value: 'BVPS' },
-        { name: 'Hieu qua hoat dong', value: 0 },
-        { name: 'Vong quay tai san co dinh', value: 'FAT' },
-        { name: 'Vong quay tong tai san', value: 'ATR' },
-        { name: 'Vong quay tien', value: 'CTR' },
-        { name: 'Vong quay VCSH', value: 'CT' },
-        { name: 'Kha nang thanh toan', value: 0 },
-        { name: 'Chi so kha nang tra no', value: 'DSCR' },
-        {
-          name: 'Ty le no hien tai/Tong tai san',
-          value: 'totalDebtToTotalAssets',
-        },
-        { name: 'Ty le no hien tai/VCSH', value: 'DE' },
-        { name: 'Ty le dam bao tra no bang tai san', value: 'ACR' },
-        { name: 'Thanh khoan', value: 0 },
-        { name: 'Ty so thanh toan hien hanh', value: 'currentRatio' },
-        { name: 'Ty so thanh nhanh', value: 'quickRatio' },
-        { name: 'Ty so thanh toan tien mat', value: 'cashRatio' },
-        { name: 'Kha nang thanh toan lai vay', value: 'interestCoverageRatio' },
-        { name: 'Kha nang sinh loi', value: 0 },
-        { name: 'Ty suat loi nhuan gop bien', value: 'GPM' },
-        { name: 'Ty suat loi nhuan rong', value: 'NPM' },
-        { name: 'ROE', value: 'roae' },
-        { name: 'ROA', value: 'roaa' },
-      ]
-        .map((item, index) =>
-          item.name != 'ROE' && item.name != 'ROA'
-            ? `
-      select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from financialReport.dbo.calBCTC where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `
-            : `
-      select '${item.name}' as name, ${item.value} as value, yearQuarter as date, ${index} as row from summ where code = '${stock}' and RIGHT(yearQuarter, 1) <> 0
-      `,
-        )
-        .join(`union all`);
-    }
+  private getChiTieuCSTC(industry: string, stock: string, order: number): string {
+    const isBanking = industry === 'Ngân hàng';
+    const isYear = order === TimeTypeEnum.Year;
+    
+    const commonFields = [
+      { name: 'Chi so danh gia', value: 0 },
+      { name: 'P/E', value: 'PE' },
+      { name: 'P/B', value: 'PB' },
+      { name: 'EPS', value: 'EPS' },
+      { name: 'BVPS', value: 'BVPS' },
+    ];
+  
+    const bankFields = [
+      ...commonFields,
+      { name: 'Hieu qua hoat dong', value: 0 },
+      { name: 'ROE', value: 'roae' },
+      { name: 'ROA', value: 'roaa' },
+      { name: 'NIM', value: 'NIM' },
+      { name: 'YOEA', value: 'YOEA' },
+      { name: 'Co cau tai san', value: 0 },
+      { name: 'LAR_EAA', value: 'LAR_EAA' },
+      { name: 'LAR_TR', value: 'LAR_TR' },
+      { name: 'DDA_EAA', value: 'DDA_EAA' },
+      { name: 'LDR', value: 'LDR' },
+      { name: 'Thanh khoan', value: 0 },
+      { name: 'LFR', value: 'LFR' },
+      { name: 'LTR', value: 'LTR' },
+      { name: 'CAR', value: 'CAR' },
+      { name: 'LAR_AR', value: 'LAR_AR' },
+      { name: 'Chat luong tin dung', value: 0 },
+      { name: 'NPLR', value: 'NPLR' },
+      { name: 'NDR', value: 'NDR' },
+      { name: 'LLP_NPL', value: 'LLP_NPL' },
+      { name: 'NPL_TR', value: 'NPL_TR' },
+    ];
+  
+    const nonBankFields = [
+      ...commonFields,
+      { name: 'Hieu qua hoat dong', value: 0 },
+      { name: 'Vong quay tai san co dinh', value: 'FAT' },
+      { name: 'Vong quay tong tai san', value: 'ATR' },
+      { name: 'Vong quay tien', value: 'CTR' },
+      { name: 'Vong quay VCSH', value: 'CT' },
+      { name: 'Kha nang thanh toan', value: 0 },
+      { name: 'Chi so kha nang tra no', value: 'DSCR' },
+      { name: 'Ty le no hien tai/Tong tai san', value: 'totalDebtToTotalAssets' },
+      { name: 'Ty le no hien tai/VCSH', value: 'DE' },
+      { name: 'Ty le dam bao tra no bang tai san', value: 'ACR' },
+      { name: 'Thanh khoan', value: 0 },
+      { name: 'Ty so thanh toan hien hanh', value: 'currentRatio' },
+      { name: 'Ty so thanh nhanh', value: 'quickRatio' },
+      { name: 'Ty so thanh toan tien mat', value: 'cashRatio' },
+      { name: 'Kha nang thanh toan lai vay', value: 'interestCoverageRatio' },
+      { name: 'Kha nang sinh loi', value: 0 },
+      { name: 'Ty suat loi nhuan gop bien', value: 'GPM' },
+      { name: 'Ty suat loi nhuan rong', value: 'NPM' },
+      { name: 'ROE', value: 'roae' },
+      { name: 'ROA', value: 'roaa' },
+    ];
+
+    const selectedFields = isBanking ? bankFields : nonBankFields;
+
+    return selectedFields.map((item, index) => {
+      const table = isBanking ? 'calBCTCNH' : 'calBCTC';
+      const isROAEROE = item.name === 'ROE' || item.name === 'ROA';
+      const dateCondition = isYear ? (isBanking ? `RIGHT(yearQuarter, 1) <> 0` : `RIGHT(yearQuarter, 1) = 0`) : `RIGHT(yearQuarter, 1) <> 0`;
+      const minYearQuarterCondition = isYear && !isROAEROE ? `and yearQuarter >= (select min(yearQuarter) from summ)` : '';
+
+      return `
+        select '${item.name}' as name, ${item.value} as value, ${isBanking && !isROAEROE ? 'cast(year as varchar) + cast(quarter as varchar)' : 'yearQuarter'} as date, ${index} as row 
+        from ${isROAEROE ? 'summ' : `financialReport.dbo.${table}`}
+        where code = '${stock}' ${isBanking && !isROAEROE ? '': `and ${dateCondition} ${minYearQuarterCondition}`}
+      `;
+    }).join('union all');
   }
+  
+  private buildQuery(stock: string, order: number, LV2: string) {
+    let select = "";
+    let roa_roe = "";
 
-  async financialIndicatorsDetail(
-    stock: string,
-    order: number,
-    is_chart: number,
-  ) {
-    const LV2 = await this.mssqlService.query(
-      `select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`,
-    );
-    if (!LV2[0]?.LV2) return [];
-
-    const redisData = await this.redis.get(
-      `${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`,
-    );
-    if (redisData) return redisData;
-
-    const temp = this.getChiTieuCSTC(LV2[0]?.LV2, stock);
-    if (!temp) return [];
-
-    let select = ``;
+    const temp = this.getChiTieuCSTC(LV2, stock, order);
+    if (!temp) return null;
 
     switch (order) {
       case TimeTypeEnum.Quarter:
-        select = `select top 200 * from temp order by date desc`;
-        break;
+          select = `SELECT TOP 200 * FROM temp ORDER BY date DESC`;
+          roa_roe = `
+              WITH roaa AS (
+                  SELECT code, ROE AS roae, ROA AS roaa, yearQuarter 
+                  FROM RATIO.dbo.ratioInYearQuarter 
+                  WHERE code = '${stock}' AND RIGHT(yearQuarter, 1) <> 0
+              ), 
+              summ AS (
+                  SELECT roaa + LEAD(roaa) OVER (PARTITION BY code ORDER BY yearQuarter DESC) 
+                              + LEAD(roaa, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) 
+                              + LEAD(roaa, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roaa, 
+                         roae + LEAD(roae) OVER (PARTITION BY code ORDER BY yearQuarter DESC) 
+                              + LEAD(roae, 2) OVER (PARTITION BY code ORDER BY yearQuarter DESC) 
+                              + LEAD(roae, 3) OVER (PARTITION BY code ORDER BY yearQuarter DESC) AS roae, 
+                         code, yearQuarter 
+                  FROM roaa
+              ),
+          `;
+          break;
+
       case TimeTypeEnum.Year:
-        select = `select top 200 name, sum(value) as value, LEFT(date, 4) as date, sum(row) as row from temp group by LEFT(date, 4), name order by LEFT(date, 4) desc`;
-        break;
+          select = `SELECT TOP 200 name, SUM(value) AS value, LEFT(date, 4) AS date, SUM(row) AS row FROM temp GROUP BY LEFT(date, 4), name 
+                    ${LV2 === 'Ngân hàng' ? 'HAVING COUNT(DISTINCT RIGHT(date, 1)) = 4' : ''} 
+                    ORDER BY LEFT(date, 4) DESC`;
+          roa_roe = `
+              WITH summ AS (
+                  SELECT code, ROE AS roae, ROA AS roaa, yearQuarter 
+                  FROM RATIO.dbo.ratioInYearQuarter 
+                  WHERE RIGHT(yearQuarter, 1) ${LV2 === 'Ngân hàng' ? '<>' : '='} '0' AND code = '${stock}'
+              ),
+          `;
+          break;
+
       default:
-        break;
+          return null;
     }
+    return { select, roa_roe, temp };
+  }
+
+  async financialIndicatorsDetail(stock: string, order: number, is_chart: number) {
+    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    if (!LV2[0]?.LV2) return [];
+
+    const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`);
+    if (redisData) return redisData;
+
+    const queryParts = this.buildQuery(stock, order, LV2[0]?.LV2);
+    if (!queryParts) return [];
 
     const query = `
-    with roaa as (select code,
-          ROE as roae,
-          ROA as roaa,
-          yearQuarter
-    from RATIO.dbo.ratioInYearQuarter
-    where code = '${stock}' and right(yearQuarter, 1) <> 0),
-    summ as (
-    select roaa +
-    lead(roaa) over (partition by code order by yearQuarter desc)
-    + lead(roaa, 2) over (partition by code order by yearQuarter desc)
-    + lead(roaa, 3) over (partition by code order by yearQuarter desc)
-    as roaa,
-    roae +
-    lead(roae) over (partition by code order by yearQuarter desc)
-    + lead(roae, 2) over (partition by code order by yearQuarter desc)
-    + lead(roae, 3) over (partition by code order by yearQuarter desc)
-    as roae, code, yearQuarter
-    from roaa),
-    temp as (${temp}),
-    date as (${select})
-    select * from date order by date asc, row asc
+      ${queryParts.roa_roe}
+      temp AS (${queryParts.temp}),
+      date AS (${queryParts.select})
+      SELECT * FROM date
+      ${order === TimeTypeEnum.Year && LV2[0]?.LV2 === 'Ngân hàng' ? 'WHERE date >= (SELECT min(LEFT(yearQuarter, 4)) FROM summ)' : ''} 
+      ORDER BY date ASC, row ASC
     `;
 
-    const data: any[] = await this.mssqlService.query<
-      FinancialIndicatorsDetailResponse[]
-    >(query);
-    const dataMapped = FinancialIndicatorsDetailResponse.mapToList(
-      data,
-      is_chart,
-    );
-    await this.redis.set(
-      `${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`,
-      dataMapped,
-      { ttl: TimeToLive.OneDay },
-    );
+    console.log(query)
+    const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query);
+    const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart);
+
+    await this.redis.set(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`, dataMapped, { ttl: TimeToLive.OneDay });
     return dataMapped;
   }
 

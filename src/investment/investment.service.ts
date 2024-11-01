@@ -808,53 +808,24 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(
-    stock: string | any[],
-    from: string,
-    to: string,
-    haveMa?: 0 | 1,
-    realtimePrice?: number,
-    role?: number,
-  ) {
-    const listStock: any = !Array.isArray(stock)
-      ? `= '${stock}'`
-      : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
+  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
 
     const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
       this.redis.get(`price:${listStock}`),
       this.redis.get(`price:${from}`),
       this.redis.get(`price:${to}`),
     ]);
-
+    
     let [data, lastPrice, date, dateTo] = await Promise.all([
-      !dataRedis
-        ? (this.mssqlService.query(
-            `select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`,
-          ) as any)
-        : [],
-      !realtimePrice
-        ? this.mssqlService.query(`WITH LatestTrade AS (
-                                                  SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
-                                                  FROM tradeIntraday.dbo.tickerTradeVNDIntraday
-                                                  WHERE code ${listStock}
+      !dataRedis ? (this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any) : [],
+      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (
+                                                    SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
+                                                    FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
                                                 )
-                                                SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;
-          `)
-        : (1 as any),
-      !dateRedis
-        ? this.mssqlService.query(
-            `select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(
-              from,
-            ).format('YYYY-MM-DD')}' order by date asc`,
-          )
-        : [],
-      !dateToRedis
-        ? this.mssqlService.query(
-            `select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(
-              to,
-            ).format('YYYY-MM-DD')}' order by date desc`,
-          )
-        : [],
+                                                SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
+      !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
+      !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
     ]);
 
     if (realtimePrice && !dataRedis) {
@@ -882,22 +853,11 @@ export class InvestmentService {
 
       stock.map((item: any) => {
         const price = data.filter((res) => res.code == item.code);
-        price[price.length - 1]['closePrice'] = !realtimePrice
-          ? lastPrice.find((price) => price.code == item.code).closePrice
-          : realtimePrice;
+        price[price.length - 1]['closePrice'] = !realtimePrice ? lastPrice.find((price) => price.code == item.code).closePrice : realtimePrice;
 
         const result = !haveMa
-          ? this.calculateMAIndex(
-              [...data.filter((res) => res.code == item.code)],
-              date,
-              dateTo,
-            )
-          : this.calculateMAIndex(
-              [...data.filter((res) => res.code == item.code)],
-              date,
-              dateTo,
-              item.ma,
-            );
+          ? this.calculateMAIndex([...data.filter((res) => res.code == item.code)], date, dateTo)
+          : this.calculateMAIndex([...data.filter((res) => res.code == item.code)], date, dateTo, item.ma);
 
         arr.push({
           code: item.code,
