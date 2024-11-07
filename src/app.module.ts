@@ -98,7 +98,7 @@ import { TCBSModule } from './tcbs/tcbs.module';
     SocketModule,
     MarketModule,
     MacroModule,
-    // KafkaModule,
+    KafkaModule,
     RetailModule,
     NewsModule,
     ReportModule,
