@@ -3,7 +3,7 @@ import { SetMetadata } from '@nestjs/common';
 export enum Role {
   User, //K được xem trading tool
   Admin, //Được chỉnh sửa bản tin, trading tool
-  WatchTradingTool, //Chỉ được xem trading tool
+  PremiumUser, //Chỉ được xem trading tool (PREMIUM USER)
 }
 
 export const ROLES_KEY = 'roles';

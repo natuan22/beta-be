@@ -34,26 +34,16 @@ async function bootstrap() {
   app.setGlobalPrefix(process.env.API_PREFIX);
   app.useGlobalInterceptors(new HttpLoggerInterceptor());
 
-  const config = new DocumentBuilder()
-    .addBearerAuth()
-    .setTitle('Stock Swagger')
-    .setDescription('Stock API - Talented Investor')
-    .setVersion('1.0')
-    .build();
+  const config = new DocumentBuilder().addBearerAuth().setTitle('Stock Swagger').setDescription('Stock API - Talented Investor').setVersion('1.0').build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('docs', app, document, {
-    customSiteTitle: 'Stock Swagger',
-  });
+  SwaggerModule.setup('docs', app, document, { customSiteTitle: 'Stock Swagger' });
 
   app.useGlobalFilters(new ValidationFilter());
   app.useGlobalPipes(new ValidationPipe({
     transform: true,
     exceptionFactory(errors: ValidationError[]) {
-      return new ExceptionResponse(
-        HttpStatus.BAD_REQUEST,
-        UtilCommonTemplate.getMessageValidator(errors),
-      );
+      return new ExceptionResponse(HttpStatus.BAD_REQUEST, UtilCommonTemplate.getMessageValidator(errors));
     }}),
   );
 

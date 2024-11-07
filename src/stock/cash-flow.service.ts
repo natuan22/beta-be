@@ -804,14 +804,8 @@ export class CashFlowService {
     return data;
   }
 
-  async getInvestorCashFlowByIndustry(
-    investorType: number,
-    type: number,
-    ex: string,
-  ) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.InvestorCashFlowByIndustry}:${ex}:${type}:${investorType}`,
-    );
+  async getInvestorCashFlowByIndustry(investorType: number, type: number, ex: string) {
+    const redisData = await this.redis.get(`${RedisKeys.InvestorCashFlowByIndustry}:${ex}:${type}:${investorType}`);
     if (redisData) return redisData;
 
     let investor!: string;
@@ -833,9 +827,7 @@ export class CashFlowService {
         );
     }
 
-    const { latestDate, monthDate, yearDate } = await this.getSessionDate(
-      `[marketTrade].[dbo].[proprietary]`,
-    );
+    const { latestDate, monthDate, yearDate } = await this.getSessionDate(`[marketTrade].[dbo].[proprietary]`);
 
     let startDate!: any;
     switch (type) {
@@ -855,53 +847,47 @@ export class CashFlowService {
     const floor = ex == 'ALL' ? ` ('HOSE', 'HNX', 'UPCOM') ` : ` ('${ex}') `;
 
     const query: string = `
-      SELECT t.industry,
-            t.buyVal,
-            t.sellVal,
-            t.netVal,
-            t.transVal,
-            t.type,
-            t.date,
-            m.marketTotalVal,
-            (t.transVal / NULLIF(m.marketTotalVal,0) * 100) as [percent]
-      FROM(
-          SELECT i.LV2 AS industry,
-                SUM(f.buyVal) AS buyVal,
-                SUM(f.sellVal) AS sellVal,
-                SUM(f.netVal) AS netVal,
-                SUM(f.buyVal) + SUM(f.sellVal) AS transVal,
-                ${investorType} AS type,
-                f.[date]
+      WITH DateIndustryGrid AS (
+          SELECT DISTINCT d.[date], i.LV2 AS industry
           FROM [marketTrade].dbo.[${investor}] f
           INNER JOIN [marketInfor].dbo.[info] i ON i.code = f.code
-          WHERE f.[date] >= @0
-            AND f.[date] <= @1            
-            AND i.floor IN ${floor}
-            AND i.LV2 != ''
-          GROUP BY f.[date], i.LV2
-      ) t
-      INNER JOIN (
-          SELECT f.[date], SUM(f.buyVal) + SUM(f.sellVal) AS marketTotalVal
+          CROSS JOIN (SELECT DISTINCT [date] FROM [marketTrade].dbo.[${investor}] WHERE [date] >= @0 AND [date] <= @1) d
+          WHERE i.floor IN ${floor} AND i.LV2 != ''
+      ),
+      MarketData AS (
+          SELECT i.LV2 AS industry, f.[date], SUM(f.buyVal) AS buyVal, SUM(f.sellVal) AS sellVal, SUM(f.netVal) AS netVal, SUM(f.buyVal) + SUM(f.sellVal) AS transVal
           FROM [marketTrade].dbo.[${investor}] f
           INNER JOIN [marketInfor].dbo.[info] i ON i.code = f.code
-          WHERE f.[date] >= @0
-            AND f.[date] <= @1            
-            AND i.floor IN ${floor}
-            AND i.LV2 != ''
-          GROUP BY f.[date]
-      ) m ON t.date = m.date
-      ORDER BY t.date, t.industry;
+          WHERE f.[date] >= @0 AND f.[date] <= @1 AND i.floor IN ${floor} AND i.LV2 != ''
+          GROUP BY i.LV2, f.[date]
+      ),
+      MarketTotal AS (
+          SELECT [date], SUM(buyVal + sellVal) AS marketTotalVal
+          FROM [marketTrade].dbo.[${investor}]
+          WHERE [date] >= @0 AND [date] <= @1
+          GROUP BY [date]
+      )
+      SELECT 
+          g.industry, 
+          ISNULL(d.buyVal, 0) AS buyVal, 
+          ISNULL(d.sellVal, 0) AS sellVal, 
+          ISNULL(d.netVal, 0) AS netVal, 
+          ISNULL(d.transVal, 0) AS transVal,
+          ${investorType} AS type, 
+          g.[date],
+          ISNULL(m.marketTotalVal, 0) AS marketTotalVal,
+          CASE WHEN m.marketTotalVal = 0 THEN 0 ELSE (ISNULL(d.transVal, 0) / m.marketTotalVal) * 100 END AS [percent]
+      FROM DateIndustryGrid g
+      LEFT JOIN MarketData d ON g.industry = d.industry AND g.[date] = d.[date]
+      LEFT JOIN MarketTotal m ON g.[date] = m.[date]
+      ORDER BY g.[date], g.industry;
     `;
 
-    const data: InvestorCashFlowByIndustryInterface[] =
-      await this.dbServer.query(query, [startDate, latestDate]);
+    const data: InvestorCashFlowByIndustryInterface[] = await this.dbServer.query(query, [startDate, latestDate]);
 
     const mappedData = new InvestorCashFlowByIndustryResponse().mapToList(data);
 
-    await this.redis.set(
-      `${RedisKeys.InvestorCashFlowByIndustry}:${ex}:${type}:${investorType}`,
-      mappedData,
-    );
+    await this.redis.set(`${RedisKeys.InvestorCashFlowByIndustry}:${ex}:${type}:${investorType}`, mappedData);
     return mappedData;
   }
 
@@ -940,7 +926,7 @@ export class CashFlowService {
       group by i.LV2, [date]
       order by [date], i.LV2
     `;
-
+    
     const data = await this.dbServer.query(query, [startDate, latestDate]);
 
     const mappedData = new MarketTotalTransValueResponse().mapToList(data);
