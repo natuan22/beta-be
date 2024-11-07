@@ -205,7 +205,7 @@ export class InvestmentController {
   }
 
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.WatchTradingTool)
+  @Roles(Role.Admin, Role.PremiumUser)
   @ApiOperation({ summary: 'Danh mục beta' })
   @Get('beta-watch-list')
   async getBeteWatchList(@Query() p: any, @Res() res: Response) {
@@ -222,7 +222,7 @@ export class InvestmentController {
    */
   
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.WatchTradingTool)
+  @Roles(Role.Admin, Role.PremiumUser)
   @ApiOperation({ summary: 'BETA Smart' })
   @Get('beta-smart')
   async getBetaSmart(@Res() res: Response) {
@@ -235,7 +235,7 @@ export class InvestmentController {
   }
 
   @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.Admin, Role.WatchTradingTool)
+  @Roles(Role.Admin, Role.PremiumUser)
   @Get('stock-basic')
   async getDataStockBasic(@Query() q: StockDto, @Res() res: Response) {
     try {

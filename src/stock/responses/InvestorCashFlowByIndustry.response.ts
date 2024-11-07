@@ -143,9 +143,7 @@ export class InvestorCashFlowByIndustryResponse {
   }
 }
 
-export class InvestorCashFlowByIndustrySwagger extends PartialType(
-  BaseResponse,
-) {
+export class InvestorCashFlowByIndustrySwagger extends PartialType(BaseResponse) {
   @ApiProperty({
     type: InvestorCashFlowByIndustryResponse,
     isArray: true,

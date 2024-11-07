@@ -1814,7 +1814,6 @@ export class SharesService {
       ORDER BY date ASC, row ASC
     `;
 
-    console.log(query)
     const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query);
     const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart);
 
