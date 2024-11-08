@@ -1355,39 +1355,30 @@ export class SharesService {
     const redisData = await this.redis.get(`${RedisKeys.castFlowDetail}:${order}:${stock}:${is_chart}`);
     if (redisData) return redisData;
 
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    const LV2 = await this.mssqlService.query(`SELECT TOP 1 LV2 FROM marketInfor.dbo.info WHERE code = '${stock}'`);
     const { chiTieu, top, cate, sort } = this.getChiTieuLCTT(LV2[0].LV2, is_chart);
 
-    let group = ``;
-    let select = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        group = `order by yearQuarter desc`;
-        select = `name, value, yearQuarter as date, id`;
-        break;
-      case TimeTypeEnum.Year:
-        group = `group by name, id, year having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
-        select = `year as date, name, sum(value) as value, id`;
-        break;
-      default:
-        break;
-    }
+    const isQuarter = order === TimeTypeEnum.Quarter;
+    const group = isQuarter ? 'ORDER BY yearQuarter DESC' : 'GROUP BY name, id, year ORDER BY year DESC';
+    const select = isQuarter ? `name, value, yearQuarter AS date, id` : `year AS date, name, SUM(value) AS value, id`;
+    const condition = `WHERE code = '${stock}' AND name IN (${chiTieu}) AND ${isQuarter ? 'RIGHT(yearQuarter, 1) <> 0' : 'RIGHT(yearQuarter, 1) = 0'} AND type = '${cate}'`;
 
     const query = `
-      with temp as (
+      WITH temp AS (
           SELECT TOP ${top} ${select}
           FROM financialReport.dbo.financialReportV2
-          WHERE code = '${stock}' AND name IN (${chiTieu}) AND yearQuarter NOT LIKE '%0' AND type = '${cate}'
+          ${condition}
           ${group}
       )
-      select case when CHARINDEX('-', name) != 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-                  when name = N'Các khoản tương đương tiền' and id = 502 then 'Cac khoan tuong duong tien dau ky'
-                  when name = N'Các khoản tương đương tiền' and id = 602 then 'Cac khoan tuong duong tien cuoi ky'
-                  when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 503 then 'Anh huong dau ky'
-                  when name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' and id = 603 then 'Anh huong cuoi ky'
-             else LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) end as name, value, date,
-             ${sort}
-      from temp order by date asc, row_num asc
+      SELECT CASE WHEN CHARINDEX('-', name) != 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+                  WHEN name = N'Các khoản tương đương tiền' AND id = 502 THEN 'Cac khoan tuong duong tien dau ky'
+                  WHEN name = N'Các khoản tương đương tiền' AND id = 602 THEN 'Cac khoan tuong duong tien cuoi ky'
+                  WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' AND id = 503 THEN 'Anh huong dau ky'
+                  WHEN name = N'Ảnh hưởng của thay đổi tỷ giá hối đoái quy đổi ngoại tệ' AND id = 603 THEN 'Anh huong cuoi ky'
+                  ELSE LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+             END AS name, value, date, ${sort}
+      FROM temp 
+      ORDER BY date ASC, row_num ASC
     `;
 
     const data = await this.mssqlService.query<CastFlowDetailResponse[]>(query);
@@ -1444,7 +1435,7 @@ export class SharesService {
   }
 
   async businessResultDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    const LV2 = await this.mssqlService.query(`SELECT TOP 1 LV2 FROM marketInfor.dbo.info WHERE code = '${stock}'`);
     if (!LV2[0]) return [];
 
     const redisData = await this.redis.get(`${RedisKeys.businessResultDetail}:${order}:${stock}:${is_chart}`);
@@ -1452,33 +1443,32 @@ export class SharesService {
 
     const { chiTieu, top, sort } = this.getChiTieuKQKD(LV2[0].LV2, is_chart);
 
-    let select = ``, group = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        select = `value, case when LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC) <> 0 then ((value - LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) / LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) * 100 else 0 end AS per, yearQuarter AS date,`;
-        group = `order by yearQuarter desc`;
-        break;
-      case TimeTypeEnum.Year:
-        select = `sum(value) as value, case when (lead(sum(value), 1) over ( partition by name order by year desc)) <> 0 then ((sum(value) - lead(sum(value), 1) over ( partition by name order by year desc)) / (lead(sum(value), 1) over ( partition by name order by year desc))) * 100 else 0 end as per, year as date,`;
-        group = `group by year, name, id having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
-        break;
-      default:
-        break;
-    }
+    const isQuarter = order === TimeTypeEnum.Quarter;
+    const selectFields = isQuarter
+      ? `value, CASE WHEN LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC) <> 0 
+            THEN ((value - LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) / LEAD(value, 1) OVER (PARTITION BY name ORDER BY yearQuarter DESC)) * 100 
+            ELSE 0 END AS per, yearQuarter AS date`
+      : `SUM(value) AS value, CASE WHEN LEAD(SUM(value), 1) OVER (PARTITION BY name ORDER BY year DESC) <> 0 
+            THEN ((SUM(value) - LEAD(SUM(value), 1) OVER (PARTITION BY name ORDER BY year DESC)) / LEAD(SUM(value), 1) OVER (PARTITION BY name ORDER BY year DESC)) * 100 
+            ELSE 0 END AS per, year AS date`;
+
+    const groupClause = isQuarter ? `ORDER BY yearQuarter DESC` : `GROUP BY year, name, id ORDER BY year DESC`;
+    const conditionClause = `WHERE code = '${stock}' AND type = 'KQKD' AND id IN (${chiTieu}) ${isQuarter ? "AND RIGHT(yearQuarter, 1) <> 0" : "AND RIGHT(yearQuarter, 1) = 0"}`;
 
     const query = `
       WITH temp AS (
-          SELECT TOP ${top} ${select}
-                CASE
-                  WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
-                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
-                  WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
-                ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2)) END AS name,
-                ${sort}
-          FROM financialReport.dbo.financialReportV2
-          WHERE code = '${stock}' AND type = 'KQKD' AND id IN (${chiTieu}) AND RIGHT(yearQuarter, 1) <> 0
-          ${group}
+        SELECT TOP ${top} ${selectFields},
+          CASE 
+            WHEN CHARINDEX('- ', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+            WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
+            WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+            WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
+            ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
+          END AS name,
+          ${sort}
+        FROM financialReport.dbo.financialReportV2
+        ${conditionClause}
+        ${groupClause}
       )
       SELECT * FROM temp
       ORDER BY date ASC, row_num ASC
@@ -1539,7 +1529,7 @@ export class SharesService {
   }
 
   async balanceSheetDetail(stock: string, order: number, is_chart: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    const LV2 = await this.mssqlService.query(`SELECT TOP 1 LV2 FROM marketInfor.dbo.info WHERE code = '${stock}'`);
     if (!LV2[0]) return [];
 
     const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetail}:${order}:${stock}:${is_chart}`);
@@ -1547,34 +1537,25 @@ export class SharesService {
 
     const { chiTieu, top, sort } = this.getChiTieuCDKT(LV2[0].LV2, is_chart);
 
-    let select = ``, group = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter AS date,`;
-        group = `order by yearQuarter desc`;
-        break;
-      case TimeTypeEnum.Year:
-        select = `sum(value) as value, year as date,`;
-        group = `group by year, name, id having count(distinct right(yearQuarter, 1)) = 4 order by year desc`;
-        break;
-      default:
-        break;
-    }
+    const isQuarter = order === TimeTypeEnum.Quarter;
+    const selectFields = isQuarter ? `value, yearQuarter AS date,` : `SUM(value) AS value, year AS date,`;
+    const timeCondition = isQuarter ? `RIGHT(yearQuarter, 1) <> 0` : `RIGHT(yearQuarter, 1) = 0`;
+    const orderClause = isQuarter ? `ORDER BY yearQuarter DESC` : `GROUP BY year, name, id ORDER BY year DESC`;
 
-    let query = `
+    const query = `
       WITH temp AS (
-          SELECT TOP ${top} ${select}
-                CASE
-                  WHEN CHARINDEX('- ', name) <> 0 then LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
-                  WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
-                  WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
-                  ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
-                END AS name,
-                ${sort}
+        SELECT TOP ${top} ${selectFields}
+            CASE
+              WHEN CHARINDEX('- ', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+              WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
+              WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+              WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
+              ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
+            END AS name,
+            ${sort}
         FROM financialReport.dbo.financialReportV2
-        WHERE code = '${stock}' AND type = 'CDKT' AND id IN (${chiTieu}) AND RIGHT(yearQuarter, 1) <> 0
-        ${group}
+        WHERE code = '${stock}' AND type = 'CDKT' AND id IN (${chiTieu}) AND ${timeCondition}
+        ${orderClause}
       )
       SELECT * FROM temp ORDER BY date ASC, row_num ASC
     `;
@@ -1587,80 +1568,75 @@ export class SharesService {
   }
 
   async balanceSheetDetailCircle(stock: string, order: number) {
-    const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
+    const LV2 = await this.mssqlService.query(`SELECT TOP 1 LV2 FROM marketInfor.dbo.info WHERE code = '${stock}'`);
     if (!LV2[0]?.LV2) return [];
 
     const redisData = await this.redis.get(`${RedisKeys.balanceSheetDetailCircle}:${order}:${stock}`);
     if (redisData) return redisData;
 
-    let select = ``, group = ``, query = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date, id`;
-        group = `order by yearQuarter desc`;
-        break;
-      case TimeTypeEnum.Year:
-        select = `sum(value) as value, year as date, id`;
-        group = `group by year, id order by year desc`;
-      default:
-        break;
-    }
-    if (LV2[0]?.LV2 == 'Dịch vụ tài chính') {
+    const isQuarter = order === TimeTypeEnum.Quarter;
+    const selectFields = isQuarter ? `value, yearQuarter AS date, id` : `SUM(value) AS value, year AS date, id`;
+    const orderClause = isQuarter ? `ORDER BY yearQuarter DESC` : `GROUP BY year, id ORDER BY year DESC`;
+    const dateCondition = `AND RIGHT(yearQuarter, 1) <> 0`;
+
+    let query;
+    if (LV2 === 'Dịch vụ tài chính') {
       query = `
-        with temp as (
-            select top 6 ${select}
-            from financialReport.dbo.financialReportV2
-            where code = '${stock}' and id IN (10101, 10201, 3, 4, 2, 5) and type = 'CDKT' AND RIGHT(yearQuarter, 1) <> 0
-            ${group}
+        WITH temp AS (
+            SELECT TOP 6 ${selectFields}
+            FROM financialReport.dbo.financialReportV2
+            WHERE code = '${stock}' AND id IN (10101, 10201, 3, 4, 2, 5) AND type = 'CDKT' ${dateCondition}
+            ${orderClause}
         ),
-        ngan_han as (
-            select 'ngan han' as name, [10101] / [2] * 100 as value, date 
-            from temp as source pivot ( sum(value) for id in([10101], [2])) as chuyen
+        ngan_han AS (
+            SELECT 'ngan han' AS name, [10101] / [2] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([10101], [2])) AS chuyen
         ),
-        dai_han as (
-            select 'dai han' as name, [10201] / [2] * 100 as value, date 
-            from temp as source pivot ( sum(value) for id in([10201], [2])) as chuyen
+        dai_han AS (
+            SELECT 'dai han' AS name, [10201] / [2] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([10201], [2])) AS chuyen
         ),
-        no_phai_tra as (
-            select 'no phai tra' as name, [3] / [5] * 100 as value, date 
-            from temp as source pivot ( sum(value) for id in([3], [5])) as chuyen
+        no_phai_tra AS (
+            SELECT 'no phai tra' AS name, [3] / [5] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([3], [5])) AS chuyen
         ),
-        von_so_huu as (
-            select 'von chu so huu' as name, [4] / [5] * 100 as value, date 
-            from temp as source pivot ( sum(value) for id in([4], [5])) as chuyen
+        von_so_huu AS (
+            SELECT 'von chu so huu' AS name, [4] / [5] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([4], [5])) AS chuyen
         )
-        select * from ngan_han
-        union all
-        select * from dai_han
-        union all
-        select * from no_phai_tra
-        union all
-        select * from von_so_huu
+        SELECT * FROM ngan_han
+        UNION ALL
+        SELECT * FROM dai_han
+        UNION ALL
+        SELECT * FROM no_phai_tra
+        UNION ALL
+        SELECT * FROM von_so_huu
       `;
     } else {
       query = `
-        with temp as (
-            select top 3 ${select}
-            from financialReport.dbo.financialReportV2
-            where code = '${stock}' and id IN (301, 302, 4) and type = 'CDKT' AND RIGHT(yearQuarter, 1) <> 0
-            ${group}
+        WITH temp AS (
+            SELECT TOP 3 ${selectFields} FROM financialReport.dbo.financialReportV2
+            WHERE code = '${stock}' AND id IN (301, 302, 4) AND type = 'CDKT' ${dateCondition}
+            ${orderClause}
         ),
-        no_phai_tra as (
-            select 'no phai tra' as name, [301] / [4] * 100 as value, date
-            from temp as source pivot ( sum(value) for id in ([301], [4])) as chuyen),
-        von_so_huu as (
-            select 'von chu so huu' as name, [302] / [4] * 100 as value, date
-            from temp as source pivot ( sum(value) for id in ([302], [4])) as chuyen),
-        tong_von as (
-            select 'tong nguon von' as name, value, date
-            from temp
-            where id = 4
+        no_phai_tra AS (
+            SELECT 'no phai tra' AS name, [301] / [4] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([301], [4])) AS chuyen
+        ),
+        von_so_huu AS (
+            SELECT 'von chu so huu' AS name, [302] / [4] * 100 AS value, date
+            FROM temp AS source PIVOT (SUM(value) FOR id IN ([302], [4])) AS chuyen
+        ),
+        tong_von AS (
+            SELECT 'tong nguon von' AS name, value, date
+            FROM temp
+            WHERE id = 4
         )
-        select * from no_phai_tra
-        union all
-        select * from von_so_huu
-        union all
-        select * from tong_von
+        SELECT * FROM no_phai_tra
+        UNION ALL
+        SELECT * FROM von_so_huu
+        UNION ALL
+        SELECT * FROM tong_von
       `;
     }
 
