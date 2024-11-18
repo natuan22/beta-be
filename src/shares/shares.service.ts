@@ -1421,6 +1421,7 @@ export class SharesService {
       case 'Bảo hiểm':
         chiTieu ='1,2,3,4,5,7,8,9,305,11,13,14,15,16,17,18,20,21,22,23,24,25,28,29,31,33,34,35,36,37';
         top = 240;
+        break;
       case 'Dịch vụ tài chính':
         chiTieu ='1,101,102,103,104,106,108,110,111,112,2,201,206,207,209,211,212,214,3,301,302,304,4,401,402,404,405,6,7,9,901,902,10,1001,1002,11,1101';
         top = 296;
@@ -1457,21 +1458,27 @@ export class SharesService {
 
     const query = `
       WITH temp AS (
-        SELECT TOP ${top} ${selectFields},
-          CASE 
-            WHEN CHARINDEX('- ', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
-            WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
-            WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
-            WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
-            ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
-          END AS name,
-          ${sort}
+        SELECT TOP ${top} ${selectFields}, ${LV2[0].LV2 === 'Bảo hiểm' ? `  
+              CASE 
+                WHEN CHARINDEX('. ', name) > 0 THEN LTRIM(SUBSTRING(name, CHARINDEX('. ', name) + 2, LEN(name)))
+                WHEN CHARINDEX('- ', name) > 0 THEN LTRIM(SUBSTRING(name, CHARINDEX('- ', name) + 2, LEN(name))) ELSE name
+              END AS name,
+            ` : `
+              CASE 
+                WHEN CHARINDEX('- ', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('-', name)))
+                WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) = 0 THEN name
+                WHEN CHARINDEX('. ', name) > 0 THEN LTRIM(SUBSTRING(name, CHARINDEX('. ', name) + 2, LEN(name)))
+                WHEN CHARINDEX('(', name) = 0 AND CHARINDEX('.', name) <> 0 THEN LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name)))
+                WHEN CHARINDEX('(', name) <> 0 AND CHARINDEX('.', name) = 0 THEN LTRIM(LEFT(name, CHARINDEX('(', name) - 2))
+                ELSE LTRIM(LEFT(RIGHT(name, LEN(name) - CHARINDEX(' ', name)), CHARINDEX('(', RIGHT(name, LEN(name) - CHARINDEX(' ', name))) - 2))
+              END AS name,
+            `}
+            ${sort}
         FROM financialReport.dbo.financialReportV2
         ${conditionClause}
         ${groupClause}
       )
-      SELECT * FROM temp
-      ORDER BY date ASC, row_num ASC
+      SELECT * FROM temp ORDER BY date ASC, row_num ASC
     `;
 
     const data = await this.mssqlService.query<BusinessResultDetailResponse[]>(query);
