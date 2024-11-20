@@ -2335,65 +2335,43 @@ select * from temp where date = (select max(date) from temp)
   }
 
   async stockInfo(code: string) {
+    const day_52_week = moment().subtract(52, 'week').format('YYYY-MM-DD');
     try {
       const query = `
-      WITH max_date
-      AS (SELECT
-        MAX(date) AS date,
-        ratioCode
-      FROM [RATIO].[dbo].[ratio]
-      WHERE code = '${code}'
-      GROUP BY ratioCode),
-      nuoc_ngoai
-      AS (select [TyleNDTNNdangnamgiu] * 100 as [foreign], maCK as code from [PHANTICH].[dbo].[soHuuNN] where maCK = '${code}'),
-      pi
-      AS (SELECT
-        *
-      FROM (SELECT
-        [code],
-        r.[ratioCode],
-        [value]
-      FROM [RATIO].[dbo].[ratio] r
-      INNER JOIN max_date m
-        ON m.ratioCode = r.ratioCode
-        AND m.date = r.date
-      WHERE (r.ratioCode IN ('PRICE_HIGHEST_CR_52W', 'PRICE_LOWEST_CR_52W', 'NMVALUE_AVG_CR_20D', 'NMVOLUME_AVG_CR_20D', 'STATE_OWNERSHIP'))
-      AND code = '${code}') AS source PIVOT (SUM(value) FOR ratioCode IN ([PRICE_HIGHEST_CR_52W], [PRICE_LOWEST_CR_52W], [NMVALUE_AVG_CR_20D], [NMVOLUME_AVG_CR_20D], [STATE_OWNERSHIP])) AS chuyen),
-      closePrice as (
-        select top 1 closePrice, code from marketTrade.dbo.tickerTradeVND where code = '${code}' order by date desc
-    )
-      SELECT
-        c.code,
-        g.closePrice,
-        marketCap,
-        shareout,
-        [PRICE_HIGHEST_CR_52W] AS high,
-        [PRICE_LOWEST_CR_52W] AS low,
-        [NMVOLUME_AVG_CR_20D] AS kl,
-        [NMVALUE_AVG_CR_20D] AS gia_tri,
-        EPS,
-        PE,
-        BVPS,
-        PB,
-        [STATE_OWNERSHIP] AS nha_nuoc,
-        [foreign] AS nuoc_ngoai,
-        LV2,
-        LV4,
-        companyName
-      FROM RATIO.dbo.ratioInday c
-      INNER JOIN marketInfor.dbo.info i
-        ON i.code = c.code
-      INNER JOIN pi p
-        ON i.code = c.code
-      LEFT JOIN nuoc_ngoai n
-        ON n.code = c.code
-      INNER JOIN closePrice g
-        ON g.code = c.code  
-      WHERE c.code = '${code}'
-      AND c.date = (SELECT
-        MAX(date)
-      FROM RATIO.dbo.ratioInday
-      WHERE code = '${code}')
+        WITH max_date AS (
+          SELECT MAX(date) AS date, ratioCode
+          FROM [RATIO].[dbo].[ratio]
+          WHERE code = '${code}'
+          GROUP BY ratioCode
+        ),
+        min_max AS (
+          SELECT code, MIN(closePrice * 1000) AS PRICE_LOWEST_CR_52W, MAX(closePrice * 1000) AS PRICE_HIGHEST_CR_52W
+          FROM marketTrade.dbo.tickerTradeVND
+          WHERE code = '${code}' AND date >= '${day_52_week}'
+          GROUP BY code
+        ),
+        nuoc_ngoai AS (
+          SELECT [TyleNDTNNdangnamgiu] * 100 AS [foreign], maCK AS code FROM [PHANTICH].[dbo].[soHuuNN] WHERE maCK = '${code}'
+        ),
+        pi AS (
+          SELECT * FROM (SELECT [code], r.[ratioCode], [value]
+          FROM [RATIO].[dbo].[ratio] r
+          INNER JOIN max_date m ON m.ratioCode = r.ratioCode  AND m.date = r.date
+          WHERE (r.ratioCode IN ('NMVALUE_AVG_CR_20D', 'NMVOLUME_AVG_CR_20D', 'STATE_OWNERSHIP')) AND code = '${code}') AS source PIVOT (SUM(value) FOR ratioCode IN ([NMVALUE_AVG_CR_20D], [NMVOLUME_AVG_CR_20D], [STATE_OWNERSHIP])) AS chuyen
+        ),
+        closePrice as (
+          select top 1 closePrice, code from marketTrade.dbo.tickerTradeVND where code = '${code}' ORDER BY date DESC
+        )
+        SELECT c.code, g.closePrice, marketCap, shareout, [PRICE_HIGHEST_CR_52W] AS high, [PRICE_LOWEST_CR_52W] AS low, 
+              [NMVOLUME_AVG_CR_20D] AS kl, [NMVALUE_AVG_CR_20D] AS gia_tri, EPS, PE, BVPS, PB, 
+              [STATE_OWNERSHIP] AS nha_nuoc, [foreign] AS nuoc_ngoai, LV2, LV4, companyName
+        FROM RATIO.dbo.ratioInday c
+        INNER JOIN marketInfor.dbo.info i ON i.code = c.code
+        INNER JOIN pi p ON i.code = c.code
+        INNER JOIN min_max highlow ON highlow.code = c.code
+        LEFT JOIN nuoc_ngoai n ON n.code = c.code
+        INNER JOIN closePrice g ON g.code = c.code  
+        WHERE c.code = '${code}' AND c.date = (SELECT MAX(date) FROM RATIO.dbo.ratioInday WHERE code = '${code}')
       `;
       const [data, data_redis] = await Promise.all([
         this.mssqlService.query(query) as any,
