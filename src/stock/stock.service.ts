@@ -1284,39 +1284,24 @@ export class StockService {
       const ex = exchange.toUpperCase();
       const floor = ex == 'ALL' ? ` ('HOSE', 'HNX', 'UPCOM') ` : ` ('${ex}') `;
 
-      const redisData = await this.redis.get(
-        `${RedisKeys.MarketMap}:${ex}:${order}`,
-      );
+      const redisData = await this.redis.get(`${RedisKeys.MarketMap}:${ex}:${order}`);
       if (redisData) {
         return redisData;
       }
 
-      let { latestDate }: SessionDatesInterface = await this.getSessionDate(
-        '[marketTrade].[dbo].[tickerTradeVND]',
-        'date',
-        this.dbServer,
-      );
+      let { latestDate }: SessionDatesInterface = await this.getSessionDate('[marketTrade].[dbo].[tickerTradeVND]', 'date', this.dbServer);
       let date = latestDate;
+
       if (+order === MarketMapEnum.Foreign) {
-        date = (
-          await this.getSessionDate(
-            '[marketTrade].[dbo].[foreign]',
-            'date',
-            this.dbServer,
-          )
-        ).latestDate;
+        date = (await this.getSessionDate('[marketTrade].[dbo].[foreign]', 'date', this.dbServer)).latestDate;
         const query: string = `
           WITH top15 AS (
-            SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, sum(c.buyVal) + sum(c.sellVal) AS value,
-            ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY sum(c.buyVal) + sum(c.sellVal) DESC) AS rn
-          FROM [marketTrade].[dbo].[foreign] c
-          INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
-          WHERE i.floor IN ${floor}
-            AND c.date = @0
-            AND i.[type] IN ('STOCK', 'ETF')
-            AND I.status = 'listed'
-            AND i.LV2 != ''
-          GROUP BY i.floor, i.LV2, c.code
+            SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, sum(c.buyVal) + sum(c.sellVal) AS value, 
+                   ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY sum(c.buyVal) + sum(c.sellVal) DESC) AS rn
+            FROM [marketTrade].[dbo].[foreign] c
+            INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
+            WHERE i.floor IN ${floor} AND c.date = @0 AND i.[type] IN ('STOCK', 'ETF') AND I.status = 'listed' AND i.LV2 != ''
+            GROUP BY i.floor, i.LV2, c.code
           )
           SELECT * FROM (
             SELECT global, industry, ticker, value
@@ -1326,45 +1311,25 @@ export class StockService {
             SELECT i.floor AS global, i.LV2 AS industry, 'KHÁC' AS ticker, SUM(c.buyVal + c.sellVal) AS value
             FROM [marketTrade].[dbo].[foreign] c
             INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
-            WHERE i.floor IN ${floor}
-              AND c.date = @0
-              AND i.[type] IN ('STOCK', 'ETF')
-              AND i.LV2 != ''
-              AND I.status = 'listed'
-              AND i.code NOT IN (SELECT ticker FROM top15 WHERE rn <= 15)
+            WHERE i.floor IN ${floor} AND c.date = @0 AND i.[type] IN ('STOCK', 'ETF') AND i.LV2 != '' AND I.status = 'listed' AND i.code NOT IN (SELECT ticker FROM top15 WHERE rn <= 15)
             GROUP BY i.floor, i.LV2
           ) AS resultredisData
           ORDER BY industry, CASE WHEN ticker = 'KHÁC' THEN 1 ELSE 0 END, value DESC;
         `;
-        const mappedData = new MarketMapResponse().mapToList(
-          await this.dbServer.query(query, [date]),
-        );
 
-        await this.redis.set(
-          `${RedisKeys.MarketMap}:${ex}:${order}`,
-          mappedData,
-          { ttl: TimeToLive.FiveMinutes },
-        );
+        const mappedData = new MarketMapResponse().mapToList(await this.dbServer.query(query, [date]));
+        await this.redis.set(`${RedisKeys.MarketMap}:${ex}:${order}`, mappedData, { ttl: TimeToLive.FiveMinutes });
 
         return mappedData;
       }
 
       if (+order === MarketMapEnum.MarketCap) {
-        const floor =
-          ex == 'ALL' ? ` ('HOSE', 'HNX', 'UPCOM') ` : ` ('${ex}') `;
+        const floor = ex == 'ALL' ? ` ('HOSE', 'HNX', 'UPCOM') ` : ` ('${ex}') `;
 
-        date = UtilCommonTemplate.toDate(
-          (
-            await this.mssqlService.query(
-              `select top 1 date from RATIO.dbo.ratio where ratioCode = 'MARKETCAP'`,
-            )
-          )[0].date,
-        );
-
+        date = UtilCommonTemplate.toDate((await this.mssqlService.query(`select max(date) as date from RATIO.dbo.ratio where ratioCode = 'MARKETCAP'`))[0].date);
         const query: string = `
           WITH top15 AS (
-              SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, c.value,
-                    ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY c.value DESC) AS rn
+              SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, c.value, ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY c.value DESC) AS rn
               FROM [RATIO].[dbo].[ratio] c
               INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
               WHERE i.floor IN ${floor}
@@ -1391,15 +1356,8 @@ export class StockService {
           ORDER BY industry, CASE WHEN ticker = 'khác' THEN 1 ELSE 0 END, value DESC;
         `;
 
-        const mappedData = new MarketMapResponse().mapToList(
-          await this.dbServer.query(query, [date]),
-        );
-
-        await this.redis.set(
-          `${RedisKeys.MarketMap}:${ex}:${order}`,
-          mappedData,
-          { ttl: TimeToLive.FiveMinutes },
-        );
+        const mappedData = new MarketMapResponse().mapToList(await this.dbServer.query(query, [date]));
+        await this.redis.set(`${RedisKeys.MarketMap}:${ex}:${order}`, mappedData, { ttl: TimeToLive.FiveMinutes });
 
         return mappedData;
       }
@@ -1413,51 +1371,41 @@ export class StockService {
           field = 'totalVol';
           break;
         default:
-          throw new ExceptionResponse(
-            HttpStatus.BAD_REQUEST,
-            'order not found',
-          );
+          throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'order not found');
       }
-
+      
       const query: string = `
         WITH top15 AS (
-              SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, c.${field} as value,
-                    ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY c.${field} DESC) AS rn
-              FROM [marketTrade].[dbo].[tickerTradeVND] c
-              INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
-              WHERE i.floor IN ${floor}
-                AND c.date = @0
-                AND i.[type] IN ('STOCK', 'ETF')
-                AND i.LV2 != ''
-              GROUP BY i.floor, i.LV2, c.code, c.${field}
-          )
-          SELECT * FROM (
-              SELECT global, industry, ticker, value
-              FROM top15
-              WHERE rn <= 15
-              UNION ALL
-              SELECT i.floor AS global, i.LV2 AS industry, 'khác' AS ticker, SUM(c.${field}) AS value
-              FROM [marketTrade].[dbo].[tickerTradeVND] c
-              INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
-              WHERE i.floor IN ${floor}
-                AND c.date = @0
-                AND i.[type] IN ('STOCK', 'ETF')
-                AND i.LV2 != ''
-                AND i.code NOT IN (SELECT ticker FROM top15 WHERE rn <= 15)
-              GROUP BY i.floor, i.LV2
-          ) AS result
-          ORDER BY industry, CASE WHEN ticker = 'khác' THEN 1 ELSE 0 END, value DESC;
+            SELECT i.floor AS global, i.LV2 AS industry, c.code AS ticker, c.${field} as value,
+                  ROW_NUMBER() OVER (PARTITION BY i.LV2 ORDER BY c.${field} DESC) AS rn
+            FROM [marketTrade].[dbo].[tickerTradeVND] c
+            INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
+            WHERE i.floor IN ${floor}
+              AND c.date = @0
+              AND i.[type] IN ('STOCK', 'ETF')
+              AND i.LV2 != ''
+            GROUP BY i.floor, i.LV2, c.code, c.${field}
+        )
+        SELECT * FROM (
+            SELECT global, industry, ticker, value
+            FROM top15
+            WHERE rn <= 15
+            UNION ALL
+            SELECT i.floor AS global, i.LV2 AS industry, 'khác' AS ticker, SUM(c.${field}) AS value
+            FROM [marketTrade].[dbo].[tickerTradeVND] c
+            INNER JOIN [marketInfor].[dbo].[info] i ON c.code = i.code
+            WHERE i.floor IN ${floor}
+              AND c.date = @0
+              AND i.[type] IN ('STOCK', 'ETF')
+              AND i.LV2 != ''
+              AND i.code NOT IN (SELECT ticker FROM top15 WHERE rn <= 15)
+            GROUP BY i.floor, i.LV2
+        ) AS result
+        ORDER BY industry, CASE WHEN ticker = 'khác' THEN 1 ELSE 0 END, value DESC;
       `;
 
-      const mappedData = new MarketMapResponse().mapToList(
-        await this.dbServer.query(query, [date]),
-      );
-
-      await this.redis.set(
-        `${RedisKeys.MarketMap}:${ex}:${order}`,
-        mappedData,
-        { ttl: TimeToLive.FiveMinutes },
-      );
+      const mappedData = new MarketMapResponse().mapToList(await this.dbServer.query(query, [date]));
+      await this.redis.set(`${RedisKeys.MarketMap}:${ex}:${order}`, mappedData, { ttl: TimeToLive.FiveMinutes });
 
       return mappedData;
     } catch (e) {
