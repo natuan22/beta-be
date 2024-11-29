@@ -11,12 +11,7 @@ export class ChangePasswordDto {
   oldPassword: string;
 
   @IsString({ message: 'password not found' })
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    {
-      message: 'password too weak',
-    },
-  )
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/, { message: 'password too weak' })
   @ApiProperty({
     type: String,
     example: '123Beta456@',
@@ -25,7 +20,7 @@ export class ChangePasswordDto {
   })
   newPassword: string;
 
-  @ValidateIf((o) => o.password != undefined)
+  @ValidateIf((o) => o.newPassword != undefined)
   @Validate(PasswordMatchValidator)
   @ApiProperty({
     type: String,

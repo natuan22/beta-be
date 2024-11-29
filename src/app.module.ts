@@ -35,6 +35,7 @@ import { WatchlistModule } from './watchlist/watchlist.module';
 import { FilterModule } from './filter/filter.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { TCBSModule } from './tcbs/tcbs.module';
+import { BlogsModule } from './blogs/blogs.module';
 
 @Module({
   imports: [
@@ -48,46 +49,30 @@ import { TCBSModule } from './tcbs/tcbs.module';
     //     config.createTypeOrmOptions(),
     //   inject: [ConfigServiceProvider],
     // }),
-    TypeOrmModule.forRootAsync({
-      name: DB_SERVER,
-      imports: [ConfigModuleModule],
-      useFactory: (config: ConfigServiceProvider) =>
-        config.createMssqlOptions(),
-      inject: [ConfigServiceProvider],
+    TypeOrmModule.forRootAsync({ name: DB_SERVER, imports: [ConfigModuleModule], 
+      useFactory: (config: ConfigServiceProvider) => config.createMssqlOptions(), inject: [ConfigServiceProvider]
     }),
 
     //jwt
-    JwtModule.registerAsync({
-      imports: [ConfigModuleModule],
-      useFactory: (config: ConfigServiceProvider) => config.createJwtOptions(),
-      inject: [ConfigServiceProvider],
+    JwtModule.registerAsync({ imports: [ConfigModuleModule],
+      useFactory: (config: ConfigServiceProvider) => config.createJwtOptions(), inject: [ConfigServiceProvider]
     }),
 
     //redis
-    CacheModule.registerAsync({
-      imports: [ConfigModuleModule],
-      useFactory: async (config: ConfigServiceProvider) => {
-        return await config.createRedisOptions();
-      },
-      isGlobal: true,
-      inject: [ConfigServiceProvider],
+    CacheModule.registerAsync({ imports: [ConfigModuleModule], isGlobal: true, inject: [ConfigServiceProvider],
+      useFactory: async (config: ConfigServiceProvider) => { return await config.createRedisOptions() },
     }),
 
     //kakfa
-    KafkaConfigModule.registerAsync({
-      imports: [ConfigModuleModule],
-      useFactory: (config: ConfigServiceProvider) =>
-        ClientProxyFactory.create(config.createKafkaConfig()),
-      inject: [ConfigServiceProvider],
+    KafkaConfigModule.registerAsync({ imports: [ConfigModuleModule], inject: [ConfigServiceProvider],
+      useFactory: (config: ConfigServiceProvider) => ClientProxyFactory.create(config.createKafkaConfig())
     }),
+
     //Minio
-    MinioModule.registerAsync({
-      imports: [ConfigModuleModule],
-      useFactory: (configService: ConfigServiceProvider) =>
-        configService.minioConfig(),
-      inject: [ConfigServiceProvider],
-      isGlobal: true,
+    MinioModule.registerAsync({ imports: [ConfigModuleModule], inject: [ConfigServiceProvider], isGlobal: true,
+      useFactory: (configService: ConfigServiceProvider) => configService.minioConfig()
     }),
+
     //aplication modules
     ConfigModuleModule,
     MssqlModule,
@@ -109,6 +94,7 @@ import { TCBSModule } from './tcbs/tcbs.module';
     FilterModule,
     AnalysisModule,
     TCBSModule,
+    BlogsModule,
   ],
 })
 export class AppModule implements NestModule {

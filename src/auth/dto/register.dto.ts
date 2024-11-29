@@ -6,7 +6,7 @@ export class RegisterDto {
   @IsPhoneNumber('VN', { message: 'Số điện thoại không hợp lệ' })
   @ApiProperty({
     type: String,
-    example: '0343892050',
+    example: '84382304927',
     description: 'Số điện thoại phải đúng 10 số! theo số điện thoại Việt Nam!',
   })
   phone: string;

@@ -28,6 +28,7 @@ import { Cache } from 'cache-manager';
 import { RegisterResponse } from './responses/Register.response';
 import { DB_SERVER } from '../constants';
 import { AnyCnameRecord } from 'dns';
+import { ChangePasswordDto } from './dto/changePassword.dto';
 
 @Injectable()
 export class AuthService {
@@ -82,17 +83,18 @@ export class AuthService {
   }
 
   async register(data: RegisterDto): Promise<RegisterResponse> {
-    const user = await this.userRepo.findOne({
-      where: { phone: data.phone },
-    });
+    const user = await this.userRepo.findOne({ where: { phone: data.phone }});
+
     if (user) {
       throw new ExceptionResponse(
         HttpStatus.BAD_REQUEST,
         'Số điện thoại đã được đăng ký',
       );
     }
+
     const saltOrRounds = 10;
     const hash: string = await bcrypt.hash(data.password, saltOrRounds);
+
     const newUser: UserEntity = await this.userRepo.save({
       name: data.first_name + ' ' + data.last_name,
       phone: data.phone,
@@ -103,10 +105,7 @@ export class AuthService {
     await this.sendOTP(newUser);
 
     // Lưu thông tin người dùng mới vào Redis để sử dụng trong các yêu cầu sau này
-    await this.redis.set(
-      `${RedisKeys.User}:${newUser.user_id}`,
-      new UserResponse(newUser),
-    );
+    await this.redis.set(`${RedisKeys.User}:${newUser.user_id}`, new UserResponse(newUser));
 
     // Trả về đối tượng RegisterResponse với thông tin người dùng mới được đăng ký thành công
     return new RegisterResponse(newUser);
@@ -173,6 +172,38 @@ export class AuthService {
     });
   }
 
+  async changePassword(req: Request, data: ChangePasswordDto, res: Response) {
+    try {
+      const { oldPassword, newPassword } = data;
+      const user_id = req['user'].userId;
+      const sessionId = req['sessionId'];
+
+      const userByPhone = await this.userRepo.findOne({ where: { user_id } });
+      if (!userByPhone) {
+        throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Số điện thoại chưa được đăng ký');
+      }
+
+      // Kiểm tra mật khẩu của người dùng
+      const isPasswordMatch = await bcrypt.compare(oldPassword, userByPhone.password);
+      if (!isPasswordMatch) {
+        throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Số điện thoại / mật khẩu không chính xác');
+      }
+
+      const saltOrRounds = 10;
+      const hash: string = await bcrypt.hash(newPassword, saltOrRounds);
+
+      res.cookie('rt', '', { maxAge: -1, path: '/' });
+      res.cookie('at', '', { maxAge: -1, path: '/' });
+
+      await this.deviceRepo.delete({ id: sessionId });
+      await this.userRepo.update({ user_id: userByPhone.user_id }, { password: hash });
+
+      return 'Your password is changed successfully. Please login again!!!';
+    } catch (e) {
+      throw new CatchException(e);
+    }
+  }
+  
   async handleDeviceSession(
     user: UserEntity,
     macId: string,
@@ -256,17 +287,8 @@ export class AuthService {
       const sessionId = randomUUID();
       const secretKey = UtilCommonTemplate.uuid();
 
-      const accessToken = this.generateAccessToken(
-        userByPhone.user_id,
-        userByPhone.role,
-        sessionId,
-        secretKey,
-      );
-      const refreshToken = this.generateRefreshToken(
-        userByPhone.user_id,
-        sessionId,
-        secretKey,
-      );
+      const accessToken = this.generateAccessToken(userByPhone.user_id, userByPhone.role, sessionId, secretKey);
+      const refreshToken = this.generateRefreshToken(userByPhone.user_id, sessionId, secretKey);
 
       //Tạo session mới
       const session = this.deviceRepo.create({
@@ -544,18 +566,10 @@ export class AuthService {
       .leftJoinAndSelect('verify_otp.user', 'user')
       .where('verify_otp.user_id = :userId', { userId })
       .getOne();
-
-    // Nếu VerifyEntity đã tồn tại, throw một ExceptionResponse với mã lỗi BAD_REQUEST
     if (verifyEntity)
-      throw new ExceptionResponse(
-        HttpStatus.BAD_REQUEST,
-        'please wait, and try again later',
-      );
+      throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'please wait, and try again later');
 
-    const user: UserEntity = await this.userRepo.findOne({
-      where: { user_id: userId },
-    });
-
+    const user: UserEntity = await this.userRepo.findOne({ where: { user_id: userId }});
     if (!user)
       throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'invalid request');
 
@@ -574,30 +588,20 @@ export class AuthService {
       .where('verify_otp.user_id = :userId', { userId })
       .andWhere('verify_otp.verify_otp = :verifyOTP', { verifyOTP })
       .getOne();
-
-    // Nếu VerifyEntity không tồn tại, throw một ExceptionResponse với mã lỗi BAD_REQUEST
     if (!verifyEntity)
       throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'OTP is not valid');
 
     // Xóa VerifyEntity đã được sử dụng và cập nhật is_verified của UserEntity tương ứng
     await this.verifyRepo.delete({ id: verifyEntity.id });
-    await this.userRepo.update(
-      { user_id: userId },
-      { is_verified: BooleanEnum.True },
-    );
+    await this.userRepo.update({ user_id: userId }, { is_verified: BooleanEnum.True });
 
     // Cập nhật Redis cache nếu UserEntity đã được lưu trữ trong cache
-    const userRedis: UserResponse = await this.redis.get(
-      `${RedisKeys.User}:${userId}`,
-    );
+    const userRedis: UserResponse = await this.redis.get(`${RedisKeys.User}:${userId}`);
     if (userRedis)
-      await this.redis.set(`${RedisKeys.User}:${userId}`, {
-        ...userRedis,
-        is_verified: BooleanEnum.True,
-      });
+      await this.redis.set(`${RedisKeys.User}:${userId}`, { ...userRedis, is_verified: BooleanEnum.True });
 
     // Trả về một thông báo cho người dùng cho biết tài khoản của họ đã được xác thực thành công
-    return 'your account is verified successfully';
+    return 'Your account is verified successfully';
   }
 
   async sendOTP(user: UserEntity): Promise<void> {
@@ -605,29 +609,15 @@ export class AuthService {
     const verifyOTP: string = UtilCommonTemplate.generateOTP();
 
     // Gửi tin nhắn SMS chứa mã OTP đến số điện thoại của người dùng (có thời hạn 5 phút)
-    const response_incom = await this.smsService.sendSMS(
-      user.phone,
-      `Your OTP is: ${verifyOTP} (5 minutes)`,
-    );
+    const response_incom = await this.smsService.sendSMS(user.phone, `Your OTP is: ${verifyOTP} (5 minutes)`);
 
     if (response_incom.StatusCode != 1)
-      throw new ExceptionResponse(
-        HttpStatus.BAD_REQUEST,
-        'Lỗi khi gửi OTP vui lòng thử lại sau',
-      );
+      throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'Lỗi khi gửi OTP vui lòng thử lại sau');
 
     // Lưu mã OTP vào cơ sở dữ liệu và đặt một công việc trong hàng đợi để xóa mã OTP sau 5 phút
-    const verifyData: VerifyEntity = await this.verifyRepo.save({
-      user_id: user.user_id,
-      user: user,
-      verify_otp: verifyOTP,
-    });
+    const verifyData: VerifyEntity = await this.verifyRepo.save({ user_id: user.user_id, user: user, verify_otp: verifyOTP });
 
-    // await this.queueService.addJob(
-    //   'delete-expired-otp',
-    //   verifyData,
-    //   TimeToLive.FiveMinutesMilliSeconds,
-    // );
+    // await this.queueService.addJob('delete-expired-otp', verifyData, TimeToLive.FiveMinutesMilliSeconds);
   }
 
   async getHistorySession(userId: number) {
