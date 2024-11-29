@@ -38,6 +38,8 @@ import {
   RegisterResponse,
   RegisterSwagger,
 } from './responses/Register.response';
+import { ChangePasswordDto } from './dto/changePassword.dto';
+import { ChangePasswordGuard } from '../guards/change_password.guard';
 
 @ApiTags('Auth - API')
 @Controller('auth')
@@ -100,17 +102,21 @@ export class AuthController {
     }
   }
 
-  // @Put('change-password')
-  // async changePassword(
-  //   @Body() changePasswordDto: ChangePasswordDto,
-  //   @Req() req,
-  // ) {
-  //   return this.authService.changePassword(
-  //     req.userId,
-  //     changePasswordDto.oldPassword,
-  //     changePasswordDto.newPassword,
-  //   );
-  // }
+  @ApiOperation({ summary: 'Đổi mật khẩu' })
+  @ApiBody({ type: ChangePasswordDto })
+  @ApiResponse({ status: HttpStatus.OK, type: BaseResponse })
+  @ApiBearerAuth()
+  @ApiCookieAuth()
+  @UseGuards(ChangePasswordGuard)
+  @Post('change-password')
+  async changePassword(@Req() req: Request, @Body() body: ChangePasswordDto, @Res() res: Response) {
+    try {
+      const message: string = await this.authService.changePassword(req, body, res);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ message }));
+    } catch (e) {
+      throw new CatchException(e);
+    }
+  }
 
   @ApiOperation({ summary: 'Xác thực số điện thoại' })
   @ApiResponse({ status: HttpStatus.OK, type: BaseResponse })

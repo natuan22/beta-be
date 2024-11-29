@@ -12,9 +12,8 @@ import * as cookieParser from 'cookie-parser';
 import { CONFIG_SERVICE } from './constants';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: true,
-  });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bodyParser: true });
+  
   // app.enableCors({
   //   origin: process.env.WHITELIST_IPS.split(','), // add your IP whitelist here
   //   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
@@ -40,22 +39,17 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document, { customSiteTitle: 'Stock Swagger' });
 
   app.useGlobalFilters(new ValidationFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    transform: true,
-    exceptionFactory(errors: ValidationError[]) {
-      return new ExceptionResponse(HttpStatus.BAD_REQUEST, UtilCommonTemplate.getMessageValidator(errors));
-    }}),
+  app.useGlobalPipes(new ValidationPipe({ transform: true,
+    exceptionFactory(errors: ValidationError[]) { return new ExceptionResponse(HttpStatus.BAD_REQUEST, UtilCommonTemplate.getMessageValidator(errors)) }}),
   );
 
   app.useStaticAssets(join(__dirname, '..', 'public'));
-
+  
   app.connectMicroservice(app.get(CONFIG_SERVICE).createKafkaConfig());
   await app.startAllMicroservices().catch((e) => console.log(e));
 
   await app.listen(parseInt(process.env.SERVER_PORT)).then(() => {
-    console.log(
-      `Server is running at ${process.env.SERVER_HOST}:${process.env.SERVER_PORT} --version: 0.1.17`,
-    );
+    console.log(`Server is running at ${process.env.SERVER_HOST}:${process.env.SERVER_PORT} --version: 0.1.17`);
   });
 
   // await app.listen(parseInt(process.env.SERVER_PORT), '192.168.9.146').then(() => {
