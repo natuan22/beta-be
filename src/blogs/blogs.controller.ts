@@ -35,8 +35,8 @@ export class BlogsController {
   * Category
   * 
   **/
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Tạo danh mục' })
   @ApiBody({ type: CreateCategoryDto })
   @ApiResponse({ status: HttpStatus.CREATED, type: CategorySwagger })
@@ -50,8 +50,8 @@ export class BlogsController {
     }
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Chỉnh sửa danh mục' })
   @ApiBody({ type: UpdateCategoryDto })
   @ApiResponse({ status: HttpStatus.OK, type: CategorySwagger })
@@ -65,8 +65,8 @@ export class BlogsController {
     }
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy tất cả categories' })
   @Get('/category')
   async findAllCate(@Res() res: Response) {
@@ -79,8 +79,8 @@ export class BlogsController {
   * Post
   * 
   **/
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @FormDataRequest()
   @ApiOperation({ summary: 'Thêm bài viết mới' })
   @ApiResponse({ status: HttpStatus.CREATED, type: PostSwagger })
@@ -94,8 +94,8 @@ export class BlogsController {
     }
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @FormDataRequest()
   @ApiOperation({ summary: 'Chỉnh sửa danh mục' })
   @ApiBody({ type: UpdatePostDto })
@@ -110,8 +110,8 @@ export class BlogsController {
     }
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Upload ảnh trong content của post' })
   @UseInterceptors(AnyFilesInterceptor())
   @ApiOkResponse({ status: HttpStatus.OK, type: UploadContentImageResponse })
@@ -126,8 +126,8 @@ export class BlogsController {
     }
   }
   
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy posts with id' })
   @Get('/post/:id')
   async getPostWithId(@Param() p: PostDataDto, @Res() res: Response) {
@@ -135,8 +135,8 @@ export class BlogsController {
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy posts with tags' })
   @Get('/post-tags')
   async findAllPostWithTag(@Query() q: GetPostsWithTagsDto, @Res() res: Response) {
@@ -144,8 +144,8 @@ export class BlogsController {
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy tất cả posts' })
   @Get('/post')
   async findAllPost(@Res() res: Response) {
@@ -158,14 +158,12 @@ export class BlogsController {
   * Tag
   * 
   **/
-  // @UseGuards(AuthGuard, RolesGuard)
-  // @Roles(Role.AdminBlogs)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy tất cả tags' })
   @Get('/tag')
   async findAllTag(@Res() res: Response) {
     const data = await this.tagService.findAllTag();
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
-
-  
 }
