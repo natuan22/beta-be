@@ -66,136 +66,72 @@ export class SharesService {
     );
     if (redisData) return redisData;
 
-    const date = (
-      await this.mssqlService.query(
-        `select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`,
-      )
-    )[0]?.date;
+    const date = (await this.mssqlService.query(`select top 1 date from RATIO.dbo.ratio where code = '${stock}' and ratioCode = 'PRICE_TO_BOOK' order by date desc`))[0]?.date;
     if (!date) return {};
 
-    const dateTickerTrade = (
-      await this.mssqlService.query(
-        `select top 1 date from marketTrade.dbo.tickerTradeVND where code = '${stock}' order by date desc`,
-      )
-    )[0]?.date;
+    const dateTickerTrade = (await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where code = '${stock}' order by date desc`))[0]?.date;
 
-    const isStock = (
-      await this.mssqlService.query(
-        `select top 1 case when LV2 = N'Ngân hàng' then 'NH' when LV2 = N'Dịch vụ tài chính' then 'CK' when LV2 = N'Bảo hiểm' then 'BH' else 'CTCP' end as LV2 from marketInfor.dbo.info where code = '${stock}'`,
-      )
-    )[0]?.LV2;
+    const isStock = (await this.mssqlService.query(`select top 1 case when LV2 = N'Ngân hàng' then 'NH' when LV2 = N'Dịch vụ tài chính' then 'CK' when LV2 = N'Bảo hiểm' then 'BH' else 'CTCP' end as LV2 from marketInfor.dbo.info where code = '${stock}'`))[0]?.LV2;
     if (!isStock || isStock != type.toUpperCase())
       throw new ExceptionResponse(HttpStatus.BAD_REQUEST, 'stock not found');
 
     const now = moment(date).format('YYYY-MM-DD');
-
     const week = moment(now).subtract(7, 'day').format('YYYY-MM-DD');
-    const month = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(
-            now,
-          )
-            .subtract(1, 'month')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const year = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(
-            now,
-          )
-            .subtract(1, 'year')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
+    const month = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const year = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.indexTradeVND where date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
 
     const query = `
-    WITH temp
-    AS (SELECT
-      i.code,
-      CASE
-        WHEN i.floor = 'HOSE' THEN 'VNINDEX'
-        ELSE i.floor
-      END AS floor,
-      i.LV2,
-      i.companyName,
-      i.companyNameEng,
-      o.vnSummary,
-      t.closePrice AS price,
-      t.change,
-      t.perChange,
-      t.totalVol AS kldg
-    FROM marketInfor.dbo.info i
-    INNER JOIN marketInfor.dbo.overview o
-      ON i.code = o.code
-      INNER JOIN marketTrade.dbo.tickerTradeVND t
-      ON i.code = t.code
-    WHERE i.code = '${stock}'
-    AND t.date = '${UtilCommonTemplate.toDate(dateTickerTrade)}'
-    ),
-    pivotted
-    AS (SELECT
-      [${now}] AS now,
-      [${week}] AS week,
-      [${month}] AS month,
-      [${year}] AS year,
-      code
-    FROM (SELECT
-      closePrice,
-      date,
-      code
-    FROM marketTrade.dbo.tickerTradeVND
-      WHERE date IN ('${now}', '${week}', '${month}',
-      '${year}') and code = '${stock}') AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen),
-    roae as (
-      select code,
-             ROE as roae,
-             ROA as roaa,
-             yearQuarter
-    from RATIO.dbo.ratioInYearQuarter
-    where code = '${stock}' and right(yearQuarter, 1) <> 0
-    ),
-    sum_roaa as (
-      select roaa +
-      lead(roaa) over (partition by code order by yearQuarter desc)
-      + lead(roaa, 2) over (partition by code order by yearQuarter desc)
-       + lead(roaa, 3) over (partition by code order by yearQuarter desc)
-      as roaa,
-        roae +
-            lead(roae) over (partition by code order by yearQuarter desc)
-            + lead(roae, 2) over (partition by code order by yearQuarter desc)
-            + lead(roae, 3) over (partition by code order by yearQuarter desc)
-      as roae, code, yearQuarter
-      from roae
-    ),
-      pe
-    AS (
-      select top 1 code, roaa, roae from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa)
-    ),
-    vh as (
-      select top 1 code, marketCap as vh, PE as pe, PB as pb from RATIO.dbo.ratioInday where code = '${stock}' order by date desc
-    )
-    SELECT
-      t.code, t.floor as exchange, t.LV2 as industry, t.companyName as company, t.companyNameEng as company_eng, t.vnSummary as summary, t.price, t.change, t.perChange, t.kldg,
-      ((p.now - p.week) / p.week) * 100 AS p_week,
-      ((p.now - p.month) / p.month) * 100 AS p_month,
-      ((p.now - p.year) / p.year) * 100 AS p_year,
-      v.pb,
-      v.pe,
-      e.roaa,
-      e.roae,
-      v.vh
-    FROM temp t
-    INNER JOIN pivotted p
-      ON p.code = t.code
-    INNER JOIN pe e
-      ON e.code = t.code
-    INNER JOIN vh v
-      ON v.code = t.code
+      WITH temp AS (
+        SELECT i.code, CASE WHEN i.floor = 'HOSE' THEN 'VNINDEX' ELSE i.floor END AS floor, i.LV2, i.companyName, 
+              i.companyNameEng, o.vnSummary, t.closePrice AS price, t.change, t.perChange, t.totalVol AS kldg
+        FROM marketInfor.dbo.info i
+        INNER JOIN marketInfor.dbo.overview o ON i.code = o.code
+        INNER JOIN marketTrade.dbo.tickerTradeVND t ON i.code = t.code
+        WHERE i.code = '${stock}'
+        AND t.date = '${UtilCommonTemplate.toDate(dateTickerTrade)}'
+      ),
+      pivotted AS (
+        SELECT [${now}] AS now, [${week}] AS week, [${month}] AS month, [${year}] AS year, code
+        FROM (SELECT closePrice, date, code FROM marketTrade.dbo.tickerTradeVND
+              WHERE date IN ('${now}', '${week}', '${month}', '${year}') and code = '${stock}') AS source PIVOT (SUM(closePrice) FOR date IN ([${now}], [${week}], [${month}], [${year}])) AS chuyen
+      ),
+      roae as (
+        select code,
+              ROE as roae,
+              ROA as roaa,
+              yearQuarter
+        from RATIO.dbo.ratioInYearQuarter
+        where code = '${stock}' and right(yearQuarter, 1) <> 0
+      ),
+      sum_roaa as (
+        select roaa + lead(roaa) over (partition by code order by yearQuarter desc)
+                    + lead(roaa, 2) over (partition by code order by yearQuarter desc)
+                    + lead(roaa, 3) over (partition by code order by yearQuarter desc) as roaa,
+               roae + lead(roae) over (partition by code order by yearQuarter desc)
+                    + lead(roae, 2) over (partition by code order by yearQuarter desc)
+                    + lead(roae, 3) over (partition by code order by yearQuarter desc) as roae, code, yearQuarter
+        from roae
+      ),
+      pe AS (
+        select top 1 code, roaa, roae from sum_roaa where yearQuarter = (select max(yearQuarter) from sum_roaa)
+      ),
+      vh as (
+        select top 1 code, marketCap as vh, PE as pe, PB as pb from RATIO.dbo.ratioInday where code = '${stock}' order by date desc
+      )
+      SELECT
+        t.code, t.floor as exchange, t.LV2 as industry, t.companyName as company, t.companyNameEng as company_eng, t.vnSummary as summary, t.price, t.change, t.perChange, t.kldg,
+        ((p.now - p.week) / p.week) * 100 AS p_week,
+        ((p.now - p.month) / p.month) * 100 AS p_month,
+        ((p.now - p.year) / p.year) * 100 AS p_year,
+        v.pb,
+        v.pe,
+        e.roaa,
+        e.roae,
+        v.vh
+      FROM temp t
+      INNER JOIN pivotted p ON p.code = t.code
+      INNER JOIN pe e ON e.code = t.code
+      INNER JOIN vh v ON v.code = t.code
     `;
     const data = await this.mssqlService.query<HeaderStockResponse[]>(query);
     const dataMapped = new HeaderStockResponse(data[0]);
@@ -1758,7 +1694,6 @@ export class SharesService {
               ),
           `;
           break;
-
       case TimeTypeEnum.Year:
           select = `SELECT TOP 200 name, SUM(value) AS value, LEFT(date, 4) AS date, SUM(row) AS row FROM temp GROUP BY LEFT(date, 4), name 
                     ${LV2 === 'Ngân hàng' ? 'HAVING COUNT(DISTINCT RIGHT(date, 1)) = 4' : ''} 
@@ -1771,7 +1706,6 @@ export class SharesService {
               ),
           `;
           break;
-
       default:
           return null;
     }
@@ -1782,8 +1716,8 @@ export class SharesService {
     const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
     if (!LV2[0]?.LV2) return [];
 
-    const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`);
-    if (redisData) return redisData;
+    // const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`);
+    // if (redisData) return redisData;
 
     const queryParts = this.buildQuery(stock, order, LV2[0]?.LV2);
     if (!queryParts) return [];
@@ -1792,10 +1726,23 @@ export class SharesService {
       ${queryParts.roa_roe}
       temp AS (${queryParts.temp}),
       date AS (${queryParts.select})
-      SELECT * FROM date
+      ${order === TimeTypeEnum.Year && LV2[0]?.LV2 === 'Ngân hàng' ? 
+        `, real_pe_pb_roa_roe as (
+            select code, LEFT(yearQuarter, 4) AS date , PE, PB, ROA, ROE
+            from [RATIO].[dbo].[ratioInYearQuarter]
+            WHERE right(yearQuarter,1) = 0 and code = '${stock}'
+           ),
+           final AS (
+               SELECT d.name, d.date, d.row, CASE WHEN d.name = 'P/E' THEN r.PE WHEN d.name = 'P/B' THEN r.PB WHEN d.name = 'ROE' THEN r.ROE WHEN d.name = 'ROA' THEN r.ROA ELSE d.value END AS value
+               FROM date d LEFT JOIN real_pe_pb_roa_roe r ON d.date = r.date
+           )
+            ` : ''}
+      SELECT * FROM ${order === TimeTypeEnum.Year && LV2[0]?.LV2 === 'Ngân hàng' ? 'final' : 'date'}
       ${order === TimeTypeEnum.Year && LV2[0]?.LV2 === 'Ngân hàng' ? 'WHERE date >= (SELECT min(LEFT(yearQuarter, 4)) FROM summ)' : ''} 
       ORDER BY date ASC, row ASC
     `;
+
+    console.log(query)
 
     const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query);
     const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart);
