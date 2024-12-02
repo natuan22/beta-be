@@ -1716,8 +1716,8 @@ export class SharesService {
     const LV2 = await this.mssqlService.query(`select top 1 LV2 from marketInfor.dbo.info where code = '${stock}'`);
     if (!LV2[0]?.LV2) return [];
 
-    // const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`);
-    // if (redisData) return redisData;
+    const redisData = await this.redis.get(`${RedisKeys.financialIndicatorsDetail}:${order}:${stock}:${is_chart}`);
+    if (redisData) return redisData;
 
     const queryParts = this.buildQuery(stock, order, LV2[0]?.LV2);
     if (!queryParts) return [];
@@ -1741,8 +1741,6 @@ export class SharesService {
       ${order === TimeTypeEnum.Year && LV2[0]?.LV2 === 'Ngân hàng' ? 'WHERE date >= (SELECT min(LEFT(yearQuarter, 4)) FROM summ)' : ''} 
       ORDER BY date ASC, row ASC
     `;
-
-    console.log(query)
 
     const data: any[] = await this.mssqlService.query<FinancialIndicatorsDetailResponse[]>(query);
     const dataMapped = FinancialIndicatorsDetailResponse.mapToList(data, is_chart);
