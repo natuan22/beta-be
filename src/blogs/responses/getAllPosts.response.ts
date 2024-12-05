@@ -26,6 +26,9 @@ export class GetAllPostResponse {
 
     @ApiProperty({ type: Date })
     updated_at: Date;
+
+    @ApiProperty({ type: Date, example: '2024-12-02T12:00:00.000Z' })
+    scheduledAt: Date;
     
     @ApiProperty({ type: () => CategoryResponse, nullable: true, example: { id: 2, name: "Category Name", description: 'Vi du', published: 1, parent_id: null }})
     category: CategoryResponse | null;
@@ -42,6 +45,7 @@ export class GetAllPostResponse {
         this.published = data?.published ?? 0;
         this.created_at = data?.created_at ?? new Date();
         this.updated_at = data?.updated_at ?? new Date();
+        this.scheduledAt = data?.scheduledAt ? new Date(data.scheduledAt) : null;
         this.category = data?.category ? new CategoryResponse(data.category) : null;
         this.tags = data?.tags?.map((tag) => new TagResponse(tag)) ?? [];
     }

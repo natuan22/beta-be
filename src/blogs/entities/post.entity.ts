@@ -22,9 +22,15 @@ export class PostEntity extends BaseModel {
 
     /**
     * Có hiển thị nội dung này hay không: 0 - không, 1 - có
-    */
+    **/
     @Column({ type: 'tinyint', default: 0 })
     published: number;
+
+    /**
+    * Hẹn lịch đăng
+    **/
+    @Column({ type: 'datetime', nullable: true })
+    scheduledAt: Date | null;
 
     @ManyToOne(() => CategoryEntity, (category) => category.posts)
     @JoinColumn({ name: 'category_id' })

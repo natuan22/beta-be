@@ -125,24 +125,6 @@ export class BlogsController {
       throw new CatchException(error);
     }
   }
-  
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.AdminBlogs)
-  @ApiOperation({ summary: 'Lấy posts with id' })
-  @Get('/post/:id')
-  async getPostWithId(@Param() p: PostDataDto, @Res() res: Response) {
-    const data = await this.postService.getPostWithId(p.id);
-    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
-  }
-
-  @UseGuards(AuthGuard, RolesGuard)
-  @Roles(Role.AdminBlogs)
-  @ApiOperation({ summary: 'Lấy posts with tags' })
-  @Get('/post-tags')
-  async findAllPostWithTag(@Query() q: GetPostsWithTagsDto, @Res() res: Response) {
-    const data = await this.postService.findAllPostWithTag(q.tags.split(','));
-    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
-  }
 
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.AdminBlogs)
@@ -153,17 +135,26 @@ export class BlogsController {
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  /**
-  * 
-  * Tag
-  * 
-  **/
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy tất cả tags' })
   @Get('/tag')
   async findAllTag(@Res() res: Response) {
     const data = await this.tagService.findAllTag();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+
+  @ApiOperation({ summary: 'Lấy posts with id (no guard)' })
+  @Get('/post/:id')
+  async getPostWithId(@Param() p: PostDataDto, @Res() res: Response) {
+    const data = await this.postService.getPostWithId(p.id);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+
+  @ApiOperation({ summary: 'Lấy posts with tags (no guard)' })
+  @Get('/post-tags')
+  async findAllPostWithTag(@Query() q: GetPostsWithTagsDto, @Res() res: Response) {
+    const data = await this.postService.findAllPostWithTag(q.tags.split(','));
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 }

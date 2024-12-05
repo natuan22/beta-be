@@ -1,18 +1,19 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
-import { PostEntity } from "./entities/post.entity";
 import { InjectRepository } from "@nestjs/typeorm";
+import * as moment from 'moment';
 import { In, Repository } from "typeorm";
 import { DB_SERVER } from "../constants";
-import { CreatePostDto } from "./dto/createPost.dto";
-import { PostResponse } from "./responses/post.response";
-import { TagEntity } from "./entities/tag.entity";
-import { CategoryEntity } from "./entities/catetory.entity";
-import { MinioOptionService } from "../minio/minio.service";
 import { CatchException } from "../exceptions/common.exception";
+import { MinioOptionService } from "../minio/minio.service";
 import { UtilCommonTemplate } from "../utils/utils.common";
-import { GetAllPostResponse } from "./responses/getAllPosts.response";
-import * as moment from 'moment';
+import { CreatePostDto } from "./dto/createPost.dto";
 import { UpdatePostDto } from "./dto/updatePost.dto";
+import { CategoryEntity } from "./entities/catetory.entity";
+import { PostEntity } from "./entities/post.entity";
+import { TagEntity } from "./entities/tag.entity";
+import { PostSchedulerService } from "./queues/post-scheduler.service";
+import { GetAllPostResponse } from "./responses/getAllPosts.response";
+import { PostResponse } from "./responses/post.response";
 
 @Injectable()
 export class PostService {
@@ -24,6 +25,7 @@ export class PostService {
         @InjectRepository(TagEntity, DB_SERVER)
         private readonly tagRepo: Repository<TagEntity>,
         private readonly minio: MinioOptionService,
+        private readonly postSchedulerService: PostSchedulerService,
     ) {}
     
     async createPost(data: CreatePostDto): Promise<PostResponse> {
@@ -75,11 +77,16 @@ export class PostService {
             content: data.content,
             thumbnail: thumbnailPath,
             published: data.published || 0,
+            scheduledAt: data.scheduledAt ? moment(data.scheduledAt).toDate() : null,
             category,
             tags,
         });
         
         await this.postRepo.save(post);
+
+        if (post.scheduledAt) {
+            await this.postSchedulerService.schedulePost(post.id, post.scheduledAt);
+        }
 
         return new PostResponse(post);
     }
@@ -146,10 +153,20 @@ export class PostService {
             post.thumbnail = thumbnailPath;
             post.published = data.published || 0;
             post.category = category;
-    
+
+            // Cập nhật scheduledAt (nếu có giá trị)
+            if (data.scheduledAt) {
+                post.scheduledAt = moment(data.scheduledAt).toDate();
+            }
+
             // Lưu bài viết và các mối quan hệ mới
             await this.postRepo.save(post);
-            
+
+            // Add job to queue if scheduledAt is updated
+            if (post.scheduledAt) {
+                await this.postSchedulerService.schedulePost(post.id, post.scheduledAt);
+            }
+
             // Lấy lại bài viết đã cập nhật và trả về kết quả
             const updatedPost = await this.postRepo.findOne({ where: { id: post.id }, relations: ['category', 'tags'] });
             return new PostResponse(updatedPost);
@@ -235,7 +252,7 @@ export class PostService {
     async findAllPost() {
         try {
             // Lấy danh sách bài viết và mối quan hệ
-            const posts = await this.postRepo.find({ relations: ['category', 'tags'] });
+            const posts = await this.postRepo.find({ relations: ['category', 'tags'], order: { created_at: 'DESC' } });
     
             // Chuyển đổi dữ liệu sang định dạng GetAllPostResponse
             const postResponses = posts.map((post) => new GetAllPostResponse({
@@ -247,6 +264,7 @@ export class PostService {
                 published: post.published,
                 created_at: post.created_at,
                 updated_at: post.updated_at,
+                scheduledAt: post.scheduledAt,
                 category: post.category ? {
                     id: post.category.id,
                     name: post.category.name,

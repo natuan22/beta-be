@@ -29,6 +29,9 @@ export class PostResponse {
     @ApiProperty({ type: [TagResponse], example: ['Tag 1', 'Tag 2'] })
     tags: string[];
 
+    @ApiProperty({ type: Date, example: '2024-12-02T12:00:00.000Z' })
+    scheduledAt: Date;
+
     @ApiProperty({ type: Date })
     created_at: Date;
 
@@ -39,6 +42,7 @@ export class PostResponse {
         this.content = data?.content || '';
         this.thumbnail = data?.thumbnail || '';
         this.published = data?.published || 0;
+        this.scheduledAt = data?.scheduledAt ? new Date(data.scheduledAt) : null;
         this.created_at = data?.created_at ?? new Date();
         this.category = data?.category ? new CategoryResponse(data.category) : null;
         this.tags = Array.isArray(data?.tags) ? data.tags.map(tag => new TagResponse(tag)) : [];

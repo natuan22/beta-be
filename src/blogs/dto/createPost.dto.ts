@@ -25,6 +25,10 @@ export class CreatePostDto {
     @ApiProperty({ type: Number, example: 1, default: 0 })
     published?: number;
 
+    @IsOptional()
+    @ApiProperty({ type: String, example: '2024-12-10T10:00:00Z', description: 'Date and time when the post is scheduled to be published' })
+    scheduledAt?: string;
+
     @ApiProperty({ type: Number, example: 1 })
     category_id: number;
 
