@@ -36,6 +36,7 @@ import { FilterModule } from './filter/filter.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { TCBSModule } from './tcbs/tcbs.module';
 import { BlogsModule } from './blogs/blogs.module';
+import { PostSchedulerModule } from './blogs/queues/post-scheduler.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { BlogsModule } from './blogs/blogs.module';
     AnalysisModule,
     TCBSModule,
     BlogsModule,
+    PostSchedulerModule,
   ],
 })
 export class AppModule implements NestModule {

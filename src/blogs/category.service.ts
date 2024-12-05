@@ -83,7 +83,7 @@ export class CategoryService {
 
     async findAllCate() {
         try {
-            const categories = await this.categoryRepo.find({ relations: ['sub_categories'] });
+            const categories = await this.categoryRepo.find({ relations: ['sub_categories'], order: { created_at: 'DESC' } });
 
             const mapCategories = (category: CategoryEntity): GetAllCategoriesResponse => {
                 return new GetAllCategoriesResponse({

@@ -28,6 +28,10 @@ export class UpdatePostDto {
   @ApiProperty({ type: Number, description: 'Indicates if the post is published (0 - no, 1 - yes)', default: 0 })
   published?: number;
 
+  @IsOptional()
+  @ApiProperty({ type: String, example: '2024-12-10T10:00:00Z', description: 'Date and time when the post is scheduled to be published' })
+  scheduledAt?: string;
+  
   @ApiProperty({ type: Number, example: 1 })
   category_id: number;
 
