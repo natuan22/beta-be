@@ -104,4 +104,28 @@ export class CategoryService {
             throw new CatchException(e);
         }
     }
+
+    async findAllCateUser() {
+        try {
+            const categories = await this.categoryRepo.find({ where: { published: 1 } , relations: ['sub_categories'] });
+
+            const mapCategories = (category: CategoryEntity): GetAllCategoriesResponse => {
+                return new GetAllCategoriesResponse({
+                  id: category.id,
+                  name: category.name,
+                  description: category.description,
+                  published: category.published,
+                  parent_id: category.parent_id,
+                  created_at: category.created_at,
+                  updated_at: category.updated_at,
+                  children: category.sub_categories?.length ? category.sub_categories.map(mapCategories) : null,
+                });
+            };
+            const rootCategories = categories.filter(category => category.parent_id === null).map(mapCategories);
+
+            return rootCategories;
+        } catch (e) {
+            throw new CatchException(e);
+        }
+    }
 }

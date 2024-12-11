@@ -744,9 +744,27 @@ export class KafkaService {
     }
   }
 
+  async backTestTradingTool(payload: ChartNenInterface[]) {
+    try {
+      const data: any[] = (await this.redis.get('beta-watch-list')) || [];
+      const item = data.find((item) => item.code == payload[0].code);
+
+      if (item) {
+        const res: any = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], moment('2024-10-23').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), payload[0].closePrice);
+        if (Array.isArray(res)) {
+          const filteredRes = res.filter((resItem: any) => resItem.code === item.code && resItem.status === 0)
+          if (filteredRes.length > 0) {
+            this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
+          }
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   async handleGiaoDichCoPhieu(payload: TickerTransInterface[]) {
-    const { code, action, matchPrice, volume, priceChangeReference, time } =
-      payload[0];
+    const { code, action, matchPrice, volume, priceChangeReference, time } = payload[0];
 
     const query = `
         select closePrice from marketTrade.dbo.tickerTradeVND

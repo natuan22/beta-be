@@ -48,6 +48,7 @@ export enum SocketEmit {
 
   CoPhieu = 'listen-co-phieu',
   MA = 'listen-ma-co-phieu',
+  BackTestTradingTool = 'listen-back-test-ma-co-phieu',
 
   TransCoPhieu = 'listen-trans-co-phieu',
 }

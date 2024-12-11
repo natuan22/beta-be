@@ -216,6 +216,18 @@ export class KafkaConsumer {
       this.logger.error(error);
     }
   }
+
+  @MessagePattern(Topics.ChartNenCoPhieuNew)
+  async handleBackTestTradingTool(
+    @Payload() payload: ChartNenInterface[],
+    @Ctx() context: KafkaContext,
+  ) {
+    try {
+      this.kafkaService.backTestTradingTool(payload);
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
   
   @MessagePattern(Topics.GiaoDichCoPhieu)
   async handleGiaoDichCoPhieu(

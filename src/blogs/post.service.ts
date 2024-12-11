@@ -175,6 +175,24 @@ export class PostService {
         }
     }
     
+    async deletePost(id: any) {
+        if (!id) {
+          throw new Error('ID không được để trống.');
+        }
+      
+        // Nếu id là một mảng, xử lý xóa nhiều bài viết
+        if (Array.isArray(id)) {
+            id = id.map((item) => (typeof item === 'string' && !isNaN(Number(item)) ? Number(item) : item));
+            const result = await this.postRepo.delete(id);
+            return result.affected || 0; // Số lượng bài viết đã xóa
+        }
+
+        if (typeof id === 'string' && !isNaN(Number(id))) { id = Number(id) }
+
+        // Nếu id là một giá trị đơn lẻ, xử lý xóa một bài viết
+        const result = await this.postRepo.delete({ id });
+        return result.affected || 0; // Số lượng bài viết đã xóa
+    }
 
     async uploadContentImage(files: any[]) {
         try {
@@ -212,41 +230,40 @@ export class PostService {
     async findAllPostWithTag(tags: string[]) {
         try {
             // Tìm các bài viết có liên quan đến các tags
-            const posts = await this.postRepo
-              .createQueryBuilder('post')
-              .leftJoinAndSelect('post.tags', 'tag') // Giả sử mỗi bài viết có quan hệ nhiều-nhiều với bảng tags
-              .where('tag.name IN (:...tags)', { tags }) // Lọc các bài viết có ít nhất một tag trong danh sách tags
-              .getMany(); // Lấy tất cả các bài viết phù hợp
+            const posts = await this.postRepo.createQueryBuilder('post')
+                .leftJoinAndSelect('post.tags', 'tag')
+                .where('tag.name IN (:...tags)', { tags })
+                .getMany();
         
             // Chuyển đổi dữ liệu sang định dạng GetAllPostResponse
             const postResponses = posts.map((post) => new GetAllPostResponse({
-              id: post.id,
-              title: post.title,
-              description: post.description,
-              content: post.content,
-              thumbnail: post.thumbnail,
-              published: post.published,
-              created_at: post.created_at,
-              updated_at: post.updated_at,
-              category: post.category ? {
+                id: post.id,
+                title: post.title,
+                description: post.description,
+                content: post.content,
+                thumbnail: post.thumbnail,
+                published: post.published,
+                created_at: post.created_at,
+                updated_at: post.updated_at,
+                category: post.category ? {
                 id: post.category.id,
                 name: post.category.name,
                 description: post.category.description,
                 published: post.category.published,
                 parent_id: post.category.parent_id,
-              } : null,
-              tags: post.tags ? post.tags.map(tag => ({
+                } : null,
+                tags: post.tags ? post.tags.map(tag => ({
                 id: tag.id,
                 name: tag.name,
                 description: tag.description,
                 published: tag.published,
-              })) : [],
+                })) : [],
             }));
         
             return postResponses;
-          } catch (e) {
+        } catch (e) {
             throw new CatchException(e);
-          }
+        }
     }
 
     async findAllPost() {
@@ -283,6 +300,45 @@ export class PostService {
             return postResponses;
         } catch (e) {
             throw new CatchException(e);
+        }
+    }
+
+    async findAllPostWithQuery(query: any) {
+        try {
+            const conditions: any = {};
+      
+            if (query.tags) {
+                const tags = query.tags.split(',');
+                conditions.tags = tags;
+            }
+        
+            if (query.categories) {
+                const categories = query.categories.split(',');
+                conditions.categories = categories;
+            }
+
+            // Start building the query
+            const qb = this.postRepo.createQueryBuilder('post').leftJoinAndSelect('post.tags', 'tag').leftJoinAndSelect('post.category', 'category');
+
+            // Apply tag filter if tags are provided
+            if (conditions.tags && conditions.tags.length > 0) {
+                qb.andWhere('tag.name IN (:...tags)', { tags: conditions.tags });
+            }
+
+            // Apply category filter if categories are provided
+            if (conditions.categories && conditions.categories.length > 0) {
+                qb.andWhere('category.id IN (:...categories)', { categories: conditions.categories });
+            }
+
+            const posts = await qb.getMany();
+
+            if (!posts.length) {
+                return { message: 'No posts found with the given criteria.' };
+            }
+
+            return posts;
+        } catch (e) {
+            throw new Error(`Error fetching posts: ${e.message}`);
         }
     }
 }
