@@ -32,6 +32,7 @@ import { InvestmentService } from './investment.service';
 import { InvestmentFilterResponseSwagger } from './response/investmentFilter.response';
 import { KeyFilterResponse } from './response/keyFilter.response';
 import { TickerTransLogResponse } from './response/tickerTransLog.response';
+import { BackTestTradingToolDto } from './dto/back-test-trading-tool';
 
 @Controller('investment')
 @ApiTags('Investment - Công cụ đầu tư')
@@ -220,7 +221,7 @@ export class InvestmentController {
   /**
    * BETA Smart
    */
-  
+
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.Admin, Role.PremiumUser, Role.AdminBlogs)
   @ApiOperation({ summary: 'BETA Smart' })
@@ -256,6 +257,21 @@ export class InvestmentController {
   async tickerTransLog(@Query() q: StockDto, @Res() res: Response) {
     try {
       const data = await this.investmentService.tickerTransLog(q.stock.toUpperCase());
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  /**
+   * Backtest Trading tool
+   */
+  @ApiOperation({ summary: 'Backtest Trading tool'})
+  @ApiOkResponse({ status: HttpStatus.OK})
+  @Get('back-test-trading-tool')
+  async backtest(@Query() p: BackTestTradingToolDto, @Res() res: Response){
+    try {
+      const data = await this.investmentService.getBackTestTrading(p.from, p.to);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (error) {
       throw new CatchException(error);

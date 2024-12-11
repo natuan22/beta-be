@@ -1,29 +1,29 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Query, Req, Res, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Response } from 'express';
+import { FormDataRequest } from 'nestjs-form-data';
 import { CatchException } from '../exceptions/common.exception';
+import { AuthGuard } from '../guards/auth.guard';
+import { Role, Roles } from '../guards/roles.decorator';
+import { RolesGuard } from '../guards/roles.guard';
 import { BaseResponse } from '../utils/utils.response';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/createCategory.dto';
-import { CategoryResponse, CategorySwagger } from './responses/category.response';
-import { UpdateCategoryDto } from './dto/updateCategory.dto';
-import { AuthGuard } from '../guards/auth.guard';
-import { RolesGuard } from '../guards/roles.guard';
-import { Role, Roles } from '../guards/roles.decorator';
-import { PostService } from './post.service';
 import { CreatePostDto } from './dto/createPost.dto';
-import { PostResponse, PostSwagger } from './responses/post.response';
-import { TagService } from './tag.service';
-import { FormDataRequest } from 'nestjs-form-data';
-import { UploadContentImageResponse } from './responses/uploadContentImage.response';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
-import { PostDataDto } from './dto/postData.dto';
-import { UpdatePostDto } from './dto/updatePost.dto';
 import { GetPostsWithTagsDto } from './dto/getPostsWithTags.dto';
+import { PostDataDto } from './dto/postData.dto';
+import { UpdateCategoryDto } from './dto/updateCategory.dto';
+import { UpdatePostDto } from './dto/updatePost.dto';
+import { PostService } from './post.service';
+import { CategoryResponse, CategorySwagger } from './responses/category.response';
+import { PostResponse, PostSwagger } from './responses/post.response';
+import { UploadContentImageResponse } from './responses/uploadContentImage.response';
+import { TagService } from './tag.service';
 
-@ApiTags('Blogs - API')
-@Controller('blogs')
-export class BlogsController {
+@ApiTags('Blogs Admin - API')
+@Controller('blogs-admin')
+export class BlogsControllerAdmin {
   constructor(
     private readonly categoryService: CategoryService,
     private readonly postService: PostService,
@@ -128,6 +128,25 @@ export class BlogsController {
 
   @UseGuards(AuthGuard, RolesGuard)
   @Roles(Role.AdminBlogs)
+  @ApiOperation({ summary: 'Xoá bài viết' })
+  @ApiOkResponse({ status: HttpStatus.OK })
+  @Post('/post/delete-post')
+  async deletePost(@Body() body: { id: any }, @Res() res: Response) {
+    try {
+      let { id } = body;
+      if (typeof id === 'string' && !isNaN(Number(id))) { id = Number(id) }
+  
+      if (Array.isArray(id)) { id = id.map((item) => (typeof item === 'string' && !isNaN(Number(item)) ? Number(item) : item)) }
+      const deletedCount = await this.postService.deletePost(id);
+  
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data: { deletedCount }, message: `${deletedCount} bài viết đã được xóa.` }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
   @ApiOperation({ summary: 'Lấy tất cả posts' })
   @Get('/post')
   async findAllPost(@Res() res: Response) {
@@ -144,14 +163,18 @@ export class BlogsController {
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({ summary: 'Lấy posts with id (no guard)' })
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
+  @ApiOperation({ summary: 'Lấy posts with id' })
   @Get('/post/:id')
   async getPostWithId(@Param() p: PostDataDto, @Res() res: Response) {
     const data = await this.postService.getPostWithId(p.id);
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 
-  @ApiOperation({ summary: 'Lấy posts with tags (no guard)' })
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.AdminBlogs)
+  @ApiOperation({ summary: 'Lấy posts with tags' })
   @Get('/post-tags')
   async findAllPostWithTag(@Query() q: GetPostsWithTagsDto, @Res() res: Response) {
     const data = await this.postService.findAllPostWithTag(q.tags.split(','));

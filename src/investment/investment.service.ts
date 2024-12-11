@@ -2,6 +2,7 @@ import { CACHE_MANAGER, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment';
+import * as _ from 'lodash';
 import * as calTech from 'technicalindicators';
 import { StepInstance } from 'twilio/lib/rest/studio/v1/flow/engagement/step';
 import { Repository } from 'typeorm';
@@ -820,8 +821,8 @@ export class InvestmentService {
     let [data, lastPrice, date, dateTo] = await Promise.all([
       !dataRedis ? (this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any) : [],
       !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (
-                                                    SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
-                                                    FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
+                                                  SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
+                                                  FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
                                                 )
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
       !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
@@ -858,7 +859,7 @@ export class InvestmentService {
         const result = !haveMa
           ? this.calculateMAIndex([...data.filter((res) => res.code == item.code)], date, dateTo)
           : this.calculateMAIndex([...data.filter((res) => res.code == item.code)], date, dateTo, item.ma);
-
+        
         arr.push({
           code: item.code,
           name: result.max.name,
@@ -877,90 +878,54 @@ export class InvestmentService {
     return result;
   }
 
-  private calculateMAIndex(
-    data: any,
-    date: any,
-    dateTo: any,
-    maNumber?: number,
-    role?: number,
-  ) {
+  private calculateMAIndex(data: any, date: any, dateTo: any, maNumber?: number, role?: number) {
     const price = data.map((item) => item.closePrice);
-    const dateFormat = data.map((item) => ({
-      ...item,
-      date: UtilCommonTemplate.toDateV2(item.date),
-    }));
-    const indexDateFrom = dateFormat.findIndex(
-      (item) => item.date == UtilCommonTemplate.toDateV2(date[0].date),
-    );
-    const indexDateTo = dateFormat.findIndex(
-      (item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date),
-    );
+    const dateFormat = data.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
+    const indexDateFrom = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(date[0].date));
+    const indexDateTo = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date));
 
     const arr = [];
-    let ma = !role
-      ? [5, 10, 20, 50, 60, 100]
-      : Array.from({ length: 96 }, (_, i) => i + 5);
+    let ma = !role ? [5, 10, 20, 50, 60, 100] : Array.from({ length: 96 }, (_, i) => i + 5);
     if (maNumber) {
       ma = [maNumber];
     }
-
+    
     ma.forEach((value) => {
       const ma = calTech.sma({ values: price, period: value });
       const maReverse = [...ma].reverse();
-      const newData = [...dateFormat]
-        .reverse()
-        .map((item, index) => ({ ...item, ma: maReverse[index] || 0 }));
+      const newData = [...dateFormat].reverse().map((item, index) => ({ ...item, ma: maReverse[index] || 0 }));
 
       let isBuy = false;
       let indexBuy = 0;
       let count = 0;
       let total = 1;
-      let min = 0,
-        max = 0;
+      let min = 0, max = 0;
       const detail = [];
       let lastSignal = 0; // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
 
-      const dataWithMa = [...newData]
-        .reverse()
-        .slice(indexDateFrom, indexDateTo + 1);
+      const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1);
 
       dataWithMa.map((item, index) => {
-        if (
-          dataWithMa[index - 1]?.closePrice &&
-          item.closePrice > item.ma &&
-          dataWithMa[index - 1].closePrice <= dataWithMa[index - 1].ma &&
-          !isBuy
-        ) {
+        if (dataWithMa[index - 1]?.closePrice && item.closePrice > item.ma && dataWithMa[index - 1].closePrice <= dataWithMa[index - 1].ma && !isBuy) {
           isBuy = true;
           indexBuy = index;
           count += 1;
         }
+
         if (index == dataWithMa.length - 1) {
-          lastSignal =
-            dataWithMa[index - 1]?.closePrice &&
-            item.closePrice > item.ma &&
-            dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma
-              ? 0
-              : dataWithMa[index - 1]?.closePrice &&
-                item.closePrice < item.ma &&
-                dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma
-              ? 1
-              : isBuy
-              ? 2
-              : 3;
+          lastSignal = 
+            dataWithMa[index - 1]?.closePrice && item.closePrice > item.ma && dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma 
+                ? 0 
+                : dataWithMa[index - 1]?.closePrice && item.closePrice < item.ma && dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma 
+                ? 1 
+                : isBuy 
+                ? 2 
+                : 3;
         }
-        if (
-          (dataWithMa[index - 1]?.closePrice &&
-            item.closePrice < item.ma &&
-            dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma &&
-            isBuy) ||
-          (index == dataWithMa.length - 1 && isBuy)
-        ) {
+      
+        if ((dataWithMa[index - 1]?.closePrice && item.closePrice < item.ma && dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma && isBuy) || (index == dataWithMa.length - 1 && isBuy)) {
           isBuy = false;
-          const percent =
-            ((item.closePrice - dataWithMa[indexBuy].closePrice) /
-              dataWithMa[indexBuy].closePrice) *
-            100;
+          const percent = ((item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice) * 100;
 
           total = total * (1 + percent / 100);
           min = Math.min(min, percent / 100);
@@ -990,16 +955,9 @@ export class InvestmentService {
       });
     });
 
-    const max = arr.reduce(
-      (acc, curr) =>
-        !acc?.total ? arr[0] : curr.total > acc.total ? curr : acc,
-      arr[0],
-    );
+    const max = arr.reduce((acc, curr) => !acc?.total ? arr[0] : curr.total > acc.total ? curr : acc, arr[0]);
 
-    return {
-      max: max,
-      data: arr,
-    };
+    return { max: max, data: arr };
   }
 
   async allStock() {
@@ -1418,5 +1376,135 @@ export class InvestmentService {
     } catch (err) {
       console.error(err);
     }
+  }
+
+  /**
+   * Backtest Trading tool
+   */
+  async getBackTestTrading(from: string, to: string) {
+    const data: any = await this.redis.get('beta-watch-list');
+
+    const result: any = await this.backtest(data.map((item) => ({ code: item.code, ma: item.ma })), from, to);
+    return result;
+  }
+
+  async backtest(stock: string | any[], from: string, to: string, realtimePrice?: number) {
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
+    
+    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+      this.redis.get(`price-back-test:${listStock}`),
+      this.redis.get(`price-back-test:${from}`),
+      this.redis.get(`price-back-test:${to}`),
+    ]);
+
+    let [data, dataSignals, lastPriceData, date, dateTo] = await Promise.all([
+      !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [],
+      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
+                               SELECT b.code, b.date, b.signal
+                               FROM PHANTICH.dbo.BuySellSignals b
+                               JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
+                               WHERE b.signal IN (0, 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
+                               ORDER BY b.date ASC;`) as any,
+      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
+                                                SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
+      !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
+      !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
+    ]);
+
+    if (realtimePrice && !dataRedis) {
+      await this.redis.set(`price-back-test:${listStock}`, data, { ttl: 180 });
+    }
+    if (!dateRedis) {
+      await this.redis.set(`price-back-test:${from}`, date, { ttl: 180 });
+    }
+    if (!dateToRedis) {
+      await this.redis.set(`price-back-test:${to}`, dateTo, { ttl: 180 });
+    }
+
+    data = dataRedis || data;
+    date = dateRedis || date;
+    dateTo = dateToRedis || dateTo;
+
+    const priceMap = new Map();
+    data.forEach((d: any) => {
+      if (!priceMap.has(d.code)) {
+        priceMap.set(d.code, {});
+      }
+      priceMap.get(d.code)[moment(d.date).format('YYYY-MM-DD')] = d.closePrice;
+    });
+
+    // Duyệt qua từng stock để tính toán price change
+    const results: any[] = [];
+    for (const item of stock) {
+      const lastPrice = !realtimePrice ? lastPriceData.find((p: any) => p.code === item.code)?.closePrice : realtimePrice;
+      const priceData = dataSignals.filter((res) => res.code === item.code);
+
+      let prevSignalZero = null;
+      let prevSignalOne = null;
+
+      priceData.forEach((priceItem) => {
+        if (priceItem.signal === 0) {
+          prevSignalZero = priceItem;
+        } else if (priceItem.signal === 1 && prevSignalZero) {
+          prevSignalOne = priceItem;
+
+          // Lấy giá từ priceMap theo ngày và code
+          const priceZero = priceMap.get(item.code)?.[moment(prevSignalZero.date).format('YYYY-MM-DD')];
+          const priceOne = priceMap.get(item.code)?.[moment(prevSignalOne.date).format('YYYY-MM-DD')];
+
+          if (priceZero !== undefined && priceOne !== undefined) {
+            // Tính giá thay đổi
+            const priceChange = ((priceOne - priceZero) / priceZero) * 100;
+
+            // Lưu kết quả
+            results.push({
+              startDate: moment(prevSignalZero.date).format('YYYY-MM-DD'),
+              endDate: moment(prevSignalOne.date).format('YYYY-MM-DD'),
+              priceBuy: priceZero,
+              priceSell: priceOne,
+              priceStar: 0,
+              priceChange: priceChange,
+              priceNow: lastPrice,
+              code: item.code,
+              status: 1,
+            });
+          }
+          prevSignalZero = null;
+        }
+      });
+      
+      // Nếu không tìm thấy signal = 1 sau signal = 0, dùng giá tại dateTo
+      if (prevSignalZero) {
+        const priceZero = priceMap.get(item.code)?.[moment(prevSignalZero.date).format('YYYY-MM-DD')];
+        let priceOne = priceMap.get(item.code)?.[moment(dateTo[0].date).format('YYYY-MM-DD')];
+      
+        if (realtimePrice) {
+          priceOne = realtimePrice;
+        }
+        
+        // Nếu `dateTo` là ngày hiện tại, dùng giá từ `lastPrice`
+        if (moment(dateTo[0].date).isSame(moment(), 'day') && lastPriceData) {
+          priceOne = lastPrice || priceOne;
+        }
+      
+        if (priceZero !== undefined && priceOne !== undefined) {
+          const priceChange = ((priceOne - priceZero) / priceZero) * 100;
+      
+          results.push({
+            startDate: moment(prevSignalZero.date).format('YYYY-MM-DD'),
+            endDate: moment(dateTo[0].date).format('YYYY-MM-DD'),
+            priceBuy: priceZero,
+            priceSell: 0,
+            priceStar: priceOne,
+            priceChange: priceChange,
+            priceNow: lastPrice,
+            code: item.code,
+            status: 0,
+          });
+        }
+      }
+    }
+
+    return results
   }
 }

@@ -6,7 +6,6 @@ import { NestjsFormDataModule } from 'nestjs-form-data';
 import { DB_SERVER } from '../constants';
 import { QueueEnum } from '../enums/queue.enum';
 import { MinioOptionModule } from '../minio/minio.module';
-import { BlogsController } from './blogs.controller';
 import { CategoryService } from './category.service';
 import { CategoryEntity } from './entities/catetory.entity';
 import { PostEntity } from './entities/post.entity';
@@ -14,6 +13,8 @@ import { TagEntity } from './entities/tag.entity';
 import { PostService } from './post.service';
 import { PostSchedulerService } from './queues/post-scheduler.service';
 import { TagService } from './tag.service';
+import { BlogsControllerAdmin } from './blogs-admin.controller';
+import { BlogsControllerUser } from './blogs-user.controller';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { TagService } from './tag.service';
     MinioOptionModule,
     BullModule.registerQueue({ name: QueueEnum.PostScheduler }),
   ],
-  controllers: [BlogsController],
+  controllers: [BlogsControllerAdmin, BlogsControllerUser],
   providers: [CategoryService, PostService, TagService, JwtService, PostSchedulerService],
 })
 export class BlogsModule {}
