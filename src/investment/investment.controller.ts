@@ -33,6 +33,7 @@ import { InvestmentFilterResponseSwagger } from './response/investmentFilter.res
 import { KeyFilterResponse } from './response/keyFilter.response';
 import { TickerTransLogResponse } from './response/tickerTransLog.response';
 import { BackTestTradingToolDto } from './dto/back-test-trading-tool';
+import { BackTestTradingToolBackupDto } from './dto/back-test-trading-tool-back-up';
 
 @Controller('investment')
 @ApiTags('Investment - Công cụ đầu tư')
@@ -277,4 +278,19 @@ export class InvestmentController {
       throw new CatchException(error);
     }
   }
+
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles(Role.Admin, Role.PremiumUser, Role.AdminBlogs)
+  @ApiOperation({ summary: 'Backtest Trading tool'})
+  @ApiOkResponse({ status: HttpStatus.OK})
+  @Get('beta-watch-list-back-up')
+  async getBetaWatchListBackup(@Query() p: BackTestTradingToolBackupDto, @Res() res: Response){
+    try {
+      const data = await this.investmentService.getBetaWatchListBackup(p.date);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+  
 }
