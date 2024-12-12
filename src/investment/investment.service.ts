@@ -1156,9 +1156,9 @@ export class InvestmentService {
     try {
       const query_signal = `
           SELECT [code], [signal]
-          FROM [PHANTICH].[dbo].[BuySellSignals2] bs
+          FROM [PHANTICH].[dbo].[BuySellSignals] bs
           WHERE (([signal] = 0 AND [perChange_2024] >= 7 AND [perChange_2025] >= 25) OR [signal] = 1) 
-                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals2] WHERE code = bs.code)
+                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals] WHERE code = bs.code)
       `;
       const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
@@ -1399,9 +1399,9 @@ export class InvestmentService {
 
     let [data, dataSignals, lastPriceData, date, dateTo] = await Promise.all([
       !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [],
-      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals2 WHERE signal = 0 GROUP BY code)
+      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
                                SELECT b.code, b.date, b.signal
-                               FROM PHANTICH.dbo.BuySellSignals2 b
+                               FROM PHANTICH.dbo.BuySellSignals b
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
                                WHERE ((b.signal = 0 AND b.perChange_2024 >= 7 AND b.perChange_2025 >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
