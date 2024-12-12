@@ -1156,9 +1156,9 @@ export class InvestmentService {
     try {
       const query_signal = `
           SELECT [code], [signal]
-          FROM [PHANTICH].[dbo].[BuySellSignals] bs
+          FROM [PHANTICH].[dbo].[BuySellSignals2] bs
           WHERE (([signal] = 0 AND [perChange_2024] >= 7 AND [perChange_2025] >= 25) OR [signal] = 1) 
-                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals] WHERE code = bs.code)
+                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals2] WHERE code = bs.code)
       `;
       const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
