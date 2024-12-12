@@ -1399,11 +1399,11 @@ export class InvestmentService {
 
     let [data, dataSignals, lastPriceData, date, dateTo] = await Promise.all([
       !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [],
-      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
+      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals2 WHERE signal = 0 GROUP BY code)
                                SELECT b.code, b.date, b.signal
-                               FROM PHANTICH.dbo.BuySellSignals b
+                               FROM PHANTICH.dbo.BuySellSignals2 b
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-                               WHERE b.signal IN (0, 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
+                               WHERE ((b.signal = 0 AND b.perChange_2024 >= 7 AND b.perChange_2025 >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
       !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
@@ -1506,5 +1506,175 @@ export class InvestmentService {
     }
 
     return results
+  }
+
+  async getBetaWatchListBackup(date: string) {
+    const data: any = await this.redis.get('beta-watch-list');
+    const from = moment(date).subtract(moment(date).isoWeekday() === 1 ? 3 : 1, 'day').format('YYYY-MM-DD');
+
+    const result: any = await this.testBackup(
+      data.map((item) => ({ code: item.code, ma: item.ma })),
+      moment(from).format('YYYY-MM-DD'),
+      moment(date).format('YYYY-MM-DD'),
+      1,
+    );
+    return result.map((item, index) => ({
+      ...item,
+      price_2024: data[index].price_2024 || 0,
+      price_2025: data[index].price_2025 || 0,
+      name: `MA_${data[index].ma}`,
+    }));
+  }
+
+  async testBackup(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
+
+    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+      this.redis.get(`price-back-up:${listStock}`),
+      this.redis.get(`price-back-up:${from}`),
+      this.redis.get(`price-back-up:${to}`),
+    ]);
+    
+    let [data, lastPrice, date, dateTo] = await Promise.all([
+      !dataRedis ? (this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any) : [],
+      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (
+                                                  SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
+                                                  FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
+                                                )
+                                                SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
+      !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
+      !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
+    ]);
+
+    if (realtimePrice && !dataRedis) {
+      await this.redis.set(`price-back-up:${listStock}`, data, { ttl: 180 });
+    }
+    if (!dateRedis) {
+      await this.redis.set(`price-back-up:${from}`, date, { ttl: 180 });
+    }
+    if (!dateToRedis) {
+      await this.redis.set(`price-back-up:${to}`, dateTo, { ttl: 180 });
+    }
+
+    if (dataRedis) {
+      data = dataRedis;
+    }
+    if (dateRedis) {
+      date = dateRedis;
+    }
+    if (dateToRedis) {
+      dateTo = dateToRedis;
+    }
+
+    if (Array.isArray(stock)) {
+      const arr = [];
+
+      stock.map((item: any) => {
+        const price = data.filter((res) => res.code == item.code);
+        price[price.length - 1]['closePrice'] = !realtimePrice ? lastPrice.find((price) => price.code == item.code).closePrice : realtimePrice;
+
+        const result = !haveMa
+          ? this.calculateMAIndexBackup([...data.filter((res) => res.code == item.code)], date, dateTo)
+          : this.calculateMAIndexBackup([...data.filter((res) => res.code == item.code)], date, dateTo, item.ma);
+        
+          arr.push({
+          code: item.code,
+          name: result.max.name,
+          total: result.max.total,
+          closePrice: result.data[result.data.length - 1].closePrice,
+          signal: result.max.signal,
+          ma: result.max.ma,
+          closePricePrev: result.data[result.data.length - 1].closePricePrev,
+        });
+      });
+
+      return arr;
+    }
+
+    const result = this.calculateMAIndexBackup(data, date, dateTo, undefined, role);
+    return result;
+  }
+
+  private calculateMAIndexBackup(data: any, date: any, dateTo: any, maNumber?: number, role?: number) {
+    const price = data.map((item) => item.closePrice);
+    const dateFormat = data.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
+    const indexDateFrom = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(date[0].date));
+    const indexDateTo = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date));
+
+    const arr = [];
+    let ma = !role ? [5, 10, 20, 50, 60, 100] : Array.from({ length: 96 }, (_, i) => i + 5);
+    if (maNumber) {
+      ma = [maNumber];
+    }
+    
+    ma.forEach((value) => {
+      const ma = calTech.sma({ values: price, period: value });
+      const maReverse = [...ma].reverse();
+      const newData = [...dateFormat].reverse().map((item, index) => ({ ...item, ma: maReverse[index] || 0 }));
+
+      let isBuy = false;
+      let indexBuy = 0;
+      let count = 0;
+      let total = 1;
+      let min = 0, max = 0;
+      const detail = [];
+      let lastSignal = 0; // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
+
+      const dataWithMa = [...newData].reverse().slice(indexDateFrom, indexDateTo + 1);
+      
+      dataWithMa.map((item, index) => {
+        if (dataWithMa[index - 1]?.closePrice && item.closePrice > item.ma && dataWithMa[index - 1].closePrice <= dataWithMa[index - 1].ma && !isBuy) {
+          isBuy = true;
+          indexBuy = index;
+          count += 1;
+        }
+        
+        if (index == dataWithMa.length - 1) {
+          lastSignal = 
+            dataWithMa[index - 1]?.closePrice && item.closePrice > item.ma && dataWithMa[index - 1].closePrice < dataWithMa[index - 1].ma 
+                ? 0 
+                : dataWithMa[index - 1]?.closePrice && item.closePrice < item.ma && dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma 
+                ? 1 
+                : isBuy 
+                ? 2 
+                : 3;
+        }
+        
+        if ((dataWithMa[index - 1]?.closePrice && item.closePrice < item.ma && dataWithMa[index - 1].closePrice > dataWithMa[index - 1].ma && isBuy) || (index == dataWithMa.length - 1 && isBuy)) {
+          isBuy = false;
+          const percent = ((item.closePrice - dataWithMa[indexBuy].closePrice) / dataWithMa[indexBuy].closePrice) * 100;
+
+          total = total * (1 + percent / 100);
+          min = Math.min(min, percent / 100);
+          max = Math.max(max, percent / 100);
+
+          detail.push({
+            date_buy: dataWithMa[indexBuy].date,
+            date_sell: item.date,
+            price_buy: dataWithMa[indexBuy].closePrice,
+            price_sell: item.closePrice,
+            profit: percent,
+          });
+        }
+      });
+      
+      
+      arr.push({
+        name: `MA_${value}`,
+        total: total - 1,
+        count: count,
+        min,
+        max,
+        detail,
+        closePrice: price[indexDateTo],
+        signal: lastSignal,
+        ma: dataWithMa[1].ma,
+        closePricePrev: price[indexDateFrom],
+      });
+    });
+    
+    const max = arr.reduce((acc, curr) => !acc?.total ? arr[0] : curr.total > acc.total ? curr : acc, arr[0]);
+    
+    return { max: max, data: arr };
   }
 }
