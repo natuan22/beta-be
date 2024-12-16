@@ -8,6 +8,7 @@ import { UpdateCategoryDto } from "./dto/updateCategory.dto";
 import { CategoryEntity } from "./entities/catetory.entity";
 import { CategoryResponse } from "./responses/category.response";
 import { GetAllCategoriesResponse } from "./responses/getAllCategories.response";
+import * as _ from 'lodash';
 
 @Injectable()
 export class CategoryService {
@@ -94,12 +95,11 @@ export class CategoryService {
                   parent_id: category.parent_id,
                   created_at: category.created_at,
                   updated_at: category.updated_at,
-                  children: category.sub_categories?.length ? category.sub_categories.map(mapCategories) : null,
+                  children: category.sub_categories?.map(mapCategories) || null,
                 });
             };
-            const rootCategories = categories.filter(category => category.parent_id === null).map(mapCategories);
 
-            return rootCategories;
+            return categories.filter(category => category.parent_id === null).map(mapCategories);
         } catch (e) {
             throw new CatchException(e);
         }
@@ -107,7 +107,7 @@ export class CategoryService {
 
     async findAllCateUser() {
         try {
-            const categories = await this.categoryRepo.find({ where: { published: 1 } , relations: ['sub_categories'] });
+            const categories = await this.categoryRepo.find({ where: { published: 1 }, relations: ['sub_categories'], order: { created_at: 'ASC' } });
 
             const mapCategories = (category: CategoryEntity): GetAllCategoriesResponse => {
                 return new GetAllCategoriesResponse({
@@ -118,12 +118,11 @@ export class CategoryService {
                   parent_id: category.parent_id,
                   created_at: category.created_at,
                   updated_at: category.updated_at,
-                  children: category.sub_categories?.length ? category.sub_categories.map(mapCategories) : null,
+                  children: category.sub_categories?.map(mapCategories) || null,
                 });
             };
-            const rootCategories = categories.filter(category => category.parent_id === null).map(mapCategories);
 
-            return rootCategories;
+            return categories.filter(category => category.parent_id === null).map(mapCategories);
         } catch (e) {
             throw new CatchException(e);
         }

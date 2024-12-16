@@ -230,35 +230,17 @@ export class PostService {
     async findAllPostWithTag(tags: string[]) {
         try {
             // Tìm các bài viết có liên quan đến các tags
-            const posts = await this.postRepo.createQueryBuilder('post')
-                .leftJoinAndSelect('post.tags', 'tag')
-                .where('tag.name IN (:...tags)', { tags })
-                .getMany();
+            const posts = await this.postRepo.createQueryBuilder('post').leftJoinAndSelect('post.tags', 'tag').where('tag.name IN (:...tags)', { tags }).getMany();
         
-            // Chuyển đổi dữ liệu sang định dạng GetAllPostResponse
-            const postResponses = posts.map((post) => new GetAllPostResponse({
-                id: post.id,
-                title: post.title,
-                description: post.description,
-                content: post.content,
-                thumbnail: post.thumbnail,
-                published: post.published,
-                created_at: post.created_at,
-                updated_at: post.updated_at,
-                category: post.category ? {
-                id: post.category.id,
-                name: post.category.name,
-                description: post.category.description,
-                published: post.category.published,
-                parent_id: post.category.parent_id,
-                } : null,
-                tags: post.tags ? post.tags.map(tag => ({
-                id: tag.id,
-                name: tag.name,
-                description: tag.description,
-                published: tag.published,
-                })) : [],
-            }));
+            const postResponses = posts.map((post) => {
+                const { id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt, category, tags } = post;
+            
+                return new GetAllPostResponse({ 
+                    id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt,
+                    category: category ? { id: category.id, name: category.name, description: category.description, published: category.published, parent_id: category.parent_id } : null,
+                    tags: tags?.map(({ id, name, description, published }) => ({ id, name, description, published, })) || [],
+                });
+            });
         
             return postResponses;
         } catch (e) {
@@ -271,31 +253,15 @@ export class PostService {
             // Lấy danh sách bài viết và mối quan hệ
             const posts = await this.postRepo.find({ relations: ['category', 'tags'], order: { created_at: 'DESC' } });
     
-            // Chuyển đổi dữ liệu sang định dạng GetAllPostResponse
-            const postResponses = posts.map((post) => new GetAllPostResponse({
-                id: post.id,
-                title: post.title,
-                description: post.description,
-                content: post.content,
-                thumbnail: post.thumbnail,
-                published: post.published,
-                created_at: post.created_at,
-                updated_at: post.updated_at,
-                scheduledAt: post.scheduledAt,
-                category: post.category ? {
-                    id: post.category.id,
-                    name: post.category.name,
-                    description: post.category.description,
-                    published: post.category.published,
-                    parent_id: post.category.parent_id,
-                } : null,
-                tags: post.tags ? post.tags.map(tag => ({
-                    id: tag.id,
-                    name: tag.name,
-                    description: tag.description,
-                    published: tag.published,
-                })) : [],
-            }));
+            const postResponses = posts.map((post) => {
+                const { id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt, category, tags } = post;
+            
+                return new GetAllPostResponse({ 
+                    id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt,
+                    category: category ? { id: category.id, name: category.name, description: category.description, published: category.published, parent_id: category.parent_id } : null,
+                    tags: tags?.map(({ id, name, description, published }) => ({ id, name, description, published, })) || [],
+                });
+            });
     
             return postResponses;
         } catch (e) {
@@ -318,7 +284,10 @@ export class PostService {
             }
 
             // Start building the query
-            const qb = this.postRepo.createQueryBuilder('post').leftJoinAndSelect('post.tags', 'tag').leftJoinAndSelect('post.category', 'category');
+            const qb = this.postRepo.createQueryBuilder('post')
+                .leftJoinAndSelect('post.tags', 'tag')
+                .leftJoinAndSelect('post.category', 'category')
+                .where('post.published = :published', { published: 1 });
 
             // Apply tag filter if tags are provided
             if (conditions.tags && conditions.tags.length > 0) {
@@ -330,13 +299,25 @@ export class PostService {
                 qb.andWhere('category.id IN (:...categories)', { categories: conditions.categories });
             }
 
+            qb.orderBy('post.created_at', 'DESC');
+
             const posts = await qb.getMany();
 
             if (!posts.length) {
                 return { message: 'No posts found with the given criteria.' };
             }
 
-            return posts;
+            const postResponses = posts.map((post) => {
+                const { id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt, category, tags } = post;
+            
+                return new GetAllPostResponse({ 
+                    id, title, description, content, thumbnail, published, created_at, updated_at, scheduledAt,
+                    category: category ? { id: category.id, name: category.name, description: category.description, published: category.published, parent_id: category.parent_id } : null,
+                    tags: tags?.map(({ id, name, description, published }) => ({ id, name, description, published })) || [],
+                });
+            });
+    
+            return postResponses;
         } catch (e) {
             throw new Error(`Error fetching posts: ${e.message}`);
         }
