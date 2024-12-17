@@ -287,7 +287,9 @@ export class PostService {
             const qb = this.postRepo.createQueryBuilder('post')
                 .leftJoinAndSelect('post.tags', 'tag')
                 .leftJoinAndSelect('post.category', 'category')
-                .where('post.published = :published', { published: 1 });
+                .where('post.published = :published', { published: 1 })
+                .andWhere('category.published = :published', { published: 1 })
+                .orderBy('post.created_at', 'DESC');
 
             // Apply tag filter if tags are provided
             if (conditions.tags && conditions.tags.length > 0) {
@@ -298,8 +300,6 @@ export class PostService {
             if (conditions.categories && conditions.categories.length > 0) {
                 qb.andWhere('category.id IN (:...categories)', { categories: conditions.categories });
             }
-
-            qb.orderBy('post.created_at', 'DESC');
 
             const posts = await qb.getMany();
 
