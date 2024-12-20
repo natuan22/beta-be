@@ -294,51 +294,15 @@ export class FilterResponse {
     this.NoTraLaiDivTongTaiSan = data?.NoTraLaiDivTongTaiSan || 0;
   }
 
-  static mapToList(
-    data: FilterResponse[],
-    data_1: any,
-    data_2: any,
-    data_4: any,
-    data_5: any,
-    data_6,
-  ) {
+  static mapToList(data: FilterResponse[], data_1: any, data_2: any, data_4: any, data_5: any, data_6) {
     return data.map(
       (item) =>
         new FilterResponse({
           ...item,
-          ...this.calculateBollingerBands(
-            item.closePrice,
-            item.closePrice_pre,
-            item.BBU,
-            item.BBL,
-          ),
-          ...this.calculateMA(
-            item.ma5,
-            item.ma10,
-            item.ma20,
-            item.ma50,
-            item.ma100,
-            item.ma200,
-            item.ema5,
-            item.ema10,
-            item.ema20,
-            item.ema50,
-            item.ema100,
-            item.ema200,
-            item.closePrice,
-            item.closePrice_pre,
-            item.ma5_pre,
-            item.ma10_pre,
-            item.ma20_pre,
-            item.ma50_pre,
-          ),
+          ...this.calculateBollingerBands(item.closePrice, item.closePrice_pre, item.BBU, item.BBL),
+          ...this.calculateMA(item.ma5, item.ma10, item.ma20, item.ma50, item.ma100, item.ma200, item.ema5, item.ema10, item.ema20, item.ema50, item.ema100, item.ema200, item.closePrice, item.closePrice_pre, item.ma5_pre, item.ma10_pre, item.ma20_pre, item.ma50_pre),
           ...this.calculateRSI(item.rsi, item.rsi_pre),
-          ...this.calculateMACD(
-            item.macd,
-            item.macd_pre,
-            item.macd_signal,
-            item.macd_signal_pre,
-          ),
+          ...this.calculateMACD(item.macd, item.macd_pre, item.macd_signal, item.macd_signal_pre),
           ...data_1.find((vol) => vol.code == item.code),
           ...data_2.find((margin) => margin.code == item.code),
           ...data_4.find((roa) => roa.code == item.code),
@@ -348,135 +312,57 @@ export class FilterResponse {
     );
   }
 
-  static calculateBollingerBands(
-    price: number,
-    price_pre: number,
-    bbu: number,
-    bbl: number,
-  ) {
-    let gia_thoat_ra_bien_tren_bollinger_band = 0,
-      gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band = 0,
-      gia_dang_o_ngoai_bien_tren_bollinger_band = 0,
-      gia_thoat_ra_bien_duoi_bollinger_band = 0,
-      gia_cat_len_tu_ngoai_bien_duoi_bollinger_band = 0,
-      gia_dang_o_ngoai_bien_duoi_bollinger_band = 0;
+  static calculateBollingerBands(price: number, price_pre: number, bbu: number, bbl: number) {
+    let gia_thoat_ra_bien_tren_bollinger_band = 0, gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band = 0, gia_dang_o_ngoai_bien_tren_bollinger_band = 0, gia_thoat_ra_bien_duoi_bollinger_band = 0, gia_cat_len_tu_ngoai_bien_duoi_bollinger_band = 0, gia_dang_o_ngoai_bien_duoi_bollinger_band = 0;
+    
     if (price_pre < bbu && price > bbu) {
       gia_thoat_ra_bien_tren_bollinger_band = 1;
     }
+
     if (price_pre > bbu && price < bbu) {
       gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band = 1;
     }
+
     if (price > bbu) {
       gia_dang_o_ngoai_bien_tren_bollinger_band = 1;
     }
+
     if (price_pre > bbl && price < bbl) {
       gia_thoat_ra_bien_duoi_bollinger_band = 1;
     }
+
     if (price_pre < bbu && price > bbu) {
       gia_cat_len_tu_ngoai_bien_duoi_bollinger_band = 1;
     }
+
     if (price < bbu) {
       gia_dang_o_ngoai_bien_duoi_bollinger_band = 1;
     }
-    return {
-      gia_thoat_ra_bien_tren_bollinger_band,
-      gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band,
-      gia_dang_o_ngoai_bien_tren_bollinger_band,
-      gia_thoat_ra_bien_duoi_bollinger_band,
-      gia_cat_len_tu_ngoai_bien_duoi_bollinger_band,
-      gia_dang_o_ngoai_bien_duoi_bollinger_band,
-    };
+
+    return { gia_thoat_ra_bien_tren_bollinger_band, gia_cat_xuong_tu_ngoai_bien_tren_bollinger_band, gia_dang_o_ngoai_bien_tren_bollinger_band, gia_thoat_ra_bien_duoi_bollinger_band, gia_cat_len_tu_ngoai_bien_duoi_bollinger_band, gia_dang_o_ngoai_bien_duoi_bollinger_band };
   }
 
-  static calculateMA(
-    ma5: number,
-    ma10: number,
-    ma20: number,
-    ma50: number,
-    ma100: number,
-    ma200: number,
-    ema5: number,
-    ema10: number,
-    ema20: number,
-    ema50: number,
-    ema100: number,
-    ema200: number,
-    price: number,
-    price_pre: number,
-    ma5_pre: number,
-    ma10_pre: number,
-    ma20_pre: number,
-    ma50_pre: number,
-  ) {
+  static calculateMA(ma5: number, ma10: number, ma20: number, ma50: number, ma100: number, ma200: number, ema5: number, ema10: number, ema20: number, ema50: number, ema100: number, ema200: number, price: number, price_pre: number, ma5_pre: number, ma10_pre: number, ma20_pre: number, ma50_pre: number) {
     const cat_len = (ma: number) => (price_pre < ma && price > ma ? 1 : 0);
     const cat_xuong = (ma: number) => (price_pre > ma && price < ma ? 1 : 0);
-    const ngan_han_cat_len = (
-      ma_ngan: number,
-      ma_dai: number,
-      ma_ngan_pre: number,
-      ma_dai_pre: number,
-    ) => (ma_ngan_pre < ma_dai_pre && ma_ngan > ma_dai ? 1 : 0);
-    const ngan_han_cat_xuong = (
-      ma_ngan: number,
-      ma_dai: number,
-      ma_ngan_pre: number,
-      ma_dai_pre: number,
-    ) => (ma_ngan_pre > ma_dai_pre && ma_ngan < ma_dai ? 1 : 0);
+
+    const ngan_han_cat_len = (ma_ngan: number, ma_dai: number, ma_ngan_pre: number, ma_dai_pre: number) => (ma_ngan_pre < ma_dai_pre && ma_ngan > ma_dai ? 1 : 0);
+    const ngan_han_cat_xuong = (ma_ngan: number, ma_dai: number, ma_ngan_pre: number, ma_dai_pre: number) => (ma_ngan_pre > ma_dai_pre && ma_ngan < ma_dai ? 1 : 0);
 
     return {
-      gia_hien_tai_cat_len_ma: {
-        ma5: cat_len(ma5),
-        ma10: cat_len(ma10),
-        ma20: cat_len(ma20),
-        ma50: cat_len(ma50),
-        ma100: cat_len(ma100),
-        ma200: cat_len(ma200),
-      },
-      gia_hien_tai_cat_xuong_ma: {
-        ma5: cat_xuong(ma5),
-        ma10: cat_xuong(ma10),
-        ma20: cat_xuong(ma20),
-        ma50: cat_xuong(ma50),
-        ma100: cat_xuong(ma100),
-        ma200: cat_xuong(ma200),
-      },
-      gia_hien_tai_cat_len_ema: {
-        ema5: cat_len(ema5),
-        ema10: cat_len(ema10),
-        ema20: cat_len(ema20),
-        ema50: cat_len(ema50),
-        ema100: cat_len(ema100),
-        ema200: cat_len(ema200),
-      },
-      gia_hien_tai_cat_xuong_ema: {
-        ema5: cat_xuong(ema5),
-        ema10: cat_xuong(ema10),
-        ema20: cat_xuong(ema20),
-        ema50: cat_xuong(ema50),
-        ema100: cat_xuong(ema100),
-        ema200: cat_xuong(ema200),
-      },
-      sma_ngan_han_cat_len_sma_dai_han: {
-        ma5_ma20: ngan_han_cat_len(ma5, ma20, ma5_pre, ma20_pre),
-        ma10_ma50: ngan_han_cat_len(ma10, ma50, ma10_pre, ma50_pre),
-      },
-      sma_ngan_han_cat_xuong_sma_dai_han: {
-        ma5_ma20: ngan_han_cat_xuong(ma5, ma20, ma5_pre, ma20_pre),
-        ma10_ma50: ngan_han_cat_xuong(ma10, ma50, ma10_pre, ma50_pre),
-      },
+      gia_hien_tai_cat_len_ma: { ma5: cat_len(ma5), ma10: cat_len(ma10), ma20: cat_len(ma20), ma50: cat_len(ma50), ma100: cat_len(ma100), ma200: cat_len(ma200) },
+      gia_hien_tai_cat_xuong_ma: { ma5: cat_xuong(ma5), ma10: cat_xuong(ma10), ma20: cat_xuong(ma20), ma50: cat_xuong(ma50), ma100: cat_xuong(ma100), ma200: cat_xuong(ma200) },
+      gia_hien_tai_cat_len_ema: { ema5: cat_len(ema5), ema10: cat_len(ema10), ema20: cat_len(ema20), ema50: cat_len(ema50), ema100: cat_len(ema100), ema200: cat_len(ema200) },
+      gia_hien_tai_cat_xuong_ema: { ema5: cat_xuong(ema5), ema10: cat_xuong(ema10), ema20: cat_xuong(ema20), ema50: cat_xuong(ema50), ema100: cat_xuong(ema100), ema200: cat_xuong(ema200) },
+      sma_ngan_han_cat_len_sma_dai_han: { ma5_ma20: ngan_han_cat_len(ma5, ma20, ma5_pre, ma20_pre), ma10_ma50: ngan_han_cat_len(ma10, ma50, ma10_pre, ma50_pre) },
+      sma_ngan_han_cat_xuong_sma_dai_han: { ma5_ma20: ngan_han_cat_xuong(ma5, ma20, ma5_pre, ma20_pre), ma10_ma50: ngan_han_cat_xuong(ma10, ma50, ma10_pre, ma50_pre) },
     };
   }
 
   static calculateRSI(rsi: number, rsi_pre: number) {
-    const di_vao_vung_qua_mua = (rsi: number, rsi_pre: number, val: number) =>
-      rsi_pre < val && rsi > val ? 1 : 0;
-    const thoat_khoi_vung_qua_mua = (
-      rsi: number,
-      rsi_pre: number,
-      val: number,
-    ) => (rsi_pre > val && rsi < val ? 1 : 0);
-    const dang_o_vung_qua_mua = (rsi: number, val: number) =>
-      rsi > val ? 1 : 0;
+    const di_vao_vung_qua_mua = (rsi: number, rsi_pre: number, val: number) => rsi_pre < val && rsi > val ? 1 : 0;
+    const thoat_khoi_vung_qua_mua = (rsi: number, rsi_pre: number, val: number) => (rsi_pre > val && rsi < val ? 1 : 0);
+    const dang_o_vung_qua_mua = (rsi: number, val: number) => rsi > val ? 1 : 0;
 
     return {
       rsi_di_vao_vung_qua_mua_70: di_vao_vung_qua_mua(rsi, rsi_pre, 70),
@@ -494,18 +380,11 @@ export class FilterResponse {
     };
   }
 
-  static calculateMACD(
-    macd: number,
-    macd_pre: number,
-    signal: number,
-    signal_pre: number,
-  ) {
+  static calculateMACD(macd: number, macd_pre: number, signal: number, signal_pre: number) {
     return {
-      macd_cat_len_duong_tin_hieu:
-        macd_pre < signal_pre && macd > signal ? 1 : 0,
+      macd_cat_len_duong_tin_hieu: macd_pre < signal_pre && macd > signal ? 1 : 0,
       macd_dang_o_tren_duong_tin_hieu: macd > signal ? 1 : 0,
-      macd_cat_xuong_duong_tin_hieu:
-        macd_pre > signal_pre && macd < signal ? 1 : 0,
+      macd_cat_xuong_duong_tin_hieu: macd_pre > signal_pre && macd < signal ? 1 : 0,
       macd_dang_o_duoi_duong_tin_hieu: macd < signal ? 1 : 0,
       macd_cat_len_duong_0: macd_pre < 0 && macd > 0 ? 1 : 0,
       macd_dang_o_tren_duong_0: macd > 0 ? 1 : 0,
@@ -567,7 +446,7 @@ export class FilterResponse {
   };
 
   private calChangeStatus(now: number, pre: number) {
-    const value = [now, pre].join(',');
+    const value = [pre, now].join(',');
     switch (value) {
       case '0,1':
         return 0; // Rất tiêu cực sang tiêu cực
