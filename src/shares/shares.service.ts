@@ -637,140 +637,52 @@ export class SharesService {
   }
 
   async tradingPriceFluctuations(stock: string) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`);
     if (redisData) return redisData;
 
     const date = UtilCommonTemplate.getLastTwoQuarters();
-
-    const now = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment().format(
-            'YYYY-MM-DD',
-          )}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const week = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
-            now,
-          )
-            .subtract(7, 'day')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const month = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
-            now,
-          )
-            .subtract(1, 'month')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const year = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
-            now,
-          )
-            .subtract(1, 'year')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const quarter_start = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
-            date.months[2],
-            'YYYY/MM/DD',
-          )
-            .endOf('month')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
-    const quarter_end = moment(
-      (
-        await this.mssqlService.query(
-          `select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(
-            date.months[5],
-            'YYYY/MM/DD',
-          )
-            .endOf('month')
-            .format('YYYY-MM-DD')}'`,
-        )
-      )[0].date,
-    ).format('YYYY-MM-DD');
+    
+    const now = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment().format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const week = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(7, 'day').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const month = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const year = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const quarter_start = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(date.months[2], 'YYYY/MM/DD',).endOf('month').subtract(3, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
+    const quarter_end = moment((await this.mssqlService.query(`select top 1 date from marketTrade.dbo.tickerTradeVND where date >= '${moment(date.months[5], 'YYYY/MM/DD').endOf('month').subtract(3, 'month').format('YYYY-MM-DD')}'`))[0].date).format('YYYY-MM-DD');
     const week_52 = moment().subtract('52', 'week').format('YYYY-MM-DD');
-
+    
     //Xoá những ngày trùng nhau
-    const same_day = UtilCommonTemplate.checkSameDate([
-      now,
-      week,
-      month,
-      year,
-      quarter_end,
-      quarter_start,
-      week_52,
-    ]);
+    const same_day = UtilCommonTemplate.checkSameDate([now, week, month, year, quarter_end, quarter_start, week_52]);
     const pivot = same_day.map((item) => `[${item}]`).join(',');
 
     const query = `
-    WITH temp
-    AS (SELECT
-      closePrice,
-      date,
-      code
-    FROM marketTrade.dbo.tickerTradeVND
-    WHERE date IN ('${now}', '${week}', '${month}', '${quarter_start}', '${quarter_end}', '${year}')
-    AND code = '${stock}'),
-    pivotted
-    AS (SELECT
-      code,
-      [${now}] AS now,
-      [${week}] AS week,
-      [${quarter_end}] AS endQ,
-      [${quarter_start}] AS startQ,
-      [${month}] AS month,
-      [${year}] AS year
-    FROM temp AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen),
-    mimax
-    AS (SELECT
-      MAX(closePrice) AS max_price,
-      MIN(closePrice) AS min_price,
-      '${stock.toUpperCase()}' AS code
-    FROM marketTrade.dbo.tickerTradeVND t
-    WHERE date >= '${week_52}'
-    AND t.code = '${stock}')
-    SELECT
-      m.min_price,
-      m.max_price,
-      ((p.now - p.week) / p.week) * 100 AS p_week,
-      ((p.now - p.month) / p.month) * 100 AS p_month,
-      ((p.endQ - p.startQ) / p.startQ) * 100 AS p_quarter,
-      ((p.now - p.year) / p.year) * 100 AS p_year
-    FROM pivotted p
-    INNER JOIN mimax m
-      ON m.code = p.code
+      WITH temp AS (
+        SELECT closePrice, date, code
+        FROM marketTrade.dbo.tickerTradeVND
+        WHERE date IN ('${now}', '${week}', '${month}', '${quarter_start}', '${quarter_end}', '${year}') AND code = '${stock}'
+      ),
+      pivotted AS (
+        SELECT code, [${now}] AS now, [${week}] AS week, [${quarter_end}] AS endQ, [${quarter_start}] AS startQ, [${month}] AS month, [${year}] AS year
+        FROM temp AS source PIVOT (SUM(closePrice) FOR date IN (${pivot})) AS chuyen
+      ),
+      mimax AS (
+        SELECT MAX(closePrice) AS max_price, MIN(closePrice) AS min_price, '${stock.toUpperCase()}' AS code
+        FROM marketTrade.dbo.tickerTradeVND t
+        WHERE date >= '${week_52}'
+        AND t.code = '${stock}'
+      )
+      SELECT m.min_price, m.max_price, 
+            ((p.now - p.week) / p.week) * 100 AS p_week, 
+            ((p.now - p.month) / p.month) * 100 AS p_month, 
+            ((p.endQ - p.startQ) / p.startQ) * 100 AS p_quarter, 
+            ((p.now - p.year) / p.year) * 100 AS p_year
+      FROM pivotted p
+      INNER JOIN mimax m ON m.code = p.code
     `;
-    const data = await this.mssqlService.query<
-      TradingPriceFluctuationsResponse[]
-    >(query);
+
+    const data = await this.mssqlService.query<TradingPriceFluctuationsResponse[]>(query);
     const dataMapped = new TradingPriceFluctuationsResponse(data[0]);
-    await this.redis.set(
-      `${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`,
-      dataMapped,
-      { ttl: TimeToLive.HaftHour },
-    );
+
+    await this.redis.set(`${RedisKeys.tradingPriceFluctuations}:${stock.toUpperCase()}`, dataMapped, { ttl: TimeToLive.HaftHour });
     return dataMapped;
   }
 
