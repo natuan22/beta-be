@@ -1510,11 +1510,11 @@ export class InvestmentService {
 
   async getBetaWatchListBackup(date: string) {
     const data: any = await this.redis.get('beta-watch-list');
-    const from = moment(date).subtract(moment(date).isoWeekday() === 1 ? 3 : 1, 'day').format('YYYY-MM-DD');
-
+    const from = await this.mssqlService.query(`SELECT MAX(date) as date FROM marketTrade.dbo.historyTicker WHERE date < '${moment(date).format('YYYY-MM-DD')}'`);
+    
     const result: any = await this.testBackup(
       data.map((item) => ({ code: item.code, ma: item.ma })),
-      moment(from).format('YYYY-MM-DD'),
+      moment(from[0].date).format('YYYY-MM-DD'),
       moment(date).format('YYYY-MM-DD'),
       1,
     );
