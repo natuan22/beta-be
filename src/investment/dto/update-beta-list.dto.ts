@@ -9,12 +9,12 @@ export class UpdateBetaListDto {
   @ApiProperty({
     type: Number,
   })
-  price_2024: number;
+  currPT: number;
 
   @ApiProperty({
     type: Number,
   })
-  price_2025: number;
+  nextPT: number;
 
   @ApiProperty({
     type: Number,

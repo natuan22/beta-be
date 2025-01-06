@@ -978,8 +978,8 @@ export class InvestmentService {
 
     const newItem = {
       code: body.code,
-      price_2024: body?.price_2024 ? parseFloat(body?.price_2024) : 0,
-      price_2025: body?.price_2025 ? parseFloat(body?.price_2025) : 0,
+      currPT: body?.currPT ? parseFloat(body?.currPT) : 0,
+      nextPT: body?.nextPT ? parseFloat(body?.nextPT) : 0,
       ma: body?.ma ? parseInt(body?.ma) : 0,
     };
     let price;
@@ -1010,8 +1010,8 @@ export class InvestmentService {
 
     const newItem = {
       code: body.code,
-      price_2024: body?.price_2024 ? parseFloat(body?.price_2024) : 0,
-      price_2025: body?.price_2025 ? parseFloat(body?.price_2025) : 0,
+      currPT: body?.currPT ? parseFloat(body?.currPT) : 0,
+      nextPT: body?.nextPT ? parseFloat(body?.nextPT) : 0,
       ma: body?.ma ? parseInt(body?.ma) : 0,
     };
 
@@ -1062,8 +1062,8 @@ export class InvestmentService {
       );
       return result.map((item, index) => ({
         ...item,
-        price_2024: data[index].price_2024 || 0,
-        price_2025: data[index].price_2025 || 0,
+        currPT: data[index].currPT || 0,
+        nextPT: data[index].nextPT || 0,
       }));
     }
     const result: any = await this.test(
@@ -1074,8 +1074,8 @@ export class InvestmentService {
     );
     return result.map((item, index) => ({
       ...item,
-      price_2024: data[index].price_2024 || 0,
-      price_2025: data[index].price_2025 || 0,
+      currPT: data[index].currPT || 0,
+      nextPT: data[index].nextPT || 0,
       name: `MA_${data[index].ma}`,
     }));
   }
@@ -1155,10 +1155,9 @@ export class InvestmentService {
   async getDataBetaSmartOutsideTrading() {
     try {
       const query_signal = `
-          SELECT [code], [signal]
-          FROM [PHANTICH].[dbo].[BuySellSignals] bs
-          WHERE (([signal] = 0 AND [perChange_2024] >= 7 AND [perChange_2025] >= 25) OR [signal] = 1) 
-                AND bs.date = (SELECT MAX(date) FROM [PHANTICH].[dbo].[BuySellSignals] WHERE code = bs.code)
+          SELECT code, signal
+          FROM PHANTICH.dbo.BuySellSignals bs
+          WHERE ((signal = 0 AND priceIncNY >= 25) OR signal = 1) AND bs.date = (SELECT MAX(date) FROM PHANTICH.dbo.BuySellSignals WHERE code = bs.code)
       `;
       const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
@@ -1196,8 +1195,8 @@ export class InvestmentService {
           const isSignalOne = item.signal === 1;
           const isSignalZeroWithConditions =
             item.signal === 0 &&
-            this.calculatePriceChange(data[index].price_2024, item.closePrice) >= 7 &&
-            this.calculatePriceChange(data[index].price_2025, item.closePrice) >= 25;
+            this.calculatePriceChange(data[index].currPT, item.closePrice) >= 7 &&
+            this.calculatePriceChange(data[index].nextPT, item.closePrice) >= 25;
 
           return isSignalOne || isSignalZeroWithConditions;
         }).map((item) => ({ code: item.code, signal: item.signal }));
@@ -1403,7 +1402,7 @@ export class InvestmentService {
                                SELECT b.code, b.date, b.signal
                                FROM PHANTICH.dbo.BuySellSignals b
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-                               WHERE ((b.signal = 0 AND b.perChange_2024 >= 7 AND b.perChange_2025 >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
+                               WHERE ((b.signal = 0 AND b.priceIncNY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
       !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
@@ -1520,8 +1519,8 @@ export class InvestmentService {
     );
     return result.map((item, index) => ({
       ...item,
-      price_2024: data[index].price_2024 || 0,
-      price_2025: data[index].price_2025 || 0,
+      currPT: data[index].currPT || 0,
+      nextPT: data[index].nextPT || 0,
       name: `MA_${data[index].ma}`,
     }));
   }
