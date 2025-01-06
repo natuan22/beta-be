@@ -249,52 +249,48 @@ export class ReportService {
 
   async exchangeRate() {
     try {
-      const now = moment(
-        (
-          await this.mssqlService.query(
-            `select top 1 date from macroEconomic.dbo.exchangeRateVCB order by date desc`,
-          )
-        )[0].date,
-      ).format('YYYY-MM-DD');
-      const prev = moment(now).subtract(1, 'day').format('YYYY-MM-DD');
-      const week = moment(now).subtract(1, 'week').format('YYYY-MM-DD');
-      const month = moment(now).subtract(1, 'month').format('YYYY-MM-DD');
-      const year = moment(now)
-        .subtract(1, 'year')
-        .endOf('year')
-        .format('YYYY-MM-DD');
+      const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.exchangeRateVCB order by date desc`))[0].date).format('YYYY-MM-DD');
+      const date = await this.mssqlService.query(`
+        with date_ranges as (
+          select max(case when date <= '${moment(now).subtract(1, 'day').format('YYYY-MM-DD')}' then date else null end) as prev,
+                  max(case when date <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week,
+                  max(case when date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then date else null end) as month,
+                  max(case when date <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then date else null end) as ytd,
+                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yty
+          from macroEconomic.dbo.exchangeRateVCB
+        )
+        select prev, week, month, ytd, yty
+        from date_ranges;
+      `);
+      const prev = moment(date[0].prev).format('YYYY-MM-DD');
+      const month = moment(date[0].month).format('YYYY-MM-DD');
+      const week = moment(date[0].week).format('YYYY-MM-DD');
+      const ytd = moment(date[0].ytd).format('YYYY-MM-DD');
+      const yty = moment(date[0].yty).format('YYYY-MM-DD');
 
-      const same_day = UtilCommonTemplate.checkSameDate([
-        now,
-        prev,
-        month,
-        year,
-        week,
-      ]);
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yty]);
       const pivot = same_day.map((item) => `[${item}]`).join(',');
 
       const code = `'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD'`;
       const sort = UtilCommonTemplate.generateSortCase(code, 'code');
 
       const query = `
-      WITH temp
-      AS (SELECT
-        date,
-        code,
-        bySell,
-        ${sort}
-      FROM macroEconomic.dbo.exchangeRateVCB
-      WHERE code IN (${code})
-      AND date IN ('${now}', '${prev}', '${week}', '${year}', '${month}'))
-      SELECT
-        code,
-        [${now}] AS price,
-        ([${now}] - [${prev}]) / [${prev}] * 100 AS day,
-        ([${now}] - [${week}]) / [${week}] * 100 AS week,
-        ([${now}] - [${month}]) / [${month}] * 100 AS month,
-        ([${now}] - [${year}]) / [${year}] * 100 AS year
-      FROM temp AS source PIVOT (SUM(bySell) FOR date IN (${pivot})) AS chuyen
+        WITH temp AS (
+          SELECT date, code, bySell, ${sort}
+          FROM macroEconomic.dbo.exchangeRateVCB
+          WHERE code IN (${code})
+          AND date IN ('${now}', '${prev}', '${week}', '${ytd}', '${month}', '${yty}')
+        )
+        SELECT code, 
+              [${now}] AS price, 
+              ([${now}] - [${prev}]) / [${prev}] * 100 AS day, 
+              ([${now}] - [${week}]) / [${week}] * 100 AS week, 
+              ([${now}] - [${month}]) / [${month}] * 100 AS month, 
+              ([${now}] - [${ytd}]) / [${ytd}] * 100 AS ytd,
+              ([${now}] - [${yty}]) / [${yty}] * 100 AS yty
+        FROM temp AS source PIVOT (SUM(bySell) FOR date IN (${pivot})) AS chuyen
       `;
+      
       const data = await this.mssqlService.query<ExchangeRateResponse[]>(query);
       const dataMapped = ExchangeRateResponse.mapToList(data);
       return dataMapped;
@@ -372,66 +368,43 @@ export class ReportService {
       const code = `N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng'`;
       const sort = UtilCommonTemplate.generateSortCase(code, 'code');
 
-      const now = moment(
-        (
-          await this.mssqlService.query(
-            `select top 1 date from macroEconomic.dbo.EconomicVN_byTriVo order by date desc`,
-          )
-        )[0].date,
-      ).format('YYYY-MM-DD');
-      const date = await this.mssqlService.query(
-        `with date_ranges as (
-          select
-              max(case when date <= '${moment(now)
-                .subtract(1, 'day')
-                .format('YYYY-MM-DD')}' then date else null end) as prev,
-              max(case when date <= '${moment(now)
-                .subtract(1, 'week')
-                .format('YYYY-MM-DD')}' then date else null end) as week,
-              max(case when date <= '${moment(now)
-                .subtract(1, 'month')
-                .format('YYYY-MM-DD')}' then date else null end) as month,
-              max(case when date <= '${moment(now)
-                .startOf('year')
-                .format('YYYY-MM-DD')}' then date else null end) as ytd
+      const now = moment((await this.mssqlService.query(`select top 1 date from macroEconomic.dbo.EconomicVN_byTriVo order by date desc`))[0].date).format('YYYY-MM-DD');
+      
+      const date = await this.mssqlService.query(`
+        with date_ranges as (
+          select max(case when date <= '${moment(now).subtract(1, 'day').format('YYYY-MM-DD')}' then date else null end) as prev,
+                  max(case when date <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week,
+                  max(case when date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then date else null end) as month,
+                  max(case when date <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then date else null end) as ytd,
+                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yty
           from macroEconomic.dbo.EconomicVN_byTriVo
-      )
-      select prev, week, month, ytd
-      from date_ranges;`,
-      );
-
+        )
+        select prev, week, month, ytd, yty
+        from date_ranges;
+      `);
       const prev = moment(date[0].prev).format('YYYY-MM-DD');
       const month = moment(date[0].month).format('YYYY-MM-DD');
       const week = moment(date[0].week).format('YYYY-MM-DD');
       const ytd = moment(date[0].ytd).format('YYYY-MM-DD');
+      const yty = moment(date[0].yty).format('YYYY-MM-DD');
 
-      const same_day = UtilCommonTemplate.checkSameDate([
-        now,
-        prev,
-        month,
-        ytd,
-        week,
-      ]);
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yty]);
       const pivot = same_day.map((item) => `[${item}]`).join(',');
 
       const query = `
-      WITH temp
-      AS (SELECT
-        date,
-        code,
-        value,
-        ${sort}
-      FROM macroEconomic.dbo.EconomicVN_byTriVo
-      WHERE date IN ('${now}', '${prev}', '${week}', '${month}', '${ytd}')
-      AND code IN (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng'))
-      SELECT
-        code,
-        [${now}] AS price,
-        ([${now}] - [${prev}]) / [${prev}] * 100 AS day,
-        ([${now}] - [${week}]) / [${week}] * 100 AS week,
-        ([${now}] - [${month}]) / [${month}] * 100 AS month,
-        ([${now}] - [${ytd}]) / [${ytd}] * 100 AS year
-      FROM temp PIVOT (SUM(value) FOR date IN (${pivot})) AS chuyen
+        WITH temp AS (
+          SELECT date, code, value, ${sort}
+          FROM macroEconomic.dbo.EconomicVN_byTriVo
+          WHERE date IN ('${now}', '${prev}', '${week}', '${month}', '${ytd}', '${yty}') AND code IN (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng')
+        )
+        SELECT code, 
+               [${now}] AS price, 
+               ([${now}] - [${prev}]) / [${prev}] * 100 AS day, 
+               ([${now}] - [${week}]) / [${week}] * 100 AS week, 
+               ([${now}] - [${month}]) / [${month}] * 100 AS month, 
+               ([${now}] - [${ytd}]) / [${ytd}] * 100 AS ytd,
+               ([${now}] - [${yty}]) / [${yty}] * 100 AS yty
+        FROM temp PIVOT (SUM(value) FOR date IN (${pivot})) AS chuyen
       `;
 
       const data = await this.mssqlService.query<ExchangeRateResponse[]>(query);
