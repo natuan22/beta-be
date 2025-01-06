@@ -256,19 +256,19 @@ export class ReportService {
                   max(case when date <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week,
                   max(case when date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then date else null end) as month,
                   max(case when date <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then date else null end) as ytd,
-                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yty
+                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yoy
           from macroEconomic.dbo.exchangeRateVCB
         )
-        select prev, week, month, ytd, yty
+        select prev, week, month, ytd, yoy
         from date_ranges;
       `);
       const prev = moment(date[0].prev).format('YYYY-MM-DD');
       const month = moment(date[0].month).format('YYYY-MM-DD');
       const week = moment(date[0].week).format('YYYY-MM-DD');
       const ytd = moment(date[0].ytd).format('YYYY-MM-DD');
-      const yty = moment(date[0].yty).format('YYYY-MM-DD');
+      const yoy = moment(date[0].yoy).format('YYYY-MM-DD');
 
-      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yty]);
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yoy]);
       const pivot = same_day.map((item) => `[${item}]`).join(',');
 
       const code = `'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD'`;
@@ -279,7 +279,7 @@ export class ReportService {
           SELECT date, code, bySell, ${sort}
           FROM macroEconomic.dbo.exchangeRateVCB
           WHERE code IN (${code})
-          AND date IN ('${now}', '${prev}', '${week}', '${ytd}', '${month}', '${yty}')
+          AND date IN ('${now}', '${prev}', '${week}', '${ytd}', '${month}', '${yoy}')
         )
         SELECT code, 
               [${now}] AS price, 
@@ -287,7 +287,7 @@ export class ReportService {
               ([${now}] - [${week}]) / [${week}] * 100 AS week, 
               ([${now}] - [${month}]) / [${month}] * 100 AS month, 
               ([${now}] - [${ytd}]) / [${ytd}] * 100 AS ytd,
-              ([${now}] - [${yty}]) / [${yty}] * 100 AS yty
+              ([${now}] - [${yoy}]) / [${yoy}] * 100 AS yoy
         FROM temp AS source PIVOT (SUM(bySell) FOR date IN (${pivot})) AS chuyen
       `;
       
@@ -376,26 +376,26 @@ export class ReportService {
                   max(case when date <= '${moment(now).subtract(1, 'week').format('YYYY-MM-DD')}' then date else null end) as week,
                   max(case when date <= '${moment(now).subtract(1, 'month').format('YYYY-MM-DD')}' then date else null end) as month,
                   max(case when date <= '${moment(now).startOf('year').format('YYYY-MM-DD')}' then date else null end) as ytd,
-                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yty
+                  max(case when date <= '${moment(now).subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as yoy
           from macroEconomic.dbo.EconomicVN_byTriVo
         )
-        select prev, week, month, ytd, yty
+        select prev, week, month, ytd, yoy
         from date_ranges;
       `);
       const prev = moment(date[0].prev).format('YYYY-MM-DD');
       const month = moment(date[0].month).format('YYYY-MM-DD');
       const week = moment(date[0].week).format('YYYY-MM-DD');
       const ytd = moment(date[0].ytd).format('YYYY-MM-DD');
-      const yty = moment(date[0].yty).format('YYYY-MM-DD');
+      const yoy = moment(date[0].yoy).format('YYYY-MM-DD');
 
-      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yty]);
+      const same_day = UtilCommonTemplate.checkSameDate([now, prev, month, ytd, week, yoy]);
       const pivot = same_day.map((item) => `[${item}]`).join(',');
 
       const query = `
         WITH temp AS (
           SELECT date, code, value, ${sort}
           FROM macroEconomic.dbo.EconomicVN_byTriVo
-          WHERE date IN ('${now}', '${prev}', '${week}', '${month}', '${ytd}', '${yty}') AND code IN (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng')
+          WHERE date IN ('${now}', '${prev}', '${week}', '${month}', '${ytd}', '${yoy}') AND code IN (N'Qua đêm', N'1 tuần', N'2 tuần', N'1 tháng', N'3 tháng')
         )
         SELECT code, 
                [${now}] AS price, 
@@ -403,7 +403,7 @@ export class ReportService {
                ([${now}] - [${week}]) / [${week}] * 100 AS week, 
                ([${now}] - [${month}]) / [${month}] * 100 AS month, 
                ([${now}] - [${ytd}]) / [${ytd}] * 100 AS ytd,
-               ([${now}] - [${yty}]) / [${yty}] * 100 AS yty
+               ([${now}] - [${yoy}]) / [${yoy}] * 100 AS yoy
         FROM temp PIVOT (SUM(value) FOR date IN (${pivot})) AS chuyen
       `;
 

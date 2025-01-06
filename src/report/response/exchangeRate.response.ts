@@ -38,9 +38,9 @@ export class ExchangeRateResponse {
 
   @ApiProperty({
     type: Number,
-    description: '%YtY',
+    description: '%YoY',
   })
-  yty: number;
+  yoy: number;
 
   @ApiProperty({
     type: String,
@@ -55,7 +55,7 @@ export class ExchangeRateResponse {
     this.week = +data?.week.toFixed(2) || 0;
     this.month = +data?.month.toFixed(2) || 0;
     this.ytd = +data?.ytd.toFixed(2) || 0;
-    this.yty = +data?.yty.toFixed(2) || 0;
+    this.yoy = +data?.yoy.toFixed(2) || 0;
     this.img = `/resources/national/${data.code}.png`;
   }
 
