@@ -734,8 +734,8 @@ export class KafkaService {
           `${SocketEmit.MA}`,
           res.map((item, index) => ({
             ...item,
-            price_2024: data[index].price_2024 || 0,
-            price_2025: data[index].price_2025 || 0,
+            currPT: data[index].currPT || 0,
+            nextPT: data[index].nextPT || 0,
           })),
         );
       }
@@ -750,7 +750,7 @@ export class KafkaService {
       const item = data.find((item) => item.code == payload[0].code);
 
       if (item) {
-        const res: any = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], moment('2024-10-23').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), payload[0].closePrice);
+        const res: any = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], moment('2024-10-01').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), payload[0].closePrice);
         if (Array.isArray(res)) {
           const filteredRes = res.filter((resItem: any) => resItem.code === item.code && resItem.status === 0)
           if (filteredRes.length > 0) {
