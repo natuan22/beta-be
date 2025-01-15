@@ -140,9 +140,9 @@ export class SharesController {
   async financialIndicators(@Query() q: StockOrderDto, @Res() res: Response) {
     try {
       const data = await this.sharesService.financialIndicators(
-        q.stock,
+        q.stock.toUpperCase(),
         +q.order,
-        q.type,
+        q.type.toUpperCase(),
       );
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
