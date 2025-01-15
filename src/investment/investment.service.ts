@@ -1155,9 +1155,9 @@ export class InvestmentService {
   async getDataBetaSmartOutsideTrading() {
     try {
       const query_signal = `
-          SELECT code, signal
-          FROM PHANTICH.dbo.BuySellSignals bs
-          WHERE ((signal = 0 AND priceIncNY >= 25) OR signal = 1) AND bs.date = (SELECT MAX(date) FROM PHANTICH.dbo.BuySellSignals WHERE code = bs.code)
+        SELECT code, signal
+        FROM PHANTICH.dbo.BuySellSignals bs
+        WHERE ((signal = 0 AND priceIncCY >= 25) OR signal = 1) AND bs.date = (SELECT MAX(date) FROM PHANTICH.dbo.BuySellSignals WHERE code = bs.code)
       `;
       const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
