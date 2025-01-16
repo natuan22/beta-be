@@ -1155,9 +1155,9 @@ export class InvestmentService {
   async getDataBetaSmartOutsideTrading() {
     try {
       const query_signal = `
-          SELECT code, signal
-          FROM PHANTICH.dbo.BuySellSignals bs
-          WHERE ((signal = 0 AND priceIncNY >= 25) OR signal = 1) AND bs.date = (SELECT MAX(date) FROM PHANTICH.dbo.BuySellSignals WHERE code = bs.code)
+        SELECT code, signal
+        FROM PHANTICH.dbo.BuySellSignals bs
+        WHERE ((signal = 0 AND priceIncCY >= 25) OR signal = 1) AND bs.date = (SELECT MAX(date) FROM PHANTICH.dbo.BuySellSignals WHERE code = bs.code)
       `;
       const data_signal = (await this.mssqlService.query(query_signal)) as any;
 
@@ -1402,7 +1402,7 @@ export class InvestmentService {
                                SELECT b.code, b.date, b.signal
                                FROM PHANTICH.dbo.BuySellSignals b
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-                               WHERE ((b.signal = 0 AND b.priceIncNY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
+                               WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
       !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
