@@ -1195,8 +1195,7 @@ export class InvestmentService {
           const isSignalOne = item.signal === 1;
           const isSignalZeroWithConditions =
             item.signal === 0 &&
-            this.calculatePriceChange(data[index].currPT, item.closePrice) >= 7 &&
-            this.calculatePriceChange(data[index].nextPT, item.closePrice) >= 25;
+            this.calculatePriceChange(data[index].currPT, item.closePrice) >= 25;
 
           return isSignalOne || isSignalZeroWithConditions;
         }).map((item) => ({ code: item.code, signal: item.signal }));
