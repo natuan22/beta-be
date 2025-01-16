@@ -1402,7 +1402,7 @@ export class InvestmentService {
                                SELECT b.code, b.date, b.signal
                                FROM PHANTICH.dbo.BuySellSignals b
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-                               WHERE ((b.signal = 0 AND b.priceIncNY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
+                               WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
       !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
