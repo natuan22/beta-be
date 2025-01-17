@@ -1482,7 +1482,7 @@ export class ReportService {
             '${UtilCommonTemplate.toDate(weekDate)}', 
             '${UtilCommonTemplate.toDate(monthDate)}', 
             '${UtilCommonTemplate.toDate(firstDateYear)}')
-            AND f.floor = 'HOSE'
+            AND f.floor = 'HOSE' AND f.code <> 'BSR'
                       AND f.LV2 IN (N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ', N'Công nghệ', N'Dầu khí'))
             select sum(closePrice * shareout) as total_market_cap, LV2 as industry, date as date_time from temp group by LV2, date ORDER BY date DESC
           `;
@@ -2538,164 +2538,89 @@ select * from temp where date = (select max(date) from temp)
 
   async technicalIndex(code: string) {
     try {
-      const { yearDate } = await this.getDateSessionV2(
-        'marketTrade.dbo.historyTicker',
-        'date',
-      );
+      const { yearDate } = await this.getDateSessionV2('marketTrade.dbo.historyTicker', 'date')
 
-      const data: {
-        closePrice: number;
-        date: string;
-        highPrice: number;
-        lowPrice: number;
-        volume: number;
-        netVal: number;
-        openPrice: number;
-      }[] = await this.mssqlService.query(`
-      select closePrice, highPrice, lowPrice, openPrice, volume, f.netVal, h.date
-      from marketTrade.dbo.historyTicker h
-      inner join marketTrade.dbo.[foreign] f on h.code = f.code and h.date = f.date
-      where h.code = '${code}'
-      order by h.date
-      `);
+      const data: { closePrice: number, date: string, highPrice: number, lowPrice: number, volume: number, netVal: number, openPrice: number }[] = await this.mssqlService.query(`
+        select closePrice, highPrice, lowPrice, openPrice, volume, f.netVal, h.date
+        from marketTrade.dbo.historyTicker h
+        inner join marketTrade.dbo.[foreign] f on h.code = f.code and h.date = f.date
+        where h.code = '${code}'
+        order by h.date
+      `)
 
-      const day = data
-        .map((item) => item.date)
-        .filter((item) => new Date(item) >= new Date(yearDate))
-        .reverse();
+      const day = data.map(item => item.date).filter(item => new Date(item) >= new Date(yearDate)).reverse()
 
-      const price = data.map((item) => item.closePrice / 1000);
-      const lastPrice = price[price.length - 1];
-      const highPrice = data.map((item) => item.highPrice / 1000);
-      const lowPrice = data.map((item) => item.lowPrice / 1000);
-      const openPrice = data.map((item) => item.openPrice / 1000);
-      const volume = data.map((item) => item.volume);
+      const price = data.map(item => item.closePrice / 1000)
+      const lastPrice = price[price.length - 1]
+      const highPrice = data.map(item => item.highPrice / 1000)
+      const lowPrice = data.map(item => item.lowPrice / 1000)
+      const openPrice = data.map(item => item.openPrice / 1000)
+      const volume = data.map(item => item.volume)
 
-      const volume_reverse = [...volume].reverse();
-      const price_reverse = [...price].reverse();
-      const high_reverse = [...highPrice].reverse();
-      const low_reverse = [...lowPrice].reverse();
-      const open_reverse = [...openPrice].reverse();
-      const net_reverse = data.map((item) => item.netVal).reverse();
+      const volume_reverse = [...volume].reverse()
+      const price_reverse = [...price].reverse()
+      const high_reverse = [...highPrice].reverse()
+      const low_reverse = [...lowPrice].reverse()
+      const open_reverse = [...openPrice].reverse()
+      const net_reverse = data.map(item => item.netVal).reverse()
 
-      const rsi = calTech.rsi({ values: price, period: 14 }).reverse();
-      const cci = calTech
-        .cci({ close: price, low: lowPrice, high: highPrice, period: 14 })
-        .reverse();
-      const williams = calTech
-        .williamsr({ close: price, low: lowPrice, high: highPrice, period: 14 })
-        .reverse();
-      const adx = calTech
-        .adx({ close: price, low: lowPrice, high: highPrice, period: 14 })
-        .reverse();
-      const stochastic = calTech
-        .stochastic({
-          close: price,
-          low: lowPrice,
-          high: highPrice,
-          period: 14,
-          signalPeriod: 3,
-        })
-        .reverse();
-      const stochasticRsi = calTech
-        .stochasticrsi({
-          values: price,
-          kPeriod: 3,
-          dPeriod: 3,
-          rsiPeriod: 14,
-          stochasticPeriod: 14,
-        })
-        .reverse();
-      const macd = calTech
-        .macd({
-          values: price,
-          fastPeriod: 12,
-          slowPeriod: 26,
-          signalPeriod: 9,
-          SimpleMAOscillator: false,
-          SimpleMASignal: false,
-        })
-        .reverse();
-      const sar = calTech.psar({
-        high: highPrice,
-        low: lowPrice,
-        max: 0.2,
-        step: 0.02,
-      });
-      const sar_reverse = [...sar].reverse();
+      const rsi = calTech.rsi({ values: price, period: 14 }).reverse()
+      const cci = calTech.cci({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const williams = calTech.williamsr({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const adx = calTech.adx({ close: price, low: lowPrice, high: highPrice, period: 14 }).reverse()
+      const stochastic = calTech.stochastic({ close: price, low: lowPrice, high: highPrice, period: 14, signalPeriod: 3 }).reverse()
+      const stochasticRsi = calTech.stochasticrsi({ values: price, kPeriod: 3, dPeriod: 3, rsiPeriod: 14, stochasticPeriod: 14 }).reverse()
+      const macd = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse()
+      const sar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 })
+      const sar_reverse = [...sar].reverse()
 
-      const ma10 = calTech.sma({ period: 10, values: price }).reverse();
-      const ma20 = calTech.sma({ period: 20, values: price }).reverse();
-      const ma50 = calTech.sma({ period: 50, values: price }).reverse();
-      const ma100 = calTech.sma({ period: 100, values: price }).reverse();
-      const ma200 = calTech.sma({ period: 200, values: price }).reverse();
+      const ma10 = calTech.sma({ period: 10, values: price }).reverse()
+      const ma20 = calTech.sma({ period: 20, values: price }).reverse()
+      const ma50 = calTech.sma({ period: 50, values: price }).reverse()
+      const ma100 = calTech.sma({ period: 100, values: price }).reverse()
+      const ma200 = calTech.sma({ period: 200, values: price }).reverse()
 
-      const volume_ma20 = calTech.sma({ period: 20, values: volume }).reverse();
+      const volume_ma20 = calTech.sma({ period: 20, values: volume }).reverse()
 
-      const arr = [5, 10, 20, 50, 100, 200];
+      const arr = [5, 10, 20, 50, 100, 200]
 
-      const table = arr.map((item) => {
-        const ma = calTech.sma({ period: item, values: price });
-        const ema = calTech.ema({ period: item, values: price });
+      const table = arr.map(item => {
+        const ma = calTech.sma({ period: item, values: price })
+        const ema = calTech.ema({ period: item, values: price })
 
         return {
           name: `MA${item}`,
-          single: this.ratingTechnicalIndex('ma', {
-            value: ma[ma.length - 1],
-            price: lastPrice,
-          }),
-          hat: this.ratingTechnicalIndex('ma', {
-            value: ema[ema.length - 1],
-            price: lastPrice,
-          }),
-        };
-      });
+          single: this.ratingTechnicalIndex('ma', { value: ma[ma.length - 1], price: lastPrice }),
+          hat: this.ratingTechnicalIndex('ma', { value: ema[ema.length - 1], price: lastPrice })
+        }
+      })
 
       table.push({
         name: `SAR`,
-        single: this.ratingTechnicalIndex('sar', {
-          value: sar[sar.length - 1],
-          price: lastPrice,
-        }),
-        hat: '',
-      });
+        single: this.ratingTechnicalIndex('sar', { value: sar[sar.length - 1], price: lastPrice }),
+        hat: ''
+      })
 
-      const rsi_date = [];
-      const cci_date = [];
-      const williams_date = [];
-      const adx_date = [];
-      const stochastic_date = [];
-      const stochasticRsi_date = [];
-      const macd_date = [];
-      const macd_histogram_date = [];
-      const volume_ma20_date = [];
+      const rsi_date = []
+      const cci_date = []
+      const williams_date = []
+      const adx_date = []
+      const stochastic_date = []
+      const stochasticRsi_date = []
+      const macd_date = []
+      const macd_histogram_date = []
+      const volume_ma20_date = []
 
       day.map((item, index) => {
-        const date = UtilCommonTemplate.toDate(item);
-        rsi_date.push({ value: rsi[index] || 0, date });
-        cci_date.push({ value: cci[index] || 0, date });
-        williams_date.push({ value: williams[index] || 0, date });
-        adx_date.push({
-          ...(adx[index] ? adx[index] : { adx: 0, pdi: 0, mdi: 0 }),
-          date,
-        });
-        stochastic_date.push({
-          ...(stochastic[index]
-            ? { k: stochastic[index]?.k || 0, d: stochastic[index]?.d || 0 }
-            : { k: 0, d: 0 }),
-          date,
-        });
-        stochasticRsi_date.push({
-          k: stochasticRsi[index]?.k || 0,
-          d: stochasticRsi[index]?.d || 0,
-          date,
-        });
-        macd_date.push({
-          k: macd[index]?.MACD || 0,
-          d: macd[index]?.signal || 0,
-          date,
-        });
-        macd_histogram_date.push({ value: macd[index]?.histogram || 0, date });
+        const date = UtilCommonTemplate.toDate(item)
+        rsi_date.push({ value: rsi[index] || 0, date })
+        cci_date.push({ value: cci[index] || 0, date })
+        williams_date.push({ value: williams[index] || 0, date })
+        adx_date.push({ ...(adx[index] ? adx[index] : {adx: 0, pdi: 0, mdi: 0}) , date })
+        stochastic_date.push({ ...(stochastic[index] ? {k: stochastic[index]?.k || 0, d: stochastic[index]?.d || 0} : {k: 0, d: 0}), date })
+        stochasticRsi_date.push({ k: stochasticRsi[index]?.k || 0, d: stochasticRsi[index]?.d || 0, date })
+        macd_date.push({ k: macd[index]?.MACD || 0, d: macd[index]?.signal || 0, date })
+        macd_histogram_date.push({ value: macd[index]?.histogram || 0, date })
         volume_ma20_date.push({
           closePrice: price_reverse[index] || 0,
           highPrice: high_reverse[index] || 0,
@@ -2722,122 +2647,62 @@ select * from temp where date = (select max(date) from temp)
         },
         stochastic: {
           value: stochastic[0],
-          rate: this.ratingTechnicalIndex('stochastic', {
-            k: stochastic[0].k,
-            d: stochastic[0].d,
-          }),
-          chart: stochastic_date.reverse(),
+          rate: this.ratingTechnicalIndex('stochastic', { k: stochastic[0].k, d: stochastic[0].d }),
+          chart: stochastic_date.reverse()
         },
         cci: {
           value: cci[0],
           rate: this.ratingTechnicalIndex('cci', { value: cci[0] }),
-          chart: cci_date.reverse(),
+          chart: cci_date.reverse()
         },
         stochasticRsi: {
           value: {
             k: stochasticRsi[0].k,
-            d: stochasticRsi[0].d,
+            d: stochasticRsi[0].d
           },
-          rate: this.ratingTechnicalIndex('stochasticRsi', {
-            value: stochasticRsi[0].k,
-          }),
-          chart: stochasticRsi_date.reverse(),
+          rate: this.ratingTechnicalIndex('stochasticRsi', { value: stochasticRsi[0].k }),
+          chart: stochasticRsi_date.reverse()
         },
         williams: {
           value: williams[0],
           rate: this.ratingTechnicalIndex('williams', { value: williams[0] }),
-          chart: williams_date.reverse(),
+          chart: williams_date.reverse()
         },
         macd: {
           value: {
             macd: macd[0].MACD,
-            signal: macd[0].signal,
+            signal: macd[0].signal
           },
-          rate: this.ratingTechnicalIndex('macd', {
-            macd: macd[0].MACD,
-            signal: macd[0].signal,
-          }),
-          chart: macd_date.reverse(),
+          rate: this.ratingTechnicalIndex('macd', { macd: macd[0].MACD, signal: macd[0].signal }),
+          chart: macd_date.reverse()
         },
         adx: {
           value: adx[0],
-          rate: this.ratingTechnicalIndex('adx', {
-            adx: adx[0].adx,
-            pdi: adx[0].pdi,
-            mdi: adx[0].mdi,
-          }),
-          chart: adx_date.reverse(),
+          rate: this.ratingTechnicalIndex('adx', { adx: adx[0].adx, pdi: adx[0].pdi, mdi: adx[0].mdi }),
+          chart: adx_date.reverse()
         },
         macdHistogram: {
           value: macd[0].histogram,
-          rate: this.ratingTechnicalIndex('macdHistogram', {
-            histogramT: macd[0].histogram,
-            histogramT1: macd[1].histogram,
-          }),
-          chart: macd_histogram_date.reverse(),
-        },
-      };
+          rate: this.ratingTechnicalIndex('macdHistogram', { histogramT: macd[0].histogram, histogramT1: macd[1].histogram }),
+          chart: macd_histogram_date.reverse()
+        }
+      }
 
       return {
         ...chart,
         table,
-        technicalSignal: this.countRate([
-          chart.rsi.rate,
-          chart.stochastic.rate,
-          chart.cci.rate,
-          chart.stochasticRsi.rate,
-          chart.williams.rate,
-          chart.macd.rate,
-          chart.adx.rate,
-          chart.macdHistogram.rate,
-        ]),
-        trendSignal: this.countRate(
-          table.map((item) => [item.single, item.hat]).flat(),
-        ),
-        generalSignal: this.countRate([
-          chart.rsi.rate,
-          chart.stochastic.rate,
-          chart.cci.rate,
-          chart.stochasticRsi.rate,
-          chart.williams.rate,
-          chart.macd.rate,
-          chart.adx.rate,
-          chart.macdHistogram.rate,
-          ...table.map((item) => [item.single, item.hat]).flat(),
-        ]),
-        chart: volume_ma20_date.reverse(),
-      };
+        technicalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate]),
+        trendSignal: this.countRate(table.map(item => [item.single, item.hat]).flat()),
+        generalSignal: this.countRate([chart.rsi.rate, chart.stochastic.rate, chart.cci.rate, chart.stochasticRsi.rate, chart.williams.rate, chart.macd.rate, chart.adx.rate, chart.macdHistogram.rate, ...table.map(item => [item.single, item.hat]).flat()]),
+        chart: volume_ma20_date.reverse()
+      }
     } catch (e) {
       throw new CatchException(e);
     }
   }
 
-  ratingTechnicalIndex(
-    name:
-      | 'ma'
-      | 'rsi'
-      | 'stochastic'
-      | 'stochasticRsi'
-      | 'macd'
-      | 'macdHistogram'
-      | 'adx'
-      | 'williams'
-      | 'cci'
-      | 'sar',
-    o: {
-      value?: number;
-      d?: number;
-      k?: number;
-      macd?: number;
-      signal?: number;
-      histogramT?: number;
-      histogramT1?: number;
-      pdi?: number;
-      mdi?: number;
-      adx?: number;
-      price?: number;
-    },
-  ) {
+  ratingTechnicalIndex(name: 'ma' | 'rsi' | 'stochastic' | 'stochasticRsi' | 'macd' | 'macdHistogram' | 'adx' | 'williams' | 'cci' | 'sar',
+    o: { value?: number, d?: number, k?: number, macd?: number, signal?: number, histogramT?: number, histogramT1?: number, pdi?: number, mdi?: number, adx?: number, price?: number }) {
     //0 - Tích cực, 1 - Tiêu cực, 2 - Trung lập
     let rate = 0;
     switch (name) {
