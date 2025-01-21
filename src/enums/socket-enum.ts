@@ -51,4 +51,5 @@ export enum SocketEmit {
   BackTestTradingTool = 'listen-back-test-ma-co-phieu',
 
   TransCoPhieu = 'listen-trans-co-phieu',
+  ContributePEPB = 'listen-pe-pb-stock'
 }

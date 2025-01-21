@@ -4,9 +4,10 @@ import { MssqlService } from '../mssql/mssql.service';
 import { StockService } from '../stock/stock.service';
 import { KafkaConsumer } from './kafka.consumer';
 import { KafkaService } from './kafka.service';
+import { SignalWarningModule } from '../signal-warning/signal-warning.module';
 
 @Module({
-  imports: [InvestmentModule],
+  imports: [InvestmentModule, SignalWarningModule],
   controllers: [KafkaConsumer],
   providers: [KafkaService, StockService, MssqlService],
 })

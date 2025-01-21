@@ -41,6 +41,7 @@ import { MarketVolatilityKafkaResponse } from './responses/MarketVolatilityKafka
 import { TickerContributeKafkaResponse } from './responses/TickerContributeKafka.response';
 import { TopNetForeignKafkaResponse } from './responses/TopNetForeignKafka.response';
 import { TickerTransInterface } from './interfaces/ticker-trans.interface';
+import { SignalWarningService } from '../signal-warning/signal-warning.service';
 
 @Injectable()
 export class KafkaService {
@@ -54,6 +55,7 @@ export class KafkaService {
     @InjectDataSource(DB_SERVER) private readonly dbServer: DataSource,
     private readonly stockService: StockService,
     private readonly investmentService: InvestmentService,
+    private readonly signalWarningService: SignalWarningService,
   ) {}
 
   send<T>(event: string, message: T): void {
@@ -763,6 +765,38 @@ export class KafkaService {
     }
   }
 
+  async handleContributePEPB(payload: ChartNenInterface[]) {
+    try {
+      const code = payload[0].code;
+      const closePrice = payload[0].closePrice;
+  
+      let data = await this.redis.get(`eps-bpvs:${code}`);
+  
+      if (!data) {
+        data = await this.dbServer.query(`
+          WITH RankedData AS (
+            SELECT code, date, EPS, BVPS, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+            FROM VISUALIZED_DATA.dbo.filterResource
+            WHERE code = '${code}'
+          )
+          SELECT code, EPS, BVPS FROM RankedData WHERE rn = 1 ORDER BY code;
+        `);
+        
+        await this.redis.set(`eps-bpvs:${code}`, data, TimeToLive.OneDay);
+      }
+  
+      const result = {
+        code,
+        pe: closePrice / data[0].EPS,
+        pb: closePrice / data[0].BVPS,
+      };
+  
+      this.send(`${SocketEmit.ContributePEPB}-${code}`, result);
+    } catch (error) {
+      this.logger.error(`handleContributePEPB failed: ${error.message}`, error);
+    }
+  }
+
   async handleGiaoDichCoPhieu(payload: TickerTransInterface[]) {
     const { code, action, matchPrice, volume, priceChangeReference, time } = payload[0];
 
@@ -857,5 +891,47 @@ export class KafkaService {
 
     await this.redis.set(`${RedisKeys.SessionDate}:${table}:${column}`, result);
     return result;
+  }
+
+  async handleEventSignalWarning(payload: ChartNenInterface[], allClientsEmit: string[]) {
+    try {
+      const { code, closePrice } = payload[0];
+      
+      if (!allClientsEmit || allClientsEmit.length === 0) {
+        console.warn('Không có client nào đăng ký');
+        return;
+      }
+  
+      await this.processClients(allClientsEmit, [{ code }], closePrice);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  private async processClients(allClientsEmit: string[], code: any[], closePrice: number) {
+    try {
+      const res = await this.signalWarningService.getDataSignal(code, closePrice);
+  
+      if (!res) { return }
+  
+      for (const clientId of allClientsEmit) {
+        this.emitToClient(clientId, res);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  private emitToClient(clientId: string, data: any) {
+    const sockets = global._server?.sockets;
+    if (!sockets) { return }
+  
+    const socket = Array.isArray(sockets)
+      ? sockets.find((s: any) => s.id === clientId)
+      : Array.from(sockets.values()).find((s: any) => s.id === clientId);
+  
+    if (socket) {
+      socket.emit('signal-warning-response', { data });
+    }
   }
 }
