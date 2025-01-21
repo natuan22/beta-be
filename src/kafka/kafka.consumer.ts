@@ -1,4 +1,4 @@
-import { Controller, Inject, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, Controller, Inject, Logger } from '@nestjs/common';
 import {
   ClientKafka,
   Ctx,
@@ -6,6 +6,7 @@ import {
   MessagePattern,
   Payload,
 } from '@nestjs/microservices';
+import { Cache } from 'cache-manager';
 import { KAFKA_MODULE } from '../constants';
 import { requestPatterns, Topics } from '../enums/kafka-topics.enum';
 import { ChartNenInterface } from './interfaces/chart-nen.interface';
@@ -18,8 +19,8 @@ import { MarketCashFlowInterface } from './interfaces/market-cash-flow.interface
 import { MarketLiquidityKafkaInterface } from './interfaces/market-liquidity-kakfa.interface';
 import { TickerChangeInterface } from './interfaces/ticker-change.interface';
 import { TickerContributeKafkaInterface } from './interfaces/ticker-contribute-kafka.interface';
-import { KafkaService } from './kafka.service';
 import { TickerTransInterface } from './interfaces/ticker-trans.interface';
+import { KafkaService } from './kafka.service';
 
 @Controller()
 export class KafkaConsumer {
@@ -28,6 +29,8 @@ export class KafkaConsumer {
   constructor(
     private readonly kafkaService: KafkaService,
     @Inject(KAFKA_MODULE) private readonly client: ClientKafka,
+    @Inject(CACHE_MANAGER)
+    private readonly redis: Cache,
   ) {}
 
   send<T>(key: string, message: T): void {
@@ -206,29 +209,38 @@ export class KafkaConsumer {
   }
 
   @MessagePattern(Topics.ChartNenCoPhieuNew)
-  async handleChartNenNew(
+  async handleChartNenMessages(
     @Payload() payload: ChartNenInterface[],
-    @Ctx() context: KafkaContext,
+    @Ctx() context: KafkaContext
   ) {
     try {
       this.kafkaService.handleBetaWatchListSocket(payload);
     } catch (error) {
       this.logger.error(error);
     }
-  }
 
-  @MessagePattern(Topics.ChartNenCoPhieuNew)
-  async handleBackTestTradingTool(
-    @Payload() payload: ChartNenInterface[],
-    @Ctx() context: KafkaContext,
-  ) {
     try {
       this.kafkaService.backTestTradingTool(payload);
     } catch (error) {
       this.logger.error(error);
     }
+
+    try {
+      this.kafkaService.handleContributePEPB(payload);
+    } catch (error) {
+      this.logger.error(error);
+    }
+
+    try {
+      const allClientsEmit: string[] = await this.redis.get('clients') || [];
+      if (Array.isArray(allClientsEmit) && allClientsEmit.length > 0) {
+        await this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
+      }
+    } catch (error) {
+      this.logger.error(error);
+    }
   }
-  
+
   @MessagePattern(Topics.GiaoDichCoPhieu)
   async handleGiaoDichCoPhieu(
     @Payload() payload: TickerTransInterface[],

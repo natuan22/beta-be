@@ -34,6 +34,7 @@ import { KeyFilterResponse } from './response/keyFilter.response';
 import { TickerTransLogResponse } from './response/tickerTransLog.response';
 import { BackTestTradingToolDto } from './dto/back-test-trading-tool';
 import { BackTestTradingToolBackupDto } from './dto/back-test-trading-tool-back-up';
+import { StockByIndustryDto } from './dto/stock-by-industry.dto';
 
 @Controller('investment')
 @ApiTags('Investment - Công cụ đầu tư')
@@ -161,6 +162,26 @@ export class InvestmentController {
   async allStock(@Query() q: any, @Res() res: Response) {
     try {
       const data = await this.investmentService.allStock();
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (e) {
+      throw new CatchException(e);
+    }
+  }
+
+  @Get('stock-by-industry')
+  async findStockByIndustry(@Query() q: StockByIndustryDto, @Res() res: Response) {
+    try {
+      const data = await this.investmentService.findStockByIndustry(q.industry);
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (e) {
+      throw new CatchException(e);
+    }
+  }
+
+  @Get('all-industry')
+  async allIndustry(@Query() q: any, @Res() res: Response) {
+    try {
+      const data = await this.investmentService.allIndustry();
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
