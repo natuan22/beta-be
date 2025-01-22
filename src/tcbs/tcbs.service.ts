@@ -43,7 +43,9 @@ export class TCBSService {
              MIN(PB) AS min_PB, MAX(PB) AS max_PB, AVG(PB) AS avg_PB, 
              AVG(PB) + STDEV(PB) AS plus_1_std_PB, AVG(PB) - STDEV(PB) AS minus_1_std_PB
       FROM [RATIO].[dbo].[ratioIndayTcbs]
-      WHERE code ${listStock} AND date BETWEEN '${moment().subtract(period, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}'
+      WHERE code ${listStock} 
+            AND date BETWEEN '${moment().subtract(period, 'year').format('YYYY-MM-DD')}' AND '${moment().format('YYYY-MM-DD')}'
+            AND PE BETWEEN 0 AND 50
       GROUP BY code
       ORDER BY code;
     `;
