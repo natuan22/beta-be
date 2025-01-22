@@ -971,7 +971,7 @@ export class InvestmentService {
 
   async findStockByIndustry(industry: string) {
     try {
-      const data: any = await this.mssqlService.query(`select code from marketInfor.dbo.info where status = 'listed' and type = 'STOCK' and LV2 = N'${industry}'`);
+      const data: any = await this.mssqlService.query(`select code from RATIO.dbo.phanNganhTcbs where nganh = N'${industry}'`);
       return data.map((item) => item.code);
     } catch (e) {
       throw new CatchException(e);
@@ -980,8 +980,8 @@ export class InvestmentService {
 
   async allIndustry() {
     try {
-      const data: any = await this.mssqlService.query(`SELECT DISTINCT LV2 FROM marketInfor.dbo.info WHERE LV2 IS NOT NULL ORDER BY LV2;`);
-      return data.map((item) => item.LV2);
+      const data: any = await this.mssqlService.query(`SELECT DISTINCT nganh FROM RATIO.dbo.phanNganhTcbs WHERE nganh IS NOT NULL ORDER BY nganh;`);
+      return data.map((item) => item.nganh);
     } catch (e) {
       throw new CatchException(e);
     }
