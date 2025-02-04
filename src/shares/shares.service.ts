@@ -282,162 +282,77 @@ export class SharesService {
   }
 
   async businessResults(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.businessResults}:${order}:${stock}:${type}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.businessResults}:${order}:${stock}:${type}`);
     if (redisData) return redisData;
 
-    let group = ``;
-    let select = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date`;
-        group = `order by yearQuarter desc`;
-        break;
-      case TimeTypeEnum.Year:
-        select = `sum(value) as value, cast(year as varchar) + '4' as date`;
-        group = `group by year, name, id order by year desc`;
-        break;
-      default:
-        break;
-    }
     const id = this.getNameBusinessResults(type);
 
     const query = `
-      with temp as (SELECT TOP ${type == 'CK' ? 16 : 20}
-      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id,
-        ${select}
-      FROM financialReport.dbo.financialReportV2 f
-      WHERE f.code = '${stock}'
-      AND f.type = 'KQKD'
-      AND f.id IN (${id})
-      ${group})
-      select * from temp order by date, case ${id
-        .split(',')
-        .map((item, index) => `when id =${item} then ${index}`)
-        .join(' ')} end
+      with temp as (
+        SELECT TOP ${type == 'CK' ? 16 : 20} LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id, value, yearQuarter as date
+        FROM financialReport.dbo.financialReportV2 f
+        WHERE f.code = '${stock}'
+        AND f.type = 'KQKD'
+        AND f.id IN (${id}) ${order === TimeTypeEnum.Year ? `and quarter = 0` : ``}
+        order by yearQuarter desc
+      )
+      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
     `;
-
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(
-      query,
-    );
+    
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query);
     const dataMapped = BusinessResultsResponse.mapToList(data);
-    await this.redis.set(
-      `${RedisKeys.businessResults}:${order}:${stock}:${type}`,
-      dataMapped,
-      { ttl: TimeToLive.OneDay },
-    );
+
+    await this.redis.set(`${RedisKeys.businessResults}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay });
     return dataMapped;
   }
 
   async balanceSheet(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.balanceSheet}:${order}:${stock}:${type}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`);
     if (redisData) return redisData;
 
-    let group = ``;
-    let select = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter:
-        select = `value, yearQuarter as date`;
-        group = `order by yearQuarter desc`;
-        break;
-      case TimeTypeEnum.Year:
-        select = `sum(value) as value, cast(year as varchar) + '4' as date`;
-        group = `group by year, name, id order by year desc`;
-        break;
-      default:
-        break;
-    }
     const id = this.getNameBalanceSheet(type);
 
     const query = `
-      with temp as (SELECT TOP 20
-      LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id,
-        ${select}
-      FROM financialReport.dbo.financialReportV2 f
-      WHERE f.code = '${stock}'
-      AND f.type = 'CDKT'
-      AND f.id IN (${id})
-      ${group})
-      select * from temp order by date, case ${id
-        .split(',')
-        .map((item, index) => `when id =${item} then ${index}`)
-        .join(' ')} end
+      with temp as (
+        SELECT TOP 20 LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id, value, yearQuarter as date
+        FROM financialReport.dbo.financialReportV2 f
+        WHERE f.code = '${stock}'
+        AND f.type = 'CDKT'
+        AND f.id IN (${id}) ${order === TimeTypeEnum.Year ? `and quarter = 0` : ``}
+        order by yearQuarter desc
+      )
+      select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
     `;
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(
-      query,
-    );
+
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query);
     const dataMapped = BusinessResultsResponse.mapToList(data);
-    await this.redis.set(
-      `${RedisKeys.balanceSheet}:${order}:${stock}:${type}`,
-      dataMapped,
-      { ttl: TimeToLive.OneDay },
-    );
+
+    await this.redis.set(`${RedisKeys.balanceSheet}:${order}:${stock}:${type}`, dataMapped, { ttl: TimeToLive.OneDay });
     return dataMapped;
   }
   
   async castFlow(stock: string, order: number, type: string) {
-    const redisData = await this.redis.get(`${RedisKeys.castFlow}:${order}:${stock}`,);
-    if (redisData) return redisData;
+    const redisData = await this.redis.get(`${RedisKeys.castFlow}:${order}:${stock}`)
+    if (redisData) return redisData
 
-    const id = this.getIDCastflow(type);
-
-    let group = ``;
-    let select = ``;
-    let date = ``;
-    switch (order) {
-      case TimeTypeEnum.Quarter: {
-        const quarters = [];
-        let currentMoment = moment().subtract(6, 'months');
-      
-        for (let i = 0; i < 4; i++) {
-          const year = currentMoment.year();
-          const quarter = Math.ceil((currentMoment.month() + 1) / 3);
-      
-          quarters.unshift(`${year}${quarter}`);
-          currentMoment = currentMoment.subtract(3, 'months');
-        }
-      
-        select = `value, CONCAT(year, quarter) as date`;
-        group = `order by year desc, quarter desc`;
-        date = quarters.map(q => `'${q}'`).join(', ');
-        break;
-      }
-
-      case TimeTypeEnum.Year: {
-        const years = [];
-        let currentMoment = moment().subtract(1, 'years');
-        for (let i = 0; i < 4; i++) {
-          years.push(currentMoment.year());
-          currentMoment = currentMoment.subtract(1, 'years');
-        }
-    
-        select = `sum(value) as value, CONCAT(year, '4') as date`;
-        group = `group by year, name, id order by year desc`;
-        date = years.map(y => `'${y}'`).join(', ');
-        break;
-      }
-      default:
-        break;
-    }
+    const id = this.getIDCastflow(type)
 
     const query = `
       with temp as (
-        SELECT TOP 20 LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id, ${select}
+        SELECT TOP 20 LTRIM(RIGHT(name, LEN(name) - CHARINDEX('.', name))) as name, id, value, yearQuarter as date
         FROM financialReport.dbo.financialReportV2 f
-        WHERE f.code = '${stock}' AND f.type like 'LC%' AND f.id IN (${id})
-              AND ${order === TimeTypeEnum.Quarter ? 'f.yearQuarter' : 'f.year'} in (${date})
-        ${group}
+        WHERE f.code = '${stock}'
+        AND f.type like 'LC%'
+        AND f.id IN (${id}) ${order === TimeTypeEnum.Year ? `and quarter = 0` : ``}
+        order by yearQuarter desc
       )
       select * from temp order by date, case ${id.split(',').map((item, index) => `when id =${item} then ${index}`).join(' ')} end
-    `;
-    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query);
-    const dataMapped = BusinessResultsResponse.mapToList(data);
-    
-    await this.redis.set(`${RedisKeys.castFlow}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay });
-    return dataMapped;
+    `
+    const data = await this.mssqlService.query<BusinessResultsResponse[]>(query)
+    const dataMapped = BusinessResultsResponse.mapToList(data)
+
+    await this.redis.set(`${RedisKeys.castFlow}:${order}:${stock}`, dataMapped, { ttl: TimeToLive.OneDay })
+    return dataMapped
   }
 
   async financialIndicators(stock: string, order: number, type: string) {
@@ -452,8 +367,8 @@ export class SharesService {
       ), 
       sum_roaa AS (
         SELECT code, yearQuarter,
-                SUM(roaa) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roaa,
-                SUM(roae) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roae
+               SUM(roaa) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roaa,
+               SUM(roae) OVER (PARTITION BY code ORDER BY yearQuarter DESC ROWS BETWEEN CURRENT ROW AND 3 FOLLOWING) AS roae
         FROM roaa
       ), 
       temp AS (
