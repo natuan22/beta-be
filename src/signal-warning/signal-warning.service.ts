@@ -12,6 +12,7 @@ import { SaveSignalDto } from './dto/save-signal.dto';
 import { SignalWarningUserEntity } from './entities/signal-warning.entity';
 import { SignalWarningResponse } from './response/signal-warning.response';
 import { SignalWarningUserResponse } from './response/signalUser.response';
+import { TimeToLive } from '../enums/common.enum';
 
 @Injectable()
 export class SignalWarningService {
@@ -25,8 +26,8 @@ export class SignalWarningService {
 
   async get() {
     try {
-      // const redisData = await this.redis.get('signal-warning');
-      // if (redisData) return redisData;
+      const redisData = await this.redis.get('signal-warning');
+      if (redisData) return redisData;
 
       const query = `
         WITH latest_dates AS (
@@ -66,7 +67,7 @@ export class SignalWarningService {
       const [data, data_2] = await Promise.all([this.mssqlService.query<SignalWarningResponse[]>(query), this.mssqlService.query(query_2)]);
       const dataMapped = SignalWarningResponse.mapToList(data, data_2);
       
-      // await this.redis.set('signal-warning', dataMapped, { ttl: TimeToLive.TenMinutes });
+      await this.redis.set('signal-warning', dataMapped, { ttl: TimeToLive.TenMinutes });
       return dataMapped;
     } catch (error) {
       throw new CatchException(error);
@@ -203,7 +204,7 @@ export class SignalWarningService {
     }
   
     if (data_2 && data_2.length > 0 && !dataLiquidityMarketCapRedis) {
-      await this.redis.set(`data-liquidity-marketCap:${listStock}`, data_2, { ttl: 360 });
+      await this.redis.set(`data-liquidity-marketCap:${listStock}`, data_2, { ttl: TimeToLive.TenMinutes });
     }
     
     if (dataRedis) data = dataRedis;
