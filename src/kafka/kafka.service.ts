@@ -738,6 +738,7 @@ export class KafkaService {
             ...item,
             currPT: data[index].currPT || 0,
             nextPT: data[index].nextPT || 0,
+            time: payload[0].time
           })),
         );
       }
@@ -752,9 +753,15 @@ export class KafkaService {
       const item = data.find((item) => item.code == payload[0].code);
 
       if (item) {
-        const res: any = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], moment('2024-10-01').format('YYYY-MM-DD'), moment().format('YYYY-MM-DD'), payload[0].closePrice);
+        const res: any = await this.investmentService.backtest(
+          [{ code: item.code, ma: item.ma }], 
+          moment('2024-10-01').format('YYYY-MM-DD'), 
+          moment().format('YYYY-MM-DD'), 
+          payload[0].closePrice
+        );
+
         if (Array.isArray(res)) {
-          const filteredRes = res.filter((resItem: any) => resItem.code === item.code && resItem.status === 0)
+          const filteredRes = res.filter((resItem: any) => resItem.code === item.code && resItem.status === 0).map((resItem: any) => ({ ...resItem, time: payload[0].time }));
           if (filteredRes.length > 0) {
             this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
           }
@@ -789,6 +796,7 @@ export class KafkaService {
         code,
         pe: closePrice / data[0].EPS,
         pb: closePrice / data[0].BVPS,
+        time: payload[0].time
       };
   
       this.send(`${SocketEmit.ContributePEPB}-${code}`, result);

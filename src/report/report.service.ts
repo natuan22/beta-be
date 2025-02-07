@@ -1258,7 +1258,7 @@ export class ReportService {
       const industry = `N'Ngân hàng', N'Dịch vụ tài chính', N'Bất động sản', N'Tài nguyên', N'Xây dựng & Vật liệu', N'Thực phẩm & Đồ uống', N'Hóa chất', N'Dịch vụ bán lẻ'`;
       const sort = UtilCommonTemplate.generateSortCase(industry, 'n.code');
       const { now, prev, prev_4 } = this.get2WeekNow();
-
+      
       const query =
         type == 0
           ? `
@@ -1299,7 +1299,7 @@ export class ReportService {
       where n.code in (${industry})
       order by row_num      
       `;
-
+      
       const data = await this.mssqlService.query<
         TransactionValueFluctuationsResponse[]
       >(query);
@@ -1622,8 +1622,8 @@ export class ReportService {
         to: friday_1,
       },
       prev: {
-        from: monday_2,
-        to: friday_2,
+        from: '2025-01-20', //monday_2,
+        to: '2025-01-24', //friday_2,
       },
       prev_4: {
         from: monday_3,
