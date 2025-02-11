@@ -148,7 +148,7 @@ export class SignalWarningService {
 
   async handleSignalWarning(type: any) {
     const stocks: any = await this.mssqlService.query(`SELECT code FROM marketInfor.dbo.info WHERE status = 'listed' AND type = 'STOCK' ORDER BY code`)
-    return this.getDataSignal(stocks, type)
+    return this.getDataSignal(stocks, type) // [{code: 'ANV'}]
   }
 
   async getDataSignal(stock: string | any[], type: any, realtimePrice?: number) {
@@ -162,8 +162,7 @@ export class SignalWarningService {
     let [data, data_2] = await Promise.all([
       !dataRedis ? (this.mssqlService.query(`
         SELECT closePrice, date, code from marketTrade.dbo.historyTicker 
-        WHERE code ${listStock} and date >= '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' 
-        and date <= '${moment().format('YYYY-MM-DD')}' 
+        WHERE code ${listStock}
         ORDER BY date DESC;
       `) as any) : [],
       !dataLiquidityMarketCapRedis ? (this.mssqlService.query(`
@@ -229,7 +228,7 @@ export class SignalWarningService {
   private calculateAllIndicators(data: any) {
     const price = data.map((item) => item.closePrice);
     const dateFormat = data.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
-  
+
     const maPeriods = [5, 10, 15, 20, 50, 60, 100];
   
     // Tính SMA và EMA
@@ -242,9 +241,10 @@ export class SignalWarningService {
         item[`ema${period}`] = parseFloat((emaValues[index] / 1000).toFixed(2));
       });
     });
-  
+
     // Tính RSI
-    const rsiValues = calTech.rsi({ values: price, period: 14 });
+    const price_reverse = price.reverse();
+    const rsiValues = calTech.rsi({ values: price_reverse, period: 14 }).reverse();
     dateFormat.forEach((item, index) => {
       item.rsi = parseFloat((rsiValues[index] || 0).toFixed(2));
     });
@@ -298,7 +298,7 @@ export class SignalWarningService {
       closePrice: todayData.closePrice ? parseFloat((todayData.closePrice / 1000).toFixed(2)) : 0,
       closePrice_pre: yesterdayData.closePrice ? parseFloat((yesterdayData.closePrice / 1000).toFixed(2)) : 0,
     }
-
+    
     return result;
   }
 }
