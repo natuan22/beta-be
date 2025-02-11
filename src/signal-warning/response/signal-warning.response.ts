@@ -63,9 +63,9 @@ export class SignalWarningResponse {
     macd_dang_o_tren_duong_0: number;
     macd_cat_xuong_duong_0: number;
     macd_dang_o_duoi_duong_0: number;
-    avg_totalVol_5d: number;
-    avg_totalVol_20d: number;
-    
+    avg_totalVal_5d: number;
+    avg_totalVal_20d: number;
+
     constructor(data?: SignalWarningResponse) {
         this.code = data?.code || '';
         this.floor = data?.floor || '';
@@ -104,8 +104,8 @@ export class SignalWarningResponse {
         this.macd_dang_o_tren_duong_0 = data?.macd_dang_o_tren_duong_0 || 0;
         this.macd_cat_xuong_duong_0 = data?.macd_cat_xuong_duong_0 || 0;
         this.macd_dang_o_duoi_duong_0 = data?.macd_dang_o_duoi_duong_0 || 0;
-        this.avg_totalVol_5d = data?.avg_totalVol_5d || 0;
-        this.avg_totalVol_20d = data?.avg_totalVol_20d || 0;
+        this.avg_totalVal_5d = data?.avg_totalVal_5d / 1000000000 || 0;
+        this.avg_totalVal_20d = data?.avg_totalVal_20d / 1000000000 || 0;
     }
     
     static mapToList(data: SignalWarningResponse[], data_1: any) {
