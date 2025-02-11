@@ -51,23 +51,23 @@ export class SignalWarningService {
 
       const query_2 = `
         WITH ranked_trades AS (
-          SELECT code, totalVol, date, row_number() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+          SELECT code, totalVal, date, row_number() OVER (PARTITION BY code ORDER BY date DESC) AS rn
           FROM marketTrade.dbo.tickerTradeVND
           WHERE type = 'STOCK'
         ),
         average_volumes AS (
-          SELECT code, AVG(CASE WHEN rn <= 5 THEN totalVol END) AS avg_totalVol_5d, AVG(CASE WHEN rn <= 20 THEN totalVol END) AS avg_totalVol_20d
+          SELECT code, AVG(CASE WHEN rn <= 5 THEN totalVal END) AS avg_totalVal_5d, AVG(CASE WHEN rn <= 20 THEN totalVal END) AS avg_totalVal_20d
           FROM ranked_trades
           GROUP BY code
         )
-        SELECT code, avg_totalVol_5d, avg_totalVol_20d
+        SELECT code, avg_totalVal_5d, avg_totalVal_20d
         FROM average_volumes
         ORDER BY code;
       `;
       const [data, data_2] = await Promise.all([this.mssqlService.query<SignalWarningResponse[]>(query), this.mssqlService.query(query_2)]);
       const dataMapped = SignalWarningResponse.mapToList(data, data_2);
       
-      await this.redis.set('signal-warning', dataMapped, { ttl: TimeToLive.TenMinutes });
+      await this.redis.set('signal-warning', dataMapped, { ttl: TimeToLive.Minute });
       return dataMapped;
     } catch (error) {
       throw new CatchException(error);

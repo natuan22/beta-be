@@ -1264,15 +1264,28 @@ export class InvestmentService {
    * MB chủ động
    */
   async tickerTransLog(code: string) {
-    const redisData = await this.redis.get(
-      `${RedisKeys.tickerTransLog}:${code}`,
-    );
+    const redisData = await this.redis.get(`${RedisKeys.tickerTransLog}:${code}`);
     if (redisData) return redisData;
 
     try {
-      const response = await axios.get(
-        `https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`,
-        {
+      const now = moment();
+      const isWeekday = now.isoWeekday() < 6;
+      
+      const query = `
+        SELECT closePrice
+        FROM marketTrade.dbo.tickerTradeVND t
+        INNER JOIN (
+            SELECT MAX(date) AS max_previous_date
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE date ${isWeekday ? `<` : `<=`} (SELECT MAX(date) FROM tradeIntraday.dbo.tickerTradeVNDIntraday)
+        ) latest ON t.date = latest.max_previous_date
+        WHERE t.code = '${code}';
+      `;
+      const data_2 = await this.mssqlService.query(query);
+
+      let response, finalResponse;
+      if(isWeekday) {
+        response = await axios.get(`https://priceapi.bsc.com.vn/datafeed/alltranslogs/${code}`, {
           headers: {
             host: 'priceapi.bsc.com.vn',
             origin: 'https://trading.bsc.com.vn',
@@ -1280,111 +1293,72 @@ export class InvestmentService {
             'User-Agent': UtilsRandomUserAgent.getRandomUserAgent(),
             'x-devicetype': 'WEB',
             'x-lang': 'vi',
-          },
-        },
-      );
+          }},
+        );
 
-      const query = ` SELECT closePrice
-                      FROM marketTrade.dbo.tickerTradeVND t
-                      INNER JOIN (
-                          SELECT MAX(date) AS max_previous_date
-                          FROM tradeIntraday.dbo.tickerTradeVNDIntraday
-                          WHERE date < (SELECT MAX(date) FROM tradeIntraday.dbo.tickerTradeVNDIntraday)
-                      ) latest ON t.date = latest.max_previous_date
-                      WHERE t.code = '${code}';
-                    `;
+        const dataCal = response.data.d.map((item) => {
+          const value = item.formattedMatchPrice * item.formattedVol;
+          const type = value < 100_000_000 ? 'small' : value < 1_000_000_000 ? 'medium' : 'large';
+  
+          const currentDate = new Date();
+  
+          const [hours, minutes, seconds] = item.formattedTime.split(':').map(Number);
+  
+          const time = new Date(Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), hours, minutes, seconds)).toISOString(); // Chuyển thành định dạng ISO
+  
+          return {
+            time,
+            action: item.lastColor === 'S' ? 'B' : item.lastColor === 'B' ? 'S' : item.lastColor,
+            type,
+            volume: +item.formattedVol,
+            value: value,
+            matchPrice: item.formattedMatchPrice / 1_000,
+            priceChangeReference: item.formattedChangeValue / 1_000,
+            perChangeReference: (item.formattedChangeValue / 1000 / data_2[0].closePrice) * 100,
+            highlight: value > 1_000_000_000,
+          };
+        });
+  
+        finalResponse = new TickerTransLogResponse({
+          ticker: code,
+          prevClosePrice: data_2[0].closePrice,
+          data: DataBuySell.mapToList(dataCal),
+        });
 
-      // const query_data = `SELECT [time], [action], [matchPrice], [priceChangeReference], [volume]
-      //                     FROM [tradeIntraday].[dbo].[tickerTransVNDIntraday]
-      //                     WHERE code = '${code}'
-      //                       AND date = '2024-10-17'
-      //                     ORDER BY [time] DESC, [id];
-      //                     `
+      } else {
+        const sql_query = `
+          select distinct code, date, time, action, matchPrice, priceChangeReference, volume
+          from tradeIntraday.dbo.tickerTransVNDIntraday
+          where code = '${code}' and date = (select MAX(date) from tradeIntraday.dbo.tickerTransVNDIntraday where code = '${code}') 
+          order by time desc
+        `
+        response = await this.mssqlService.query(sql_query);
+        
+        const dataCal = response.map((item) => {
+          const value = item.matchPrice * item.volume;
+          const type = value < 100_000_000 ? "small" : value < 1_000_000_000 ? "medium" : "large";
 
-      // const promise = this.mssqlService.query(query_data)
-      // const promise_2 = this.mssqlService.query(query)
+            return {
+              time: item.time,
+              action: item.action,
+              type,
+              volume: +item.volume,
+              value: value,
+              matchPrice: item.matchPrice / 1_000,
+              priceChangeReference: item.priceChangeReference / 1_000,
+              perChangeReference: (item.priceChangeReference / 1000 / data_2[0].closePrice) * 100,
+              highlight: value > 1_000_000_000,
+            }
+        })
 
-      // const [data, data_2] = await Promise.all([promise, promise_2]) as any
+        finalResponse = new TickerTransLogResponse({
+          ticker: code,
+          prevClosePrice: data_2[0].closePrice,
+          data: DataBuySell.mapToList(dataCal),
+        });
+      }
 
-      // const dataCal = data.map((item) => {
-      //   const value = item.matchPrice * item.volume;
-      //   const type = value < 100_000_000
-      //                         ? "small"
-      //                         : value < 1_000_000_000
-      //                         ? "medium"
-      //                         : "large";
-
-      //   return {
-      //     time: item.time,
-      //     action: item.action,
-      //     type,
-      //     volume: +item.volume,
-      //     value: value,
-      //     matchPrice: item.matchPrice / 1_000,
-      //     priceChangeReference: item.priceChangeReference / 1_000,
-      //     perChangeReference: (item.priceChangeReference / 1000 / data_2[0].closePrice) * 100,
-      //     highlight: value > 1_000_000_000,
-      //   }
-      // })
-
-      const data_2 = await this.mssqlService.query(query);
-
-      const dataCal = response.data.d.map((item) => {
-        const value = item.formattedMatchPrice * item.formattedVol;
-        const type =
-          value < 100_000_000
-            ? 'small'
-            : value < 1_000_000_000
-            ? 'medium'
-            : 'large';
-
-        const currentDate = new Date();
-
-        const [hours, minutes, seconds] = item.formattedTime
-          .split(':')
-          .map(Number);
-
-        const time = new Date(
-          Date.UTC(
-            currentDate.getFullYear(),
-            currentDate.getMonth(),
-            currentDate.getDate(),
-            hours,
-            minutes,
-            seconds,
-          ),
-        ).toISOString(); // Chuyển thành định dạng ISO
-
-        return {
-          time,
-          action:
-            item.lastColor === 'S'
-              ? 'B'
-              : item.lastColor === 'B'
-              ? 'S'
-              : item.lastColor,
-          type,
-          volume: +item.formattedVol,
-          value: value,
-          matchPrice: item.formattedMatchPrice / 1_000,
-          priceChangeReference: item.formattedChangeValue / 1_000,
-          perChangeReference:
-            (item.formattedChangeValue / 1000 / data_2[0].closePrice) * 100,
-          highlight: value > 1_000_000_000,
-        };
-      });
-
-      const finalResponse = new TickerTransLogResponse({
-        ticker: code,
-        prevClosePrice: data_2[0].closePrice,
-        data: DataBuySell.mapToList(dataCal),
-      });
-
-      await this.redis.set(
-        `${RedisKeys.tickerTransLog}:${code}`,
-        finalResponse,
-        { ttl: TimeToLive.HaftMinute },
-      );
+      await this.redis.set(`${RedisKeys.tickerTransLog}:${code}`, finalResponse, { ttl: TimeToLive.HaftMinute });
 
       return finalResponse;
     } catch (err) {

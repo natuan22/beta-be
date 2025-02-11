@@ -214,28 +214,14 @@ export class KafkaConsumer {
     @Ctx() context: KafkaContext
   ) {
     try {
-      this.kafkaService.handleBetaWatchListSocket(payload);
-    } catch (error) {
-      this.logger.error(error);
-    }
-
-    try {
-      this.kafkaService.backTestTradingTool(payload);
-    } catch (error) {
-      this.logger.error(error);
-    }
-
-    try {
-      this.kafkaService.handleContributePEPB(payload);
-    } catch (error) {
-      this.logger.error(error);
-    }
-
-    try {
-      const allClientsEmit: string[] = await this.redis.get('clients') || [];
-      if (Array.isArray(allClientsEmit) && allClientsEmit.length > 0) {
-        await this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
-      }
+      const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+  
+      await Promise.all([
+        this.kafkaService.handleBetaWatchListSocket(payload),
+        this.kafkaService.backTestTradingTool(payload),
+        this.kafkaService.handleContributePEPB(payload),
+        allClientsEmit.length > 0 ? this.kafkaService.handleEventSignalWarning(payload, allClientsEmit) : Promise.resolve(),
+      ]);
     } catch (error) {
       this.logger.error(error);
     }

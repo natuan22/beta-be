@@ -1622,8 +1622,8 @@ export class ReportService {
         to: friday_1,
       },
       prev: {
-        from: '2025-01-20', //monday_2,
-        to: '2025-01-24', //friday_2,
+        from: monday_2,
+        to: friday_2,
       },
       prev_4: {
         from: monday_3,
@@ -1661,8 +1661,8 @@ export class ReportService {
       AND date in ('${UtilCommonTemplate.toDate(
         date[0].week,
       )}', '${UtilCommonTemplate.toDate(date[0].now)}')
-)
-select * from temp where date = (select max(date) from temp)
+      )
+      select * from temp where date = (select max(date) from temp)
       `);
 
       //top nganh noi bat
