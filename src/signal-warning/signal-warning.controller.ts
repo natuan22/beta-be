@@ -67,7 +67,7 @@ export class SignalWarningController {
   @ApiOperation({ summary: 'Lấy dữ liệu signal realtime MA' })
   @Get('testRealtime')
   async testRealtime(@Query() q: TestQueryDto, @Res() res: Response) {
-    const data = await this.signalWarningService.handleSignalWarning(q.type);
+    const data = await this.signalWarningService.handleSignalWarning(q.stock);
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 }

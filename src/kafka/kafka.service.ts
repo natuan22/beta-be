@@ -42,6 +42,7 @@ import { TickerContributeKafkaResponse } from './responses/TickerContributeKafka
 import { TopNetForeignKafkaResponse } from './responses/TopNetForeignKafka.response';
 import { TickerTransInterface } from './interfaces/ticker-trans.interface';
 import { SignalWarningService } from '../signal-warning/signal-warning.service';
+import { SignalWarningResponse } from '../signal-warning/response/signal-warning.response';
 
 @Injectable()
 export class KafkaService {
@@ -778,12 +779,10 @@ export class KafkaService {
   
       if (!data) {
         data = await this.dbServer.query(`
-          WITH RankedData AS (
-            SELECT code, date, EPS, BVPS, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-            FROM VISUALIZED_DATA.dbo.filterResource
-            WHERE code = '${code}'
-          )
-          SELECT code, EPS, BVPS FROM RankedData WHERE rn = 1 ORDER BY code;
+          SELECT TOP 1 WITH TIES code, EPS, BVPS 
+          FROM VISUALIZED_DATA.dbo.filterResource
+          WHERE code = '${code}'
+          ORDER BY date DESC;
         `);
         
         await this.redis.set(`eps-bpvs:${code}`, data, TimeToLive.OneDay);
@@ -915,13 +914,17 @@ export class KafkaService {
 
   private async processClients(allClientsEmit: string[], code: any[], closePrice: number) {
     try {
-      const res = await this.signalWarningService.getDataSignal(code, closePrice);
-  
-      if (!res) { return }
-  
-      for (const clientId of allClientsEmit) {
-        this.emitToClient(clientId, res);
-      }
+      const [dataSignal, dataLiquidMarketCap] = await Promise.all([
+        this.signalWarningService.getDataSignal(code, closePrice),
+        this.signalWarningService.getLiquidMarketCap(code).catch(() => []), // Nếu lỗi, trả về []
+      ]);
+      if (!dataSignal?.length) return;
+
+      const res = SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
+      if (!res?.length) return;
+
+      // Gửi dữ liệu đến tất cả client
+      allClientsEmit.forEach(clientId => this.emitToClient(clientId, res));
     } catch (error) {
       console.error(error);
     }

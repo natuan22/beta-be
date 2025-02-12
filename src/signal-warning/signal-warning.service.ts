@@ -146,74 +146,33 @@ export class SignalWarningService {
     }
   }
 
-  async handleSignalWarning(type: any) {
+  async handleSignalWarning(stock: any) {
     const stocks: any = await this.mssqlService.query(`SELECT code FROM marketInfor.dbo.info WHERE status = 'listed' AND type = 'STOCK' ORDER BY code`)
-    return this.getDataSignal(stocks, type) // [{code: 'ANV'}]
+
+    const dataSignal = await this.getDataSignal([{ code: stock }]); // [{code: 'ANV'}]
+    const dataLiquidMarketCap = await this.getLiquidMarketCap([{ code: stock }]);
+
+    return SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
   }
 
-  async getDataSignal(stock: string | any[], type: any, realtimePrice?: number) {
+  async getDataSignal(stock: string | any[], realtimePrice?: number) {
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
     
-    const [dataRedis, dataLiquidityMarketCapRedis] = await Promise.all([
-      this.redis.get(`price-signal:${listStock}`),
-      this.redis.get(`data-liquidity-marketCap:${listStock}`)
-    ]);
+    const dataRedis = await this.redis.get(`price:${listStock}`);
     
-    let [data, data_2] = await Promise.all([
-      !dataRedis ? (this.mssqlService.query(`
-        SELECT closePrice, date, code from marketTrade.dbo.historyTicker 
-        WHERE code ${listStock}
-        ORDER BY date DESC;
-      `) as any) : [],
-      !dataLiquidityMarketCapRedis ? (this.mssqlService.query(`
-        WITH LatestTrade AS (
-          SELECT r.marketCap, r.date, r.code
-          FROM RATIO.dbo.ratioInday r
-          INNER JOIN marketInfor.dbo.info i ON i.code = r.code
-          WHERE r.code ${listStock} AND r.type = 'STOCK' AND i.status = 'listed' 
-          AND r.date = (SELECT MAX(date) FROM [RATIO].[dbo].[ratioInday] WHERE code = r.code)
-        ),
-        ranked_trades AS (
-          SELECT code, totalVol, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-          FROM marketTrade.dbo.tickerTradeVND 
-          WHERE type = 'STOCK' AND code ${listStock}
-        ),
-        average_volumes AS (
-          SELECT code, 
-                 AVG(CASE WHEN rn <= 5 THEN totalVol END) AS avg_totalVol_5d, 
-                 AVG(CASE WHEN rn <= 20 THEN totalVol END) AS avg_totalVol_20d
-          FROM ranked_trades 
-          GROUP BY code
-        ),
-        info AS (
-          SELECT code, floor, indexCode
-          FROM marketInfor.dbo.info
-          WHERE code ${listStock}
-        )
-        SELECT lt.marketCap, lt.date, lt.code, av.avg_totalVol_5d, av.avg_totalVol_20d, i.floor, i.indexCode
-        FROM LatestTrade lt
-        JOIN average_volumes av ON lt.code = av.code
-        JOIN info i ON lt.code = i.code
-        ORDER BY lt.code;
-      `) as any) : [],
-    ]);
+    let data = !dataRedis ? (await this.mssqlService.query(`SELECT closePrice, date, code from marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date asc;`) as any) : [];
 
     if (realtimePrice && !dataRedis) {
-      await this.redis.set(`price-signal:${listStock}`, data, { ttl: 180 });
+      await this.redis.set(`price:${listStock}`, data, { ttl: 180 });
     }
   
-    if (data_2 && data_2.length > 0 && !dataLiquidityMarketCapRedis) {
-      await this.redis.set(`data-liquidity-marketCap:${listStock}`, data_2, { ttl: TimeToLive.TenMinutes });
-    }
-    
     if (dataRedis) data = dataRedis;
-    if (dataLiquidityMarketCapRedis) data_2 = dataLiquidityMarketCapRedis;
     
     const arr = [];
 
     if (Array.isArray(stock)) {
       stock.map((item: any) => {
-        const stockData = data.filter(res => res.code === item.code);
+        const stockData = data.filter(res => res.code === item.code).reverse();
         stockData[stockData.length - 1]['closePrice'] = !realtimePrice ? data.find((price) => price.code == item.code).closePrice : realtimePrice;
 
         const result = this.calculateAllIndicators(stockData);
@@ -221,8 +180,43 @@ export class SignalWarningService {
         arr.push(result);
       });
     }
+    
+    return arr
+  }
 
-    return SignalWarningResponse.mapToList(arr, data_2)
+  async getLiquidMarketCap(stock: string | any[]): Promise<any> {
+    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
+    
+    const redisData = await this.redis.get(`data-liquidity-marketCap:${listStock}`);
+    if (redisData) return redisData;
+
+    const query = `
+      WITH LatestTrade AS (
+        SELECT r.marketCap, r.date, r.code
+        FROM RATIO.dbo.ratioInday r
+        INNER JOIN marketInfor.dbo.info i ON i.code = r.code
+        CROSS APPLY (SELECT TOP 1 date FROM RATIO.dbo.ratioInday WHERE code = r.code ORDER BY date DESC) AS latest
+        WHERE r.code ${listStock} AND r.type = 'STOCK' AND i.status = 'listed' AND r.date = latest.date
+      ),
+      ranked_trades AS (
+        SELECT code, totalVal, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+        FROM marketTrade.dbo.tickerTradeVND 
+        WHERE type = 'STOCK' AND code ${listStock}
+      ),
+      average_volumes AS (
+        SELECT code, AVG(CASE WHEN rn <= 5 THEN totalVal END) AS avg_totalVal_5d, AVG(CASE WHEN rn <= 20 THEN totalVal END) AS avg_totalVal_20d
+        FROM ranked_trades GROUP BY code
+      )
+      SELECT lt.marketCap, lt.date, lt.code, av.avg_totalVal_5d, av.avg_totalVal_20d
+      FROM LatestTrade lt
+      JOIN average_volumes av ON lt.code = av.code
+      ORDER BY lt.code;
+    `
+
+    const data = await this.mssqlService.query(query);
+    
+    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: TimeToLive.Minute });
+    return data;
   }
 
   private calculateAllIndicators(data: any) {
