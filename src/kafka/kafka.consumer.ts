@@ -213,14 +213,16 @@ export class KafkaConsumer {
     @Payload() payload: ChartNenInterface[],
     @Ctx() context: KafkaContext
   ) {
+    const withTimeout = (promise, ms) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))]);
+    
     try {
       const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
-  
+    
       await Promise.all([
-        this.kafkaService.handleBetaWatchListSocket(payload),
-        this.kafkaService.backTestTradingTool(payload),
-        this.kafkaService.handleContributePEPB(payload),
-        allClientsEmit.length > 0 ? this.kafkaService.handleEventSignalWarning(payload, allClientsEmit) : Promise.resolve(),
+        withTimeout(this.kafkaService.handleBetaWatchListSocket(payload), 5000),
+        withTimeout(this.kafkaService.backTestTradingTool(payload), 5000),
+        withTimeout(this.kafkaService.handleContributePEPB(payload), 5000),
+        allClientsEmit.length > 0 ? withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 5000) : Promise.resolve(),
       ]);
     } catch (error) {
       this.logger.error(error);
