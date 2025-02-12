@@ -723,24 +723,21 @@ export class KafkaService {
   async handleBetaWatchListSocket(payload: ChartNenInterface[]) {
     try {
       const data: any[] = (await this.redis.get('beta-watch-list')) || [];
-      const item = data.find((item) => item.code == payload[0].code);
-      if (item) {
+      const foundItem = data.find((item) => item.code == payload[0].code);
+      if (foundItem) {
         const res: any = await this.investmentService.test(
-          [{ code: item.code, ma: item.ma }],
+          [{ code: foundItem.code, ma: foundItem.ma }],
           moment().subtract(2, 'year').format('YYYY-MM-DD'),
           moment().format('YYYY-MM-DD'),
           1,
           payload[0].closePrice,
         );
-        this.send(
-          `${SocketEmit.MA}`,
-          res.map((item, index) => ({
-            ...item,
-            currPT: data[index].currPT || 0,
-            nextPT: data[index].nextPT || 0,
-            time: payload[0].time
-          })),
-        );
+        this.send(`${SocketEmit.MA}`, res.map((item) => ({
+          ...item,
+          currPT: foundItem.currPT || 0,
+          nextPT: foundItem.nextPT || 0,
+          time: payload[0].time
+        })));
       }
     } catch (e) {
       console.error(e);
