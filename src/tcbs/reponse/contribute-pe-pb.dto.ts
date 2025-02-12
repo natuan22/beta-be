@@ -70,13 +70,13 @@ export class ContributePEPBResponse {
         this.code = data?.code || '';
         this.latest_PE = data?.latest_PE || 0;
         this.latest_PB = data?.latest_PB || 0;
-        this.min_PE = data?.min_PE || 0;
-        this.max_PE = data?.max_PE || 0;
+        this.min_PE = Math.min(data?.min_PE, data?.latest_PE) || 0;
+        this.max_PE = Math.max(data?.max_PE, data?.latest_PE) || 0;
         this.avg_PE = data?.avg_PE || 0;
         this.plus_1_std_PE = data?.plus_1_std_PE || 0;
         this.minus_1_std_PE = data?.minus_1_std_PE || 0;
-        this.min_PB = data?.min_PB || 0;
-        this.max_PB = data?.max_PB || 0;
+        this.min_PB = Math.min(data?.min_PB, data?.latest_PB) || 0;
+        this.max_PB = Math.max(data?.max_PB, data?.latest_PB) || 0;
         this.avg_PB = data?.avg_PB || 0;
         this.plus_1_std_PB = data?.plus_1_std_PB || 0;
         this.minus_1_std_PB = data?.minus_1_std_PB || 0;
@@ -87,5 +87,5 @@ export class ContributePEPBResponse {
             ...item,
             ...data_1.find((vol) => item.code == vol.code)
         }));
-      }
+    }
 }
