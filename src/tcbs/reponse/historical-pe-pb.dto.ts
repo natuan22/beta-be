@@ -39,8 +39,8 @@ export class DataHistoricalPEPB {
     constructor(data?: DataHistoricalPEPB) {
         this.pe = data?.pe || 0;
         this.pb = data?.pb || 0;
-        this.industryPe = data?.industryPe || null;
-        this.industryPb = data?.industryPb || null;
+        this.industryPe = data?.industryPe || 0;
+        this.industryPb = data?.industryPb || 0;
         this.indexPe = data?.indexPe || 0;
         this.indexPb = data?.indexPb || 0;
         this.date = data?.date || '';
