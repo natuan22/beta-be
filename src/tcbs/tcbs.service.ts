@@ -7,6 +7,7 @@ import { RedisKeys } from '../enums/redis-keys.enum';
 import { MssqlService } from '../mssql/mssql.service';
 import { UtilsRandomUserAgent } from './utils/utils.random-user-agent';
 import { ContributePEPBResponse } from './reponse/contribute-pe-pb.dto';
+import { DataHistoricalPEPB, HistoricalPEPBResponse } from './reponse/historical-pe-pb.dto';
 
 @Injectable()
 export class TCBSService {
@@ -20,11 +21,30 @@ export class TCBSService {
     if (redisData) return redisData;
 
     try {
-      const response = await axios.get(`https://apipubaws.tcbs.com.vn/tcanalysis/v1/evaluation/${code}/historical-chart?period=${period}&tWindow=D`, { headers: { 'User-Agent': UtilsRandomUserAgent.getRandomUserAgent() }});
+      const startDate = moment().subtract(period, 'year').format('YYYY-MM-DD');
+      const endDate = moment().format('YYYY-MM-DD');
 
-      await this.redis.set(`${RedisKeys.historicalPEPB}:${code}:${period}`, response.data, { ttl: TimeToLive.OneHour });
+      const query = `
+        WITH Industry AS ( SELECT nganh FROM RATIO.dbo.phanNganhTcbs WHERE code = '${code}' ORDER BY date DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY)
+        SELECT s.date, s.PE AS pe, s.PB AS pb, i.PE AS industryPe, i.PB AS industryPb, idx.PE AS indexPe, idx.PB AS indexPb
+        FROM RATIO.dbo.ratioIndayTcbs s
+        LEFT JOIN Industry ind ON 1=1
+        LEFT JOIN RATIO.dbo.ratioIndayTcbs i ON i.code = ind.nganh AND i.date = s.date AND i.type = 'industry'
+        LEFT JOIN RATIO.dbo.ratioIndayTcbs idx ON idx.type = 'index' AND idx.date = s.date
+        WHERE s.code = '${code}' AND s.date BETWEEN '${startDate}' AND '${endDate}'
+        ORDER BY s.date ASC;
+      `;
+      const industry = `SELECT nganh FROM RATIO.dbo.phanNganhTcbs WHERE code = '${code}'`
 
-      return response.data;
+      const [data, data_industry] = await Promise.all([
+        this.mssqlService.query<DataHistoricalPEPB[]>(query),
+        this.mssqlService.query<{ nganh: string }[]>(industry),
+      ]);
+      const industryName = data_industry.length > 0 ? data_industry[0].nganh : '';
+      const result = new HistoricalPEPBResponse(data, industryName)
+      
+      await this.redis.set(`${RedisKeys.historicalPEPB}:${code}:${period}`, result, { ttl: TimeToLive.OneHour });
+      return result;
     } catch (err) {
       console.error(err);
     }

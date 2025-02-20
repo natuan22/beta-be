@@ -899,20 +899,20 @@ export class KafkaService {
 
   async handleEventSignalWarning(payload: ChartNenInterface[], allClientsEmit: string[]) {
     try {
-      const { code, closePrice } = payload[0];
+      const { code, closePrice, time } = payload[0];
       
       if (!allClientsEmit || allClientsEmit.length === 0) {
         console.warn('Không có client nào đăng ký');
         return;
       }
   
-      await this.processClients(allClientsEmit, [{ code }], closePrice);
+      await this.processClients(allClientsEmit, [{ code }], closePrice, time);
     } catch (e) {
       console.error(e);
     }
   }
 
-  private async processClients(allClientsEmit: string[], code: any[], closePrice: number) {
+  private async processClients(allClientsEmit: string[], code: any[], closePrice: number, time: string) {
     try {
       const [dataSignal, dataLiquidMarketCap] = await Promise.all([
         this.signalWarningService.getDataSignal(code, closePrice),
@@ -923,8 +923,10 @@ export class KafkaService {
       const res = SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
       if (!res?.length) return;
 
+      const resSend = res.map((item) => ({ ...item, time: time }));
+      
       // Gửi dữ liệu đến tất cả client
-      allClientsEmit.forEach(clientId => this.emitToClient(clientId, res));
+      allClientsEmit.forEach(clientId => this.emitToClient(clientId, resSend));
     } catch (error) {
       console.error(error);
     }

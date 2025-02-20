@@ -1393,7 +1393,10 @@ export class InvestmentService {
                                JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
                                WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
                                ORDER BY b.date ASC;`) as any,
-      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock})
+      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (
+                                                  SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
+                                                  FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
+                                                )
                                                 SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
       !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
       !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
