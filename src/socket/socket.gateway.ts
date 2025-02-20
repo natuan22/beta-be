@@ -48,21 +48,16 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect, 
   }
 
   async handleDisconnect(client: any) {
-    this.logger.log(client.id + ' Disconnected!');
+    this.logger.log(`${client.id} Disconnected!`);
 
-    const signalTypes = ['tin-hieu-ma', 'tin-hieu-rsi', 'tin-hieu-macd'];
-    for (const signalType of signalTypes) {
-      const key = `clients:${signalType}`;
-      const clients = await this.redis.get(key);
+    const clients: string[] = await this.redis.get('clients');
 
-      if (Array.isArray(clients)) {
-        const updatedClients = clients.filter((id: string) => id !== client.id);
+    if (Array.isArray(clients)) {
+      const updatedClients = clients.filter(id => id !== client.id);
 
-        await this.redis.set(key, updatedClients);
-        this.logger.log(`Client ${client.id} has been deleted from ${key}.`);
-      }
+      await this.redis.set('clients', updatedClients);
     }
-  }
+}
 
   @SubscribeMessage('signal-warning')
   async handleEventSignalWarning(@MessageBody() data: any, @ConnectedSocket() client: Socket) {

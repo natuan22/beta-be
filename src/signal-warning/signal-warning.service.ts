@@ -158,12 +158,12 @@ export class SignalWarningService {
   async getDataSignal(stock: string | any[], realtimePrice?: number) {
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
     
-    const dataRedis = await this.redis.get(`price:${listStock}`);
+    const dataRedis = await this.redis.get(`price-signal:${listStock}`);
     
-    let data = !dataRedis ? (await this.mssqlService.query(`SELECT closePrice, date, code from marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date asc;`) as any) : [];
+    let data = !dataRedis ? (await this.mssqlService.query(`SELECT TOP 150 closePrice, date, code from marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date DESC;`) as any) : [];
 
     if (realtimePrice && !dataRedis) {
-      await this.redis.set(`price:${listStock}`, data, { ttl: 180 });
+      await this.redis.set(`price-signal:${listStock}`, data, { ttl: 180 });
     }
   
     if (dataRedis) data = dataRedis;
@@ -172,8 +172,8 @@ export class SignalWarningService {
 
     if (Array.isArray(stock)) {
       stock.map((item: any) => {
-        const stockData = data.filter(res => res.code === item.code).reverse();
-        stockData[stockData.length - 1]['closePrice'] = !realtimePrice ? data.find((price) => price.code == item.code).closePrice : realtimePrice;
+        const stockData = data.filter(res => res.code === item.code);
+        stockData[0]['closePrice'] = !realtimePrice ? data.find((price) => price.code == item.code).closePrice : realtimePrice;
 
         const result = this.calculateAllIndicators(stockData);
 
@@ -192,30 +192,32 @@ export class SignalWarningService {
 
     const query = `
       WITH LatestTrade AS (
-        SELECT r.marketCap, r.date, r.code
-        FROM RATIO.dbo.ratioInday r
-        INNER JOIN marketInfor.dbo.info i ON i.code = r.code
-        CROSS APPLY (SELECT TOP 1 date FROM RATIO.dbo.ratioInday WHERE code = r.code ORDER BY date DESC) AS latest
-        WHERE r.code ${listStock} AND r.type = 'STOCK' AND i.status = 'listed' AND r.date = latest.date
+        SELECT r.marketCap, r.date, r.code, i.floor, i.indexCode
+        FROM (
+          SELECT marketCap, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
+          FROM RATIO.dbo.ratioInday WITH (NOLOCK)
+          WHERE type = 'STOCK'
+        ) r
+        INNER JOIN marketInfor.dbo.info i WITH (NOLOCK) ON i.code = r.code
+        WHERE r.rn = 1 AND i.status = 'listed' AND r.code ${listStock}
       ),
       ranked_trades AS (
         SELECT code, totalVal, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-        FROM marketTrade.dbo.tickerTradeVND 
+        FROM marketTrade.dbo.tickerTradeVND WITH (NOLOCK)
         WHERE type = 'STOCK' AND code ${listStock}
-      ),
-      average_volumes AS (
-        SELECT code, AVG(CASE WHEN rn <= 5 THEN totalVal END) AS avg_totalVal_5d, AVG(CASE WHEN rn <= 20 THEN totalVal END) AS avg_totalVal_20d
-        FROM ranked_trades GROUP BY code
       )
-      SELECT lt.marketCap, lt.date, lt.code, av.avg_totalVal_5d, av.avg_totalVal_20d
+      SELECT lt.marketCap, lt.date, lt.code, lt.floor, lt.indexCode,
+             AVG(CASE WHEN rt.rn <= 5 THEN COALESCE(rt.totalVal, 0) END) AS avg_totalVal_5d,
+             AVG(CASE WHEN rt.rn <= 20 THEN COALESCE(rt.totalVal, 0) END) AS avg_totalVal_20d
       FROM LatestTrade lt
-      JOIN average_volumes av ON lt.code = av.code
+      LEFT JOIN ranked_trades rt ON lt.code = rt.code  
+      GROUP BY lt.marketCap, lt.date, lt.code, lt.floor, lt.indexCode
       ORDER BY lt.code;
     `
 
     const data = await this.mssqlService.query(query);
     
-    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: TimeToLive.Minute });
+    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: 180 });
     return data;
   }
 
@@ -226,54 +228,41 @@ export class SignalWarningService {
     const maPeriods = [5, 10, 15, 20, 50, 60, 100];
   
     // Tính SMA và EMA
-    maPeriods.forEach((period) => {
-      const maValues = calTech.sma({ values: price, period });
-      const emaValues = calTech.ema({ values: price, period });
-  
-      dateFormat.forEach((item, index) => {
-        item[`ma${period}`] = parseFloat((maValues[index] / 1000).toFixed(2));
-        item[`ema${period}`] = parseFloat((emaValues[index] / 1000).toFixed(2));
-      });
-    });
+    const maResults = maPeriods.map(period => calTech.sma({ values: price, period }));
+    const emaResults = maPeriods.map(period => calTech.ema({ values: price, period }));
 
     // Tính RSI
-    const price_reverse = price.reverse();
-    const rsiValues = calTech.rsi({ values: price_reverse, period: 14 }).reverse();
-    dateFormat.forEach((item, index) => {
-      item.rsi = parseFloat((rsiValues[index] || 0).toFixed(2));
-    });
+    const rsiResults = calTech.rsi({ values: [...price].reverse(), period: 14 }).reverse();
   
     // Tính MACD
-    const macdValues = calTech.macd({ 
-      values: price, 
-      fastPeriod: 12, 
-      slowPeriod: 26, 
-      signalPeriod: 9, 
-      SimpleMAOscillator: false, 
-      SimpleMASignal: false 
-    });
-    const macd = macdValues.map((value) => value.MACD);
-    const macdSignal = macdValues.map((value) => value.signal);
-  
-    dateFormat.forEach((item, index) => {
-      item.macd = parseFloat((macd[index] / 1000 || 0).toFixed(2));
-      item.macd_signal = parseFloat((macdSignal[index] / 1000 || 0).toFixed(2));
-    });
+    const macdResults = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false });
+    const macd = macdResults.map(value => value.MACD);
+    const macdSignal = macdResults.map(value => value.signal);
   
     // Tính Bollinger Bands
-    const bollingerBandValues = calTech.bollingerbands({ period: 20, stdDev: 2, values: price });
-    const bbu = bollingerBandValues.map((value) => value.upper);
-    const bbl = bollingerBandValues.map((value) => value.lower);
-  
+    const bollingerResults = calTech.bollingerbands({ period: 20, stdDev: 2, values: price });
+    const bbu = bollingerResults.map(value => value.upper);
+    const bbl = bollingerResults.map(value => value.lower);
+
+    // Gán giá trị vào `dateFormat`
     dateFormat.forEach((item, index) => {
+      maPeriods.forEach((period, i) => {
+          item[`ma${period}`] = parseFloat((maResults[i][index] / 1000).toFixed(2));
+          item[`ema${period}`] = parseFloat((emaResults[i][index] / 1000).toFixed(2));
+      });
+
+      item.rsi = parseFloat((rsiResults[index] || 0).toFixed(2));
+      item.macd = parseFloat((macd[index] / 1000 || 0).toFixed(2));
+      item.macd_signal = parseFloat((macdSignal[index] / 1000 || 0).toFixed(2));
       item.BBU = parseFloat((bbu[index] / 1000 || 0).toFixed(2));
       item.BBL = parseFloat((bbl[index] / 1000 || 0).toFixed(2));
     });
 
+    // Lấy dữ liệu hôm nay và hôm qua
     const today = UtilCommonTemplate.toDateV2(moment());
     const yesterday = UtilCommonTemplate.toDateV2(moment().subtract(1, 'day'));
-    const todayData = dateFormat.find((item) => item.date === today) || {};
-    const yesterdayData = dateFormat.find((item) => item.date === yesterday) || {};
+    const todayData = dateFormat.find(item => item.date === today) || {};
+    const yesterdayData = dateFormat.find(item => item.date === yesterday) || {};
     
     // Kết hợp kết quả cho tất cả chỉ báo
     const result = {
