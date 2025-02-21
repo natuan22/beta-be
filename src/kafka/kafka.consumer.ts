@@ -208,7 +208,7 @@ export class KafkaConsumer {
     }
   }
 
-  @MessagePattern([Topics.ChartNenCoPhieuNew, Topics.ChartNenCoPhieuNewSignal])
+  @MessagePattern(Topics.ChartNenCoPhieuNew) //, Topics.ChartNenCoPhieuNewSignal]
   async handleKafkaMessages(
     @Payload() payload: ChartNenInterface[],
     @Ctx() context: KafkaContext
