@@ -218,7 +218,7 @@ export class KafkaConsumer {
     try {
       const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
   
-      await Promise.allSettled([
+      await Promise.all([
         withTimeout(this.kafkaService.handleBetaWatchListSocket(payload), 7000, 'handleBetaWatchListSocket'),
         withTimeout(this.kafkaService.backTestTradingTool(payload), 7000, 'backTestTradingTool'),
         withTimeout(this.kafkaService.handleContributePEPB(payload), 7000, 'handleContributePEPB'),
