@@ -219,10 +219,10 @@ export class KafkaConsumer {
       const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
   
       await Promise.all([
-        withTimeout(this.kafkaService.handleBetaWatchListSocket(payload), 7000, 'handleBetaWatchListSocket'),
-        withTimeout(this.kafkaService.backTestTradingTool(payload), 7000, 'backTestTradingTool'),
-        withTimeout(this.kafkaService.handleContributePEPB(payload), 7000, 'handleContributePEPB'),
-        ...(allClientsEmit.length > 0 ? [withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 7000, 'handleEventSignalWarning')] : []),
+        withTimeout(this.kafkaService.handleBetaWatchListSocket(payload), 5000, 'handleBetaWatchListSocket'),
+        withTimeout(this.kafkaService.backTestTradingTool(payload), 5000, 'backTestTradingTool'),
+        withTimeout(this.kafkaService.handleContributePEPB(payload), 5000, 'handleContributePEPB'),
+        // ...(allClientsEmit.length > 0 ? [withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 5000, 'handleEventSignalWarning')] : []),
       ]);
     } catch (error) {
       this.logger.error(error);
