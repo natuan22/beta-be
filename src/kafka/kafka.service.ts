@@ -901,10 +901,7 @@ export class KafkaService {
     try {
       const { code, closePrice, time } = payload[0];
       
-      if (!allClientsEmit || allClientsEmit.length === 0) {
-        console.warn('Không có client nào đăng ký');
-        return;
-      }
+      if (!allClientsEmit || allClientsEmit.length === 0) { return }
   
       await this.processClients(allClientsEmit, [{ code }], closePrice, time);
     } catch (e) {
