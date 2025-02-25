@@ -1380,7 +1380,7 @@ export class InvestmentService {
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
     
     const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
-      this.redis.get(`price:${listStock}`),
+      this.redis.get(`price-back-test:${listStock}`),
       this.redis.get(`price-back-test:${from}`),
       this.redis.get(`price-back-test:${to}`),
     ]);
@@ -1403,7 +1403,7 @@ export class InvestmentService {
     ]);
 
     if (realtimePrice && !dataRedis) {
-      await this.redis.set(`price:${listStock}`, data, { ttl: 180 });
+      await this.redis.set(`price-back-test:${listStock}`, data, { ttl: 180 });
     }
     if (!dateRedis) {
       await this.redis.set(`price-back-test:${from}`, date, { ttl: 180 });
