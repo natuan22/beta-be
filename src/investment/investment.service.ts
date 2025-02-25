@@ -809,6 +809,10 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
+  private hasValidData = (data: any): boolean => {
+    return !!(data && typeof data === 'object' && Object.keys(data).length > 0);
+  };
+
   async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
 
@@ -829,7 +833,7 @@ export class InvestmentService {
       !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
     ]);
 
-    if (realtimePrice && !dataRedis) {
+    if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price:${listStock}`, data, { ttl: 180 });
     }
     if (!dateRedis) {
@@ -1402,7 +1406,7 @@ export class InvestmentService {
       !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
     ]);
 
-    if (realtimePrice && !dataRedis) {
+    if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price-back-test:${listStock}`, data, { ttl: 180 });
     }
     if (!dateRedis) {
@@ -1543,7 +1547,7 @@ export class InvestmentService {
       !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
     ]);
 
-    if (realtimePrice && !dataRedis) {
+    if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price-back-up:${listStock}`, data, { ttl: 180 });
     }
     if (!dateRedis) {
