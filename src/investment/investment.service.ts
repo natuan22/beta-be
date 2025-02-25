@@ -1412,9 +1412,15 @@ export class InvestmentService {
       await this.redis.set(`price-back-test:${to}`, dateTo, { ttl: 180 });
     }
 
-    data = dataRedis || data;
-    date = dateRedis || date;
-    dateTo = dateToRedis || dateTo;
+    if (dataRedis) {
+      data = dataRedis;
+    }
+    if (dateRedis) {
+      date = dateRedis;
+    }
+    if (dateToRedis) {
+      dateTo = dateToRedis;
+    }
 
     const priceMap = new Map();
     data.forEach((d: any) => {
