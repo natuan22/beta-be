@@ -1228,7 +1228,7 @@ export class MacroService {
     const redisData = await this.redis.get(
       `${RedisKeys.corporateBondsIssuedSuccessfully}`,
     );
-    // if(redisData) return redisData
+    if(redisData) return redisData
 
     const query = `
     SELECT

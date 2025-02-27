@@ -19,19 +19,20 @@ process.on('message', async (data: any) => {
         ex = 'UPINDEX';
     }
     let query: string = `
-            select top 1 Khoi_luong_cung as sellPressure, Khoi_luong_cau as buyPressure
-            from [PHANTICH].[dbo].[INDEX_AC_CC]
-            where Ticker = '${ex}' order by
-            [DateTime] desc
-        `;
+      select top 1 Khoi_luong_cung as sellPressure, Khoi_luong_cau as buyPressure
+      from [PHANTICH].[dbo].[INDEX_AC_CC]
+      where Ticker = '${ex}' 
+      order by [DateTime] desc
+    `;
 
     if (exchange == 'ALL') {
       query = `
-                select sum(CAST(Khoi_luong_cung AS float)) as sellPressure, sum(CAST(Khoi_luong_cau AS float)) as buyPressure
-                from [PHANTICH].[dbo].[INDEX_AC_CC]
-                where Ticker in ('VNINDEX', 'HNXINDEX', 'UPINDEX')
-            `;
+        select sum(CAST(Khoi_luong_cung AS float)) as sellPressure, sum(CAST(Khoi_luong_cau AS float)) as buyPressure
+        from [PHANTICH].[dbo].[INDEX_AC_CC]
+        where Ticker in ('VNINDEX', 'HNXINDEX', 'UPINDEX')
+      `;
     }
+    
     // tạo database connection mới và thực hiện truy vấn
     const sql = await connectDB();
     const buySellData = (await sql.query(query)).recordset;
