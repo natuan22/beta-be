@@ -12,6 +12,9 @@ import { FilterResponse, InfoStockResponse } from './response/filer.response';
 import { MacroDomesticResponse } from './response/macro-domestic.response';
 import { NewsEnterpriseResponse } from './response/news-enterprise.response';
 import { NewsFilterResponse } from './response/news-filter.response';
+import { NewsProxyDto } from './dto/news-proxy.dto';
+import axios from 'axios';
+import { UtilsRandomUserAgent } from '../tcbs/utils/utils.random-user-agent';
 
 @Controller('news')
 @ApiTags('Trung tâm tin tức')
@@ -97,6 +100,25 @@ export class NewsController {
     try {
       const data = await this.newsService.newsFilter(q);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  @ApiOperation({ summary: 'Tin tức proxy' })
+  @ApiOkResponse({ type: NewsFilterResponse })
+  @Get('proxy')
+  async newsProxy(@Res() res: Response, @Query() q: NewsProxyDto) {
+    try {
+      const response = await axios.get(q.url, { responseType: 'text', headers: { 'User-Agent': UtilsRandomUserAgent.getRandomUserAgent() }, maxRedirects: 5 });
+  
+      let html = response.data;
+      // Thêm thẻ <base> vào <head> để đảm bảo tải đúng tài nguyên
+      html = html.replace(/<head>/i, `<head><base href="${new URL(q.url).origin}/">`);
+  
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('X-Frame-Options', 'ALLOW-FROM *');
+      res.send(html);
     } catch (error) {
       throw new CatchException(error);
     }

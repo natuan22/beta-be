@@ -360,44 +360,25 @@ export class StockService {
   async getIndustry(exchange: string): Promise<any> {
     try {
       //Check caching data is existed
-      const redisData: IndustryResponse[] = await this.redis.get(
-        `${RedisKeys.Industry}:${exchange}`,
-      );
-      // if (redisData) return redisData;
+      const redisData: IndustryResponse[] = await this.redis.get(`${RedisKeys.Industry}:${exchange}`);
+      if (redisData) return redisData;
 
       //Get 2 latest date
-      const {
-        latestDate,
-        previousDate,
-        weekDate,
-        monthDate,
-        firstDateYear,
-      }: SessionDatesInterface = await this.getSessionDate(
-        '[RATIO].[dbo].[ratioInday]',
-        'date',
-        this.dbServer,
-      );
+      const { latestDate, previousDate, weekDate, monthDate, firstDateYear }: SessionDatesInterface = await this.getSessionDate('[RATIO].[dbo].[ratioInday]', 'date', this.dbServer);
 
       const query = (date): string => `
-      SELECT
-        i.LV2 AS industry,
-        t.code AS ticker,
-        t.closePrice AS close_price,
-        t.highPrice AS high,
-        t.lowPrice AS low,
-        t.date AS date_time
-      FROM marketTrade.dbo.tickerTradeVND t
-      INNER JOIN marketInfor.dbo.info i
-        ON t.code = i.code
-      WHERE t.date = '${date}'
-    ${
-      exchange == 'ALL'
-        ? ``
-        : exchange == 'HSX'
-        ? `AND t.floor = 'HOSE'`
-        : `AND t.floor = '${exchange}'`
-    }
-            `;
+        SELECT
+          i.LV2 AS industry,
+          t.code AS ticker,
+          t.closePrice AS close_price,
+          t.highPrice AS high,
+          t.lowPrice AS low,
+          t.date AS date_time
+        FROM marketTrade.dbo.tickerTradeVND t
+        INNER JOIN marketInfor.dbo.info i ON t.code = i.code
+        WHERE t.date = '${date}' ${exchange == 'ALL' ? `` : exchange == 'HSX' ? `AND t.floor = 'HOSE'` : `AND t.floor = '${exchange}'`}
+      `;
+
       // const marketCapQuery: string = `
       //           SELECT c.LV2 AS industry, p.date_time, SUM(p.mkt_cap) AS total_market_cap
       //           ${groupBy} FROM [PHANTICH].[dbo].[database_mkt] p JOIN [WEBSITE_SERVER].[dbo].[ICBID] c
@@ -414,86 +395,47 @@ export class StockService {
       //           GROUP BY c.LV2 ${groupBy}, p.date_time
       //           ORDER BY p.date_time DESC
       //       `;
+      
       const marketCapQuery = `
-        SELECT
-        i.date AS date_time,
-        sum(i.closePrice * i.shareout)  AS total_market_cap,
-        f.LV2 as industry
+        SELECT i.date AS date_time, sum(i.closePrice * i.shareout)  AS total_market_cap, f.LV2 as industry
         FROM RATIO.dbo.ratioInday i
         inner join marketInfor.dbo.info f on f.code = i.code
-        WHERE i.date IN ('${UtilCommonTemplate.toDate(latestDate)}', 
-        '${UtilCommonTemplate.toDate(previousDate)}', 
-        '${UtilCommonTemplate.toDate(weekDate)}', 
-        '${UtilCommonTemplate.toDate(monthDate)}', 
-        '${UtilCommonTemplate.toDate(firstDateYear)}')
-        ${
-          exchange == 'ALL'
-            ? ``
-            : exchange == 'HSX'
-            ? `AND f.floor = 'HOSE'`
-            : `AND f.floor = '${exchange}'`
-        }
+        WHERE i.date IN ('${UtilCommonTemplate.toDate(latestDate)}', '${UtilCommonTemplate.toDate(previousDate)}', '${UtilCommonTemplate.toDate(weekDate)}', '${UtilCommonTemplate.toDate(monthDate)}', '${UtilCommonTemplate.toDate(firstDateYear)}')
+        ${exchange == 'ALL' ? `` : exchange == 'HSX' ? `AND f.floor = 'HOSE'` : `AND f.floor = '${exchange}'`}
         GROUP BY f.LV2, i.date ${exchange == 'ALL' ? `` : `, f.floor`} 
         ORDER BY i.date DESC
-        `;
+      `;
 
       const marketCapQuery2 = `
-          with temp as (select distinct i.closePrice, i.shareout, i.code, f.LV2 ,date FROM RATIO.dbo.ratioInday i inner join marketInfor.dbo.info f on f.code = i.code
-            where date in ('${UtilCommonTemplate.toDate(latestDate)}', 
-            '${UtilCommonTemplate.toDate(previousDate)}', 
-            '${UtilCommonTemplate.toDate(weekDate)}', 
-            '${UtilCommonTemplate.toDate(monthDate)}', 
-            '${UtilCommonTemplate.toDate(firstDateYear)}') 
-            ${
-              exchange == 'ALL'
-                ? ``
-                : exchange == 'HSX'
-                ? `AND f.floor = 'HOSE'`
-                : `AND f.floor = '${exchange}'`
-            }
-                      )
-            select sum(closePrice * shareout) as total_market_cap, LV2 as industry, date as date_time from temp group by LV2, date ORDER BY date DESC
-          `;
+        with temp as (
+          select distinct i.closePrice, i.shareout, i.code, f.LV2 ,date 
+          FROM RATIO.dbo.ratioInday i inner join marketInfor.dbo.info f on f.code = i.code
+          where date in ('${UtilCommonTemplate.toDate(latestDate)}', '${UtilCommonTemplate.toDate(previousDate)}', '${UtilCommonTemplate.toDate(weekDate)}', '${UtilCommonTemplate.toDate(monthDate)}', '${UtilCommonTemplate.toDate(firstDateYear)}') ${exchange == 'ALL' ? `` : exchange == 'HSX' ? `AND f.floor = 'HOSE'` : `AND f.floor = '${exchange}'`}
+        )
+        select sum(closePrice * shareout) as total_market_cap, LV2 as industry, date as date_time from temp group by LV2, date ORDER BY date DESC
+      `;
 
-      const industryChild: ChildProcess = fork(
-        __dirname + '/processes/industry-child.js',
-      );
+      const industryChild: ChildProcess = fork(__dirname + '/processes/industry-child.js');
       industryChild.send({ marketCapQuery: marketCapQuery2 });
+      
       const industryChanges = (await new Promise((resolve, reject): void => {
-        industryChild.on('message', (industryChanges): void => {
-          resolve(industryChanges);
-        });
-        industryChild.on('exit', (code, e): void => {
-          if (code !== 0) reject(e);
-        });
+        industryChild.on('message', (industryChanges): void => { resolve(industryChanges) });
+        industryChild.on('exit', (code, e): void => { if (code !== 0) reject(e) });
       })) as any;
 
-      const industryDataChild: ChildProcess = fork(
-        __dirname + '/processes/industry-data-child.js',
-      );
+      const industryDataChild: ChildProcess = fork(__dirname + '/processes/industry-data-child.js');
 
-      industryDataChild.send({
-        query1: query(UtilCommonTemplate.toDate(latestDate)),
-        query2: query(UtilCommonTemplate.toDate(previousDate)),
-      });
-
+      industryDataChild.send({ query1: query(UtilCommonTemplate.toDate(latestDate)), query2: query(UtilCommonTemplate.toDate(previousDate)) });
+      
       const result = (await new Promise((resolve, reject): void => {
-        industryDataChild.on('message', (result: any): void => {
-          resolve(result);
-        });
-        industryDataChild.on('exit', (code, e): void => {
-          if (code !== 0) reject(e);
-        });
+        industryDataChild.on('message', (result: any): void => { resolve(result) });
+        industryDataChild.on('exit', (code, e): void => { if (code !== 0) reject(e) });
       })) as any;
 
       //Count how many stock change (increase, decrease, equal, ....) by industry(ICBID.LV2)
       const final = result.reduce((stats, record) => {
-        const existingStats = stats.find(
-          (s) => s?.industry === record?.industry,
-        );
-        const industryChange = industryChanges.find(
-          (i) => i?.industry == record?.industry,
-        );
+        const existingStats = stats.find((s) => s?.industry === record?.industry);
+        const industryChange = industryChanges.find((i) => i?.industry == record?.industry);
         if (!industryChange) return stats;
 
         if (existingStats) {
@@ -516,35 +458,19 @@ export class StockService {
         return stats;
       }, []);
 
-      const buySellPressure: ChildProcess = fork(
-        __dirname + '/processes/buy-sell-pressure-child.js',
-      );
+      const buySellPressure: ChildProcess = fork(__dirname + '/processes/buy-sell-pressure-child.js');
       buySellPressure.send({ exchange });
 
       const buySellData = (await new Promise((resolve, reject): void => {
-        buySellPressure.on('message', (buySellData: any): void => {
-          resolve(buySellData);
-        });
-        buySellPressure.on('exit', (code, e): void => {
-          if (code !== 0) reject(e);
-        });
+        buySellPressure.on('message', (buySellData: any): void => { resolve(buySellData) });
+        buySellPressure.on('exit', (code, e): void => { if (code !== 0) reject(e) });
       })) as any;
 
       //Map response
-      const mappedData: IndustryResponse[] = [
-        ...new IndustryResponse().mapToList(final),
-      ].sort((a, b) => (a.industry > b.industry ? 1 : -1));
+      const mappedData: IndustryResponse[] = [...new IndustryResponse().mapToList(final)].sort((a, b) => (a.industry > b.industry ? 1 : -1));
 
       //Caching data for the next request
-      await this.redis.set(
-        `${RedisKeys.Industry}:${exchange}`,
-        {
-          data: mappedData,
-          buySellData: buySellData?.[0],
-        },
-        { ttl: TimeToLive.Minute },
-      );
-
+      await this.redis.set(`${RedisKeys.Industry}:${exchange}`, { data: mappedData, buySellData: buySellData?.[0] }, { ttl: TimeToLive.Minute });
       return { data: mappedData, buySellData: buySellData?.[0] };
     } catch (error) {
       throw new CatchException(error);
@@ -677,10 +603,10 @@ export class StockService {
   //Top giá trị ròng khối ngoại
   async getTopNetForeign(exchange): Promise<TopNetForeignResponse[]> {
     try {
-      // const redisData: TopNetForeignResponse[] = await this.redis.get(
-      //   RedisKeys.TopNetForeign,
-      // );
-      // if (redisData) return redisData;
+      const redisData: TopNetForeignResponse[] = await this.redis.get(
+        RedisKeys.TopNetForeign,
+      );
+      if (redisData) return redisData;
 
       const { latestDate } = await this.getSessionDate(
         '[marketTrade].[dbo].[foreign]',
@@ -716,7 +642,7 @@ export class StockService {
         ...dataTop,
         ...[...dataBot].reverse(),
       ]);
-      // await this.redis.set(RedisKeys.TopNetForeign, mappedData);
+      await this.redis.set(RedisKeys.TopNetForeign, mappedData);
 
       return mappedData;
     } catch (e) {
@@ -728,10 +654,10 @@ export class StockService {
   async getNetForeign(q: NetForeignQueryDto): Promise<NetForeignResponse[]> {
     try {
       const { exchange, transaction } = q;
-      // const redisData: NetForeignResponse[] = await this.redis.get(
-      //   `${RedisKeys.NetForeign}:${exchange}:${transaction}`,
-      // );
-      // if (redisData) return redisData;
+      const redisData: NetForeignResponse[] = await this.redis.get(
+        `${RedisKeys.NetForeign}:${exchange}:${transaction}`,
+      );
+      if (redisData) return redisData;
 
       const { latestDate }: SessionDatesInterface = await this.getSessionDate(
         '[marketTrade].[dbo].[foreign]',
@@ -757,10 +683,10 @@ export class StockService {
         [latestDate, exchange],
       );
       const mappedData = new NetForeignResponse().mapToList(data);
-      // await this.redis.set(
-      //   `${RedisKeys.NetForeign}:${exchange}:${transaction}`,
-      //   mappedData,
-      // );
+      await this.redis.set(
+        `${RedisKeys.NetForeign}:${exchange}:${transaction}`,
+        mappedData,
+      );
       return mappedData;
     } catch (e) {
       throw new CatchException(e);
@@ -818,7 +744,7 @@ export class StockService {
       const redisData: TopNetForeignByExResponse[] = await this.redis.get(
         `${RedisKeys.TopNetForeignByEx}:${exchange.toUpperCase()}`,
       );
-      // if (redisData) return redisData;
+      if (redisData) return redisData;
 
       const { latestDate, weekDate }: SessionDatesInterface =
         await this.getSessionDate(`[PHANTICH].[dbo].[BCN_netvalue]`);
@@ -1037,7 +963,7 @@ export class StockService {
       const redisData: MerchandisePriceResponse[] = await this.redis.get(
         `${RedisKeys.MerchandisePrice}:${type}`,
       );
-      // if (redisData) return redisData;
+      if (redisData) return redisData;
 
       const codeExchange = `'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'SGD', 'CAD', 'HKD', 'THB', 'CNY', 'MYR', 'INR', 'KRW', 'RUB', 'SEK', 'CHF', 'NOK', 'DKK', 'SAR', 'KWD'`;
       const sortExchange = UtilCommonTemplate.generateSortCase(

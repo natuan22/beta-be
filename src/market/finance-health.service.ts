@@ -770,7 +770,7 @@ export class FinanceHealthService {
     const redisData = await this.redis.get(
       `${RedisKeys.indsProfitMarginsTable}:${ex}:${order}`,
     );
-    // if(redisData) return redisData
+    if(redisData) return redisData
 
     const lastDate = (
       await this.mssqlService.query(
