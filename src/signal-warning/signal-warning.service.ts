@@ -192,18 +192,15 @@ export class SignalWarningService {
 
     const query = `
       WITH LatestTrade AS (
-        SELECT r.marketCap, r.date, r.code, i.floor, i.indexCode
-        FROM (
-          SELECT marketCap, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-          FROM RATIO.dbo.ratioInday WITH (NOLOCK)
-          WHERE type = 'STOCK'
-        ) r
-        INNER JOIN marketInfor.dbo.info i WITH (NOLOCK) ON i.code = r.code
-        WHERE r.rn = 1 AND i.status = 'listed' AND r.code ${listStock}
+        SELECT TOP 1 WITH TIES r.marketCap, r.date, r.code, i.floor, i.indexCode
+        FROM RATIO.dbo.ratioInday r
+        INNER JOIN marketInfor.dbo.info i ON i.code = r.code
+        WHERE r.type = 'STOCK' AND i.status = 'listed' AND r.code ${listStock}
+        ORDER BY ROW_NUMBER() OVER (PARTITION BY r.code ORDER BY r.date DESC)
       ),
       ranked_trades AS (
         SELECT code, totalVal, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-        FROM marketTrade.dbo.tickerTradeVND WITH (NOLOCK)
+        FROM marketTrade.dbo.tickerTradeVND
         WHERE type = 'STOCK' AND code ${listStock}
       )
       SELECT lt.marketCap, lt.date, lt.code, lt.floor, lt.indexCode,
@@ -217,7 +214,7 @@ export class SignalWarningService {
 
     const data = await this.mssqlService.query(query);
     
-    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: 180 });
+    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: TimeToLive.FiveMinutes });
     return data;
   }
 

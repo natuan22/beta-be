@@ -836,10 +836,10 @@ export class InvestmentService {
     if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price:${listStock}`, data, { ttl: 180 });
     }
-    if (!dateRedis) {
+    if (!dateRedis && this.hasValidData(date)) {
       await this.redis.set(`price:${from}`, date, { ttl: 180 });
     }
-    if (!dateToRedis) {
+    if (!dateToRedis && this.hasValidData(dateTo)) {
       await this.redis.set(`price:${to}`, dateTo, { ttl: 180 });
     }
 
@@ -1409,10 +1409,10 @@ export class InvestmentService {
     if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price-back-test:${listStock}`, data, { ttl: 180 });
     }
-    if (!dateRedis) {
+    if (!dateRedis && this.hasValidData(date)) {
       await this.redis.set(`price-back-test:${from}`, date, { ttl: 180 });
     }
-    if (!dateToRedis) {
+    if (!dateToRedis && this.hasValidData(dateTo)) {
       await this.redis.set(`price-back-test:${to}`, dateTo, { ttl: 180 });
     }
 
@@ -1550,10 +1550,10 @@ export class InvestmentService {
     if (realtimePrice && !dataRedis && this.hasValidData(data)) {
       await this.redis.set(`price-back-up:${listStock}`, data, { ttl: 180 });
     }
-    if (!dateRedis) {
+    if (!dateRedis && this.hasValidData(date)) {
       await this.redis.set(`price-back-up:${from}`, date, { ttl: 180 });
     }
-    if (!dateToRedis) {
+    if (!dateToRedis && this.hasValidData(dateTo)) {
       await this.redis.set(`price-back-up:${to}`, dateTo, { ttl: 180 });
     }
 
