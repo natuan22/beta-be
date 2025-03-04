@@ -2372,41 +2372,46 @@ export class ReportService {
 
   async priceFluctuationCorrelation(code: string) {
     try {
-      const date = await this.mssqlService.query(`with date_ranges as (
-        select
-            max(case when date <= '${moment().format(
-              'YYYY-MM-DD',
-            )}' then date else null end) as now,
-            max(case when date <= '${moment()
-              .subtract(1, 'year')
-              .format('YYYY-MM-DD')}' then date else null end) as year
-        from marketTrade.dbo.historyTicker
-    )
-    select now, year
-    from date_ranges;`);
+      const date = await this.mssqlService.query(`
+        with date_ranges as (
+          select max(case when date <= '${moment().format('YYYY-MM-DD')}' then date else null end) as now, 
+                 max(case when date <= '${moment().subtract(1, 'year').format('YYYY-MM-DD')}' then date else null end) as year
+          from marketTrade.dbo.historyTicker
+          where code = '${code}'
+        )
+        select now, year from date_ranges;
+      `);
 
       const now = moment(date[0].now).format('YYYY-MM-DD');
       const year = moment(date[0].year).format('YYYY-MM-DD');
 
       const query_2 = `
-      with base as (select closePrice, code from marketTrade.dbo.historyTicker where date = '${year}' and code = '${code}'
-      union
-      select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
-      union
-      select sum(t.closePrice) as closePrice, (select LV2 from marketInfor.dbo.info where code = '${code}') as code
-      from marketTrade.dbo.tickerTradeVND t
-      inner join marketInfor.dbo.info i on i.code = t.code
-      where date = '${year}' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')),
-      temp as (select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code from marketTrade.dbo.historyTicker where code = '${code}' and date between '${year}' and '${now}'
-            union all
-            select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code from marketTrade.dbo.indexTradeVND where code = 'VNINDEX' and date between '${year}' and '${now}'
-            )
-            select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc`;
+        with base as (
+          select TOP 1 WITH TIES closePrice, code from marketTrade.dbo.historyTicker where date >= '${year}' and code = '${code}' ORDER BY date ASC
+          union
+          select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
+          union
+          select sum(t.closePrice) as closePrice, (select LV2 from marketInfor.dbo.info where code = '${code}') as code
+          from marketTrade.dbo.tickerTradeVND t
+          inner join marketInfor.dbo.info i on i.code = t.code
+          where date = '${year}' and i.LV2 = (select LV2 from marketInfor.dbo.info where code = '${code}')
+        ),
+        temp as (
+          select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code 
+          from marketTrade.dbo.historyTicker 
+          where code = '${code}' and date >= '${year}' and date <= '${now}'
+          union all
+          select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code 
+          from marketTrade.dbo.indexTradeVND 
+          where code = 'VNINDEX' and date between '${year}' and '${now}'
+        )
+        select * from temp where date not in (select date from temp group by date having count(date) < 2) order by date asc, code desc;
+      `;
+
       // union all
       // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
-      const data = await this.mssqlService.query<InterestRateResponse[]>(
-        query_2,
-      );
+      const data = await this.mssqlService.query<InterestRateResponse[]>(query_2);
+      console.log(query_2)
       return data.map((item) => ({
         ...item,
         date: UtilCommonTemplate.toDate(item.date) || '',
