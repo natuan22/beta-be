@@ -236,7 +236,7 @@ export class KafkaConsumer {
       const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
 
       await Promise.all([
-        allClientsEmit.length > 0 ? withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 6000, 'handleEventSignalWarning') : Promise.resolve(),
+        // allClientsEmit.length > 0 ? withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 6000, 'handleEventSignalWarning') : Promise.resolve(),
         withTimeout(this.kafkaService.handleContributePEPB(payload), 6000, 'handleContributePEPB'),
       ]);
     } catch (error) {
