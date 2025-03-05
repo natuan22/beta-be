@@ -2387,7 +2387,7 @@ export class ReportService {
 
       const query_2 = `
         with base as (
-          select TOP 1 WITH TIES closePrice, code from marketTrade.dbo.historyTicker where date >= '${year}' and code = '${code}' ORDER BY date ASC
+          select TOP 1 WITH TIES closePrice, code from marketTrade.dbo.historyTicker where date = '${year}' and code = '${code}' ORDER BY date ASC
           union
           select closePrice, code from marketTrade.dbo.indexTradeVND where date = '${year}' and code = 'VNINDEX'
           union
@@ -2399,7 +2399,7 @@ export class ReportService {
         temp as (
           select (closePrice - (select closePrice from base where code = '${code}')) / (select closePrice from base where code = '${code}') * 100 as value, date, code 
           from marketTrade.dbo.historyTicker 
-          where code = '${code}' and date >= '${year}' and date <= '${now}'
+          where code = '${code}' and date between '${year}' and '${now}'
           union all
           select (closePrice - (select closePrice from base where code = 'VNINDEX')) / (select closePrice from base where code = 'VNINDEX') * 100 as value, date, code 
           from marketTrade.dbo.indexTradeVND 
@@ -2411,7 +2411,7 @@ export class ReportService {
       // union all
       // select (closePrice - (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}'))) / (select closePrice from base where code = (select LV2 from marketInfor.dbo.info where code = '${code}')) * 100 as value, date, code from marketTrade.dbo.inDusTrade where code = (select LV2 from marketInfor.dbo.info where code = '${code}') and floor = 'ALL' and date between '${year}' and '${now}'
       const data = await this.mssqlService.query<InterestRateResponse[]>(query_2);
-      console.log(query_2)
+
       return data.map((item) => ({
         ...item,
         date: UtilCommonTemplate.toDate(item.date) || '',
