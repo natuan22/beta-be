@@ -233,7 +233,7 @@ export class KafkaConsumer {
     const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
     
     try {
-      const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+      // const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
 
       await Promise.all([
         // allClientsEmit.length > 0 ? withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 6000, 'handleEventSignalWarning') : Promise.resolve(),
