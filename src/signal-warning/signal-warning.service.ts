@@ -149,39 +149,33 @@ export class SignalWarningService {
   async handleSignalWarning(stock: any) {
     const stocks: any = await this.mssqlService.query(`SELECT code FROM marketInfor.dbo.info WHERE status = 'listed' AND type = 'STOCK' ORDER BY code`)
 
-    const dataSignal = await this.getDataSignal([{ code: stock }]); // [{code: 'ANV'}]
+    const dataSignal = await this.getDataSignal([{ code: stock }]); // [{code: 'ANV'}] //(stocks)
     const dataLiquidMarketCap = await this.getLiquidMarketCap([{ code: stock }]);
 
     return SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
   }
 
-  async getDataSignal(stock: string | any[], realtimePrice?: number) {
-    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
-    
+  async getDataSignal(stock: any[], realtimePrice?: number) {
+    const listStock = stock.map(item => `'${item.code}'`).join(',');
+
     const dataRedis = await this.redis.get(`price-signal:${listStock}`);
     
-    let data = !dataRedis ? (await this.mssqlService.query(`SELECT TOP 150 closePrice, date, code from marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date DESC;`) as any) : [];
+    let data = dataRedis ? dataRedis : await this.mssqlService.query(`SELECT TOP 150 closePrice, date, code FROM marketTrade.dbo.historyTicker WHERE code IN (${listStock}) ORDER BY date DESC;`) as any;
 
-    if (realtimePrice && !dataRedis) {
-      await this.redis.set(`price-signal:${listStock}`, data, { ttl: 180 });
-    }
-  
-    if (dataRedis) data = dataRedis;
-    
+    if (realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)) { await this.redis.set(`price-signal:${listStock}`, data, { ttl: 180 }) }
+
     const arr = [];
-
-    if (Array.isArray(stock)) {
-      stock.map((item: any) => {
+    stock.forEach((item: any) => {
         const stockData = data.filter(res => res.code === item.code);
-        stockData[0]['closePrice'] = !realtimePrice ? data.find((price) => price.code == item.code).closePrice : realtimePrice;
+        if (stockData.length > 0) {
+          stockData[0]['closePrice'] = realtimePrice ? realtimePrice : stockData[0].closePrice;
+        }
 
         const result = this.calculateAllIndicators(stockData);
-
         arr.push(result);
-      });
-    }
+    });
     
-    return arr
+    return arr;
   }
 
   async getLiquidMarketCap(stock: string | any[]): Promise<any> {
@@ -191,25 +185,31 @@ export class SignalWarningService {
     if (redisData) return redisData;
 
     const query = `
-      WITH LatestTrade AS (
-        SELECT TOP 1 WITH TIES r.marketCap, r.date, r.code, i.floor, i.indexCode
-        FROM RATIO.dbo.ratioInday r
-        INNER JOIN marketInfor.dbo.info i ON i.code = r.code
-        WHERE r.type = 'STOCK' AND i.status = 'listed' AND r.code ${listStock}
-        ORDER BY ROW_NUMBER() OVER (PARTITION BY r.code ORDER BY r.date DESC)
+      WITH LatestRatio AS (
+        SELECT r.marketCap, r.date, r.code
+        FROM (SELECT code, marketCap, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
+              FROM RATIO.dbo.ratioInday 
+              WHERE type = 'STOCK' AND code ${listStock}
+            ) r
+        WHERE r.rn = 1
       ),
-      ranked_trades AS (
-        SELECT code, totalVal, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn
-        FROM marketTrade.dbo.tickerTradeVND
-        WHERE type = 'STOCK' AND code ${listStock}
+      StockInfo AS (SELECT code, floor, indexCode FROM marketInfor.dbo.info WHERE status = 'listed' AND code ${listStock}),
+      RecentTrades AS (
+        SELECT code, totalVal, CASE WHEN rn <= 5 THEN 1 WHEN rn <= 20 THEN 2 ELSE 3 END AS period_type
+        FROM (SELECT code, totalVal, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
+              FROM marketTrade.dbo.tickerTradeVND WITH (NOLOCK)
+              WHERE type = 'STOCK' AND code ${listStock} AND date >= DATEADD(DAY, -30, GETDATE())
+            ) AS t
+        WHERE rn <= 20
       )
-      SELECT lt.marketCap, lt.date, lt.code, lt.floor, lt.indexCode,
-             AVG(CASE WHEN rt.rn <= 5 THEN COALESCE(rt.totalVal, 0) END) AS avg_totalVal_5d,
-             AVG(CASE WHEN rt.rn <= 20 THEN COALESCE(rt.totalVal, 0) END) AS avg_totalVal_20d
-      FROM LatestTrade lt
-      LEFT JOIN ranked_trades rt ON lt.code = rt.code  
-      GROUP BY lt.marketCap, lt.date, lt.code, lt.floor, lt.indexCode
-      ORDER BY lt.code;
+      SELECT lr.marketCap, lr.date, lr.code, si.floor, si.indexCode,
+             AVG(CASE WHEN rt.period_type = 1 THEN rt.totalVal ELSE NULL END) AS avg_totalVal_5d,
+             AVG(CASE WHEN rt.period_type IN (1, 2) THEN rt.totalVal ELSE NULL END) AS avg_totalVal_20d
+      FROM LatestRatio lr
+      JOIN StockInfo si ON lr.code = si.code
+      LEFT JOIN RecentTrades rt ON lr.code = rt.code
+      GROUP BY lr.marketCap, lr.date, lr.code, si.floor, si.indexCode
+      ORDER BY lr.code;
     `
 
     const data = await this.mssqlService.query(query);
@@ -232,7 +232,7 @@ export class SignalWarningService {
     const rsiResults = calTech.rsi({ values: [...price].reverse(), period: 14 }).reverse();
   
     // Tính MACD
-    const macdResults = calTech.macd({ values: price, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false });
+    const macdResults = calTech.macd({ values: [...price].reverse(), fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse();
     const macd = macdResults.map(value => value.MACD);
     const macdSignal = macdResults.map(value => value.signal);
   
@@ -244,8 +244,8 @@ export class SignalWarningService {
     // Gán giá trị vào `dateFormat`
     dateFormat.forEach((item, index) => {
       maPeriods.forEach((period, i) => {
-          item[`ma${period}`] = parseFloat((maResults[i][index] / 1000).toFixed(2));
-          item[`ema${period}`] = parseFloat((emaResults[i][index] / 1000).toFixed(2));
+        item[`ma${period}`] = parseFloat((maResults[i][index] / 1000).toFixed(2));
+        item[`ema${period}`] = parseFloat((emaResults[i][index] / 1000).toFixed(2));
       });
 
       item.rsi = parseFloat((rsiResults[index] || 0).toFixed(2));

@@ -208,24 +208,23 @@ export class KafkaConsumer {
     }
   }
 
-  @MessagePattern(Topics.ChartNenCoPhieuNew)
-  async handleChartNenCoPhieuNewMessages(
-    @Payload() payload: ChartNenInterface[],
+  @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
+  async handleChartNenNew(
+    @Payload() payload: ChartNenInterface[], 
     @Ctx() context: KafkaContext
-  ) {
-    const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
-    
+  ){
     try {
-      await Promise.all([
-        withTimeout(this.kafkaService.handleBetaWatchListSocket(payload), 6000, 'handleBetaWatchListSocket'),
-        withTimeout(this.kafkaService.backTestTradingTool(payload), 6000, 'backTestTradingTool'),
-      ]);
+      const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+
+      if(allClientsEmit.length > 0) {
+        this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
+      }
     } catch (error) {
-      this.logger.error(error);
+      this.logger.error(error)
     }
   }
 
-  @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
+  @MessagePattern(Topics.ChartNenCoPhieuNew)
   async handleChartNenCoPhieuNewSignalMessages(
     @Payload() payload: ChartNenInterface[],
     @Ctx() context: KafkaContext
@@ -233,10 +232,9 @@ export class KafkaConsumer {
     const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
     
     try {
-      // const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
-
-      await Promise.all([
-        // allClientsEmit.length > 0 ? withTimeout(this.kafkaService.handleEventSignalWarning(payload, allClientsEmit), 6000, 'handleEventSignalWarning') : Promise.resolve(),
+      await Promise.allSettled([
+        this.kafkaService.handleBetaWatchListSocket(payload),
+        withTimeout(this.kafkaService.backTestTradingTool(payload), 6000, 'backTestTradingTool'),
         withTimeout(this.kafkaService.handleContributePEPB(payload), 6000, 'handleContributePEPB'),
       ]);
     } catch (error) {
