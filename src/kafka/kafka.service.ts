@@ -722,51 +722,59 @@ export class KafkaService {
   }
 
   async handleBetaWatchListSocket(payload: ChartNenInterface[]) {
+    if (!payload?.length) return;
+    
     try {
-      const data: any[] = (await this.redis.get('beta-watch-list')) || [];
-      const foundItem = data.find((item) => item.code == payload[0].code);
-      if (foundItem) {
-        const res: any = await this.investmentService.test(
-          [{ code: foundItem.code, ma: foundItem.ma }],
-          moment().subtract(2, 'year').format('YYYY-MM-DD'),
-          moment().format('YYYY-MM-DD'),
-          1,
-          payload[0].closePrice,
-        );
-        this.send(`${SocketEmit.MA}`, res.map((item) => ({
-          ...item,
-          currPT: foundItem.currPT || 0,
-          nextPT: foundItem.nextPT || 0,
-          time: payload[0].time
-        })));
-      }
-    } catch (e) {
-      console.error(e);
+      const code = payload[0].code;
+      const time = payload[0].time;
+      
+      if (!code) return;
+      
+      const data: any[] = await this.redis.get('beta-watch-list') || [];
+      const item = data.find(item => item.code === code);
+      
+      if (!item) return;
+      
+      const startDate = moment().subtract(2, 'year').format('YYYY-MM-DD');
+      const endDate = moment().format('YYYY-MM-DD');
+      const closePrice = payload[0].closePrice;
+      
+      const results = await this.investmentService.test([{ code: item.code, ma: item.ma }], startDate, endDate, 1, closePrice);
+      
+      const resultsWithTime = Array.isArray(results) ? results.map(res => ({ ...res, time })) : [];
+      
+      this.send(`${SocketEmit.MA}`, resultsWithTime);
+    } catch (error) {
+      console.error(error);
     }
   }
 
   async backTestTradingTool(payload: ChartNenInterface[]) {
+    if (!payload?.length) return;
+    
     try {
-      const data: any[] = (await this.redis.get('beta-watch-list')) || [];
-      const item = data.find((item) => item.code == payload[0].code);
-
-      if (item) {
-        const res: any = await this.investmentService.backtest(
-          [{ code: item.code, ma: item.ma }], 
-          moment('2024-10-01').format('YYYY-MM-DD'), 
-          moment().format('YYYY-MM-DD'), 
-          payload[0].closePrice
-        );
-
-        if (Array.isArray(res)) {
-          const filteredRes = res.filter((resItem: any) => resItem.code === item.code && resItem.status === 0).map((resItem: any) => ({ ...resItem, time: payload[0].time }));
-          if (filteredRes.length > 0) {
-            this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
-          }
-        }
+      const code = payload[0].code;
+      if (!code) return;
+      
+      const data: any[] = await this.redis.get('beta-watch-list') || [];
+      const item = data.find(item => item.code === code);
+      
+      if (!item) return;
+      
+      const startDate = moment('2024-10-01').format('YYYY-MM-DD');
+      const endDate = moment().format('YYYY-MM-DD');
+      const closePrice = payload[0].closePrice;
+      
+      const res = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], startDate, endDate, closePrice);
+      
+      if (!Array.isArray(res)) return;
+      const filteredRes = res.filter(resItem => resItem.code === code && resItem.status === 0).map(resItem => ({ ...resItem, time: payload[0].time }));
+      
+      if (filteredRes.length > 0) {
+        this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -899,10 +907,12 @@ export class KafkaService {
 
   async handleEventSignalWarning(payload: ChartNenInterface[], allClientsEmit: string[]) {
     try {
+      if (!allClientsEmit?.length || !payload?.length) return;
+      
       const { code, closePrice, time } = payload[0];
       
-      if (!allClientsEmit || allClientsEmit.length === 0) { return }
-  
+      if (!code || closePrice === undefined) return;
+      
       await this.processClients(allClientsEmit, [{ code }], closePrice, time);
     } catch (e) {
       console.error(e);
@@ -910,35 +920,48 @@ export class KafkaService {
   }
 
   private async processClients(allClientsEmit: string[], code: any[], closePrice: number, time: string) {
+    if (!allClientsEmit?.length || !code?.length) return;
+    
     try {
       const [dataSignal, dataLiquidMarketCap] = await Promise.all([
         this.signalWarningService.getDataSignal(code, closePrice),
-        this.signalWarningService.getLiquidMarketCap(code).catch(() => []), // Nếu lỗi, trả về []
+        this.signalWarningService.getLiquidMarketCap(code)
       ]);
+      
       if (!dataSignal?.length) return;
-
+  
       const res = SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
       if (!res?.length) return;
-
-      const resSend = res.map((item) => ({ ...item, time: time }));
+  
+      const resSend = res.map(item => ({ ...item, time }));
       
-      // Gửi dữ liệu đến tất cả client
-      allClientsEmit.forEach(clientId => this.emitToClient(clientId, resSend));
+      const sockets = global._server?.sockets;
+      if (!sockets) return;
+      
+      const socketMap = new Map();
+      if (Array.isArray(sockets)) {
+        sockets.forEach((socket: any) => {
+          if (socket.id && allClientsEmit.includes(socket.id)) {
+            socketMap.set(socket.id, socket);
+          }
+        });
+      } else {
+        for (const socket of sockets.values()) {
+          if (socket.id && allClientsEmit.includes(socket.id)) {
+            socketMap.set(socket.id, socket);
+          }
+        }
+      }
+      
+      const validClientIds = allClientsEmit.filter(id => socketMap.has(id));
+      
+      const payload = { data: resSend };
+      
+      validClientIds.forEach(clientId => {
+        socketMap.get(clientId).emit('signal-warning-response', payload);
+      });
     } catch (error) {
       console.error(error);
-    }
-  }
-
-  private emitToClient(clientId: string, data: any) {
-    const sockets = global._server?.sockets;
-    if (!sockets) { return }
-  
-    const socket = Array.isArray(sockets)
-      ? sockets.find((s: any) => s.id === clientId)
-      : Array.from(sockets.values()).find((s: any) => s.id === clientId);
-  
-    if (socket) {
-      socket.emit('signal-warning-response', { data });
     }
   }
 }

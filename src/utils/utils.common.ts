@@ -5,6 +5,10 @@ import { TimeTypeEnum } from '../enums/common.enum';
 import { industryMapping } from '../market/mapping/industry.mapping';
 import { IPPIndustyMapping } from '../macro/mapping/ipp-industry.mapping';
 export class UtilCommonTemplate {
+  static hasValidData = (data: any): boolean => {
+    return !!(data && typeof data === 'object' && Object.keys(data).length > 0);
+  };
+
   static toDateTime(value?: any): any | string {
     if (!value) {
       return '';
