@@ -38,7 +38,6 @@ import { TCBSModule } from './tcbs/tcbs.module';
 import { BlogsModule } from './blogs/blogs.module';
 import { PostSchedulerModule } from './blogs/queues/post-scheduler.module';
 import { SignalWarningModule } from './signal-warning/signal-warning.module';
-import { WebhookModule } from './webhook/webhook.module';
 
 @Module({
   imports: [
@@ -100,7 +99,6 @@ import { WebhookModule } from './webhook/webhook.module';
     BlogsModule,
     PostSchedulerModule,
     SignalWarningModule,
-    WebhookModule,
   ],
 })
 export class AppModule implements NestModule {
