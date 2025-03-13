@@ -37,7 +37,7 @@ import { SaveStockRecommendWeekDto } from './dto/saveStockRecommendWeek.dto';
 import { SetFlexiblePageDto } from './dto/setFlexiblePage.dto';
 import { SetInfoReportTechnicalDto } from './dto/setInfoReportTechnical.dto';
 import { StockMarketDto } from './dto/stockMarket.dto';
-import { TopNetBuyingAndSellingDto } from './dto/topNetBuyingAndSelling.dto';
+import { TopNetBuyingAndSellingNewDto } from './dto/topNetBuyingAndSellingNew.dto';
 import { ReportService } from './report.service';
 import {
   AfternoonReport1,
@@ -57,6 +57,8 @@ import { AfterNoonReport2Response } from './response/stockMarket.response';
 import { TechnicalIndexResponse } from './response/technicalIndex.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
+import { TopNetBuyingAndSellingDto } from './dto/topNetBuyingAndSelling.dto';
+import { TopBuySellActiveDto } from './dto/topBuySellActive.dto';
 @Controller('report')
 @ApiTags('Report')
 export class ReportController {
@@ -348,6 +350,38 @@ export class ReportController {
   @Get('phan-nganh')
   async industry(@Query() q: StockMarketDto, @Res() res: Response) {
     const data = await this.reportService.industry(+q.type || 0);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+
+  @ApiOperation({ summary: 'Top cổ phiếu đóng góp điểm số' })
+  @ApiOkResponse({ status: HttpStatus.OK })
+  @Get('top-contributing-stocks')
+  async topContributingStocks(@Res() res: Response) {
+    const data = await this.reportService.topContributingStocks();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+
+  @ApiOperation({ summary: 'Top mua bán ròng khối ngoại, tự doanh' })
+  @ApiOkResponse({ status: HttpStatus.OK })
+  @Get('top-net-buy-sell')
+  async topNetBuySell(@Query() q: TopNetBuyingAndSellingNewDto, @Res() res: Response) {
+    const data = await this.reportService.topNetBuySell(+q.type, q.floor);
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+
+  @ApiOperation({ summary: 'Top tăng, giảm giá có khối lượng đột biến' })
+  @ApiOkResponse({ status: HttpStatus.OK })
+  @Get('top-sudden-vol')
+  async topSuddenVol(@Res() res: Response) {
+    const data = await this.reportService.topSuddenVol();
+    return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+  }
+  
+  @ApiOperation({ summary: 'Top mua bán chủ động' })
+  @ApiOkResponse({ status: HttpStatus.OK })
+  @Get('top-buy-sell-active')
+  async topBuySellActive(@Query() q: TopBuySellActiveDto, @Res() res: Response) {
+    const data = await this.reportService.topBuySellActive(q.floor);
     return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
   }
 

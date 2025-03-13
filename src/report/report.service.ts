@@ -3,6 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment';
 import * as calTech from 'technicalindicators';
+import * as _ from 'lodash';
 import { DataSource } from 'typeorm';
 import { DB_SERVER } from '../constants';
 import { TimeToLive } from '../enums/common.enum';
@@ -48,6 +49,7 @@ import {
 } from './response/stockMarket.response';
 import { TopScoreResponse } from './response/topScore.response';
 import { TransactionValueFluctuationsResponse } from './response/transactionValueFluctuations.response';
+import { BuySellActiveResponse } from './response/buySellActive.response';
 @Injectable()
 export class ReportService {
   constructor(
@@ -244,6 +246,270 @@ export class ReportService {
       return dataMapped;
     } catch (e) {
       throw new CatchException(e);
+    }
+  }
+
+  // Helper functions
+  private async getLatestAndPreviousDate(tableName: string, schema = 'WEBSITE_SERVER.dbo') {
+    // Get latest date
+    const latestDateQuery = `select top 1 date from ${schema}.${tableName} order by date desc`;
+    const latestDateResult = (await this.mssqlService.query(latestDateQuery)) as any[];
+    if (!latestDateResult?.length) {
+      throw new Error('No data found for latest date');
+    }
+
+    const now = moment(latestDateResult[0].date).format('YYYY-MM-DD');
+    
+    // Get previous date
+    const prevDateQuery = `
+      with date_ranges as (
+        select max(case when date <= '${moment(now).subtract(1, 'day').format('YYYY-MM-DD')}' then date else null end) as prev
+        from ${schema}.${tableName}
+      )
+      select prev from date_ranges;
+    `;
+    const prevDateResult = (await this.mssqlService.query(prevDateQuery)) as any[];
+    if (!prevDateResult?.length) {
+      throw new Error('No data found for previous date');
+    }
+
+    const prev = moment(prevDateResult[0].prev).format('YYYY-MM-DD');
+    return { now, prev };
+  }
+
+  private buildCommonPriceComparisonCTE(now: string, prev: string, topStocksCTE: string) {
+    return `
+      WITH ${topStocksCTE},
+      StockData AS (
+        SELECT t.code, t.closePrice, t.date, t.totalVal, t.totalVol
+        FROM marketTrade.dbo.tickerTradeVND t
+        WHERE t.date IN ('${now}', '${prev}') 
+        AND t.code IN (SELECT code FROM Top5Stock)
+      ),
+      PriceComparison AS (
+        SELECT s.code,
+          MAX(CASE WHEN s.date = '${now}' THEN s.closePrice END) AS price_today,
+          MAX(CASE WHEN s.date = '${prev}' THEN s.closePrice END) AS price_yesterday,
+          MAX(CASE WHEN s.date = '${now}' THEN s.totalVal END) AS totalVal,
+          MAX(CASE WHEN s.date = '${now}' THEN s.totalVol END) AS totalVol
+        FROM StockData s
+        GROUP BY s.code
+      )
+    `;
+  }
+
+  async topContributingStocks() {
+    try {
+      const { now, prev } = await this.getLatestAndPreviousDate('CPAH');
+
+      const buildTopStocksQuery = (orderDirection: 'DESC' | 'ASC') => {
+        const topStocksCTE = `
+          Top5Stock AS (
+            SELECT TOP 5 c.symbol AS code, c.point
+            FROM WEBSITE_SERVER.dbo.CPAH c
+            WHERE c.date = '${now}' 
+            AND c.floor = 'HSX'
+            ORDER BY c.point ${orderDirection}
+          )
+        `;
+
+        return `
+          ${this.buildCommonPriceComparisonCTE(now, prev, topStocksCTE)}
+          SELECT 
+            p.code, 
+            p.price_today * 1000  AS price, 
+            (p.price_today - p.price_yesterday) / NULLIF(p.price_yesterday, 0) * 100 AS day, 
+            t.point, 
+            p.totalVal / 1000000000 AS value, 
+            p.totalVol AS volume
+          FROM PriceComparison p
+          JOIN Top5Stock t ON p.code = t.code
+          WHERE p.price_today IS NOT NULL AND p.price_yesterday IS NOT NULL
+          ORDER BY t.point ${orderDirection};
+        `;
+      };
+      
+      const [stock_advance, stock_decline] = await Promise.all([
+        this.mssqlService.query(buildTopStocksQuery('DESC')),
+        this.mssqlService.query(buildTopStocksQuery('ASC'))
+      ]);
+      
+      return { stock_advance, stock_decline };
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  async topNetBuySell(tableType: number, floor: string) {
+    try {
+      const { now, prev } = await this.getLatestAndPreviousDate(tableType == 0 ? '[foreign]' : '[proprietary]', 'marketTrade.dbo');
+
+      const buildTopStocksQuery = (orderDirection: 'DESC' | 'ASC', compareType: '>' | '<') => {
+        const tableName = tableType == 0 ? '[foreign]' : '[proprietary]';
+        const topStocksCTE = `
+          Top5Stock AS (
+            SELECT TOP 5 code, netVal
+            FROM marketTrade.dbo.${tableName}
+            WHERE type = 'STOCK' AND date = '${now}' AND floor = '${floor}' AND netVal ${compareType} 0
+            ORDER BY netVal ${orderDirection}
+          )
+        `;
+
+        return `
+          ${this.buildCommonPriceComparisonCTE(now, prev, topStocksCTE)}
+          SELECT 
+            p.code, 
+            p.price_today * 1000 AS price, 
+            (p.price_today - p.price_yesterday) / NULLIF(p.price_yesterday, 0) * 100 AS day, 
+            t.netVal / 1000000000 as point, 
+            p.totalVal / 1000000000 AS value, 
+            p.totalVol AS volume
+          FROM PriceComparison p
+          JOIN Top5Stock t ON p.code = t.code
+          WHERE p.price_today IS NOT NULL AND p.price_yesterday IS NOT NULL
+          ORDER BY t.netVal ${orderDirection};
+        `;
+      };
+
+      const [buy, sell] = await Promise.all([
+        this.mssqlService.query(buildTopStocksQuery('DESC', '>')),
+        this.mssqlService.query(buildTopStocksQuery('ASC', '<'))
+      ]);
+      
+      return { buy, sell };
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  async topSuddenVol() {
+    try {
+      const { now, prev } = await this.getLatestAndPreviousDate('tickerTradeVND', 'marketTrade.dbo');
+
+      const buildTopStocksQuery = (orderDirection: 'DESC' | 'ASC') => {
+        const topStocksCTE = `
+          Top5Stock AS (
+            SELECT TOP 5 code, closePrice, totalVol
+            FROM marketTrade.dbo.tickerTradeVND
+            WHERE floor = 'HOSE' AND type = 'STOCK' AND date = '${now}'
+            ORDER BY perChange ${orderDirection}
+          ),
+          ranked_trades AS (
+            SELECT code, totalVol, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
+            FROM marketTrade.dbo.tickerTradeVND 
+            WHERE type = 'STOCK' and code IN (SELECT code FROM Top5Stock)
+          ),
+          average_volumes AS (
+            SELECT code, AVG(CASE WHEN rn <= 20 THEN totalVol END) AS avg_totalVol_20d FROM ranked_trades GROUP BY code
+          )
+        `;
+
+        return `
+          ${this.buildCommonPriceComparisonCTE(now, prev, topStocksCTE)}
+          SELECT 
+            p.code, 
+            p.price_today * 1000  AS price, 
+            (p.price_today - p.price_yesterday) / NULLIF(p.price_yesterday, 0) * 100 AS day, 
+            p.totalVol / avger.avg_totalVol_20d as point, 
+            p.totalVal / 1000000000 AS value, 
+            p.totalVol AS volume
+          FROM PriceComparison p
+          JOIN Top5Stock t ON p.code = t.code
+          JOIN average_volumes avger ON p.code = avger.code
+          WHERE p.price_today IS NOT NULL AND p.price_yesterday IS NOT NULL
+          ORDER BY p.totalVol / avger.avg_totalVol_20d DESC;
+        `;
+      };
+      
+      const [desc, asc] = await Promise.all([
+        this.mssqlService.query(buildTopStocksQuery('DESC')),
+        this.mssqlService.query(buildTopStocksQuery('ASC'))
+      ]);
+
+      return { desc, asc };
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  async topBuySellActive(floor: string) {
+    try {
+      const { now, prev } = await this.getLatestAndPreviousDate('tickerTransVNDIntraday', 'tradeIntraday.dbo');
+
+      const query = `
+        WITH FloorStocks AS (
+          SELECT code 
+          FROM marketInfor.dbo.info 
+          WHERE floor = '${floor}' AND status = 'listed' AND type = 'STOCK'
+        ),
+        StockData AS (
+          SELECT t.code,
+              MAX(CASE WHEN t.date = '${now}' THEN t.closePrice END) AS price_today,
+              MAX(CASE WHEN t.date = '${prev}' THEN t.closePrice END) AS price_yesterday,
+              MAX(CASE WHEN t.date = '${now}' THEN t.totalVal END) AS totalVal,
+              MAX(CASE WHEN t.date = '${now}' THEN t.totalVol END) AS totalVol
+          FROM marketTrade.dbo.tickerTradeVND t
+          INNER JOIN FloorStocks fs ON t.code = fs.code
+          WHERE t.date IN ('${now}', '${prev}')
+          GROUP BY t.code
+          HAVING MAX(CASE WHEN t.date = '${now}' THEN t.totalVol END) > 200000  -- Lọc totalVol trước
+        ),
+        MBChuDong AS (
+          SELECT 
+              tti.code, 
+              SUM(CASE WHEN tti.action = 'B' THEN tti.volume ELSE 0 END) AS Mua, 
+              SUM(CASE WHEN tti.action = 'S' THEN tti.volume ELSE 0 END) AS Ban,
+              CASE 
+                  WHEN SUM(CASE WHEN tti.action = 'S' THEN tti.volume ELSE 0 END) > 0 
+                  THEN SUM(CASE WHEN tti.action = 'B' THEN tti.volume ELSE 0 END) / SUM(CASE WHEN tti.action = 'S' THEN tti.volume ELSE 0 END) 
+                  ELSE NULL 
+              END AS MB,
+              CASE 
+                  WHEN SUM(CASE WHEN tti.action = 'B' THEN tti.volume ELSE 0 END) > 0 
+                  THEN SUM(CASE WHEN tti.action = 'S' THEN tti.volume ELSE 0 END) / SUM(CASE WHEN tti.action = 'B' THEN tti.volume ELSE 0 END) 
+                  ELSE NULL 
+              END AS BM
+          FROM tradeIntraday.dbo.tickerTransVNDIntraday tti
+          INNER JOIN StockData sd ON tti.code = sd.code  -- Chỉ lấy những mã đã lọc
+          WHERE tti.date = (SELECT MAX(date) FROM tradeIntraday.dbo.tickerTransVNDIntraday)
+          GROUP BY tti.code, tti.date
+        ),
+        TopStocks AS (
+          SELECT code, MB as point, 'MB' as type
+          FROM (SELECT TOP 5 code, MB FROM MBChuDong WHERE MB IS NOT NULL ORDER BY MB DESC) AS topMB
+          UNION ALL
+          SELECT code, BM as point, 'BM' as type
+          FROM (SELECT TOP 5 code, BM FROM MBChuDong WHERE BM IS NOT NULL ORDER BY BM DESC) AS topBM
+        )
+        SELECT ts.code, ts.point, ts.type,
+            COALESCE(sd.price_today * 1000, 0) AS price,
+            COALESCE((sd.price_today - sd.price_yesterday) / NULLIF(sd.price_yesterday, 0) * 100, 0) AS day,
+            COALESCE(sd.totalVal / 1000000000, 0) AS value,
+            COALESCE(sd.totalVol, 0) AS volume
+        FROM TopStocks ts
+        LEFT JOIN StockData sd ON ts.code = sd.code
+        ORDER BY ts.type, ts.point DESC;
+      `;
+
+      const data = await this.mssqlService.query<BuySellActiveResponse[]>(query);
+
+      return data.reduce<{ MB: BuySellActiveResponse[]; BM: BuySellActiveResponse[] }>(
+        (acc, item) => {
+          acc[item.type].push({
+            code: item.code,
+            point: item.point,
+            price: item.price,
+            day: item.day,
+            value: item.value,
+            volume: item.volume,
+            type: item.type
+          });
+          return acc;
+        },
+        { MB: [], BM: [] }
+      );
+    } catch (error) {
+      throw new CatchException(error);
     }
   }
 
@@ -1543,7 +1809,7 @@ export class ReportService {
       const dataYesterday = await this.dbServer.query(
         query(type ? weekDate : previousDate),
       );
-
+      
       const result = dataToday.map((item) => {
         const yesterdayItem = dataYesterday.find(
           (i) => i.ticker === item.ticker,
