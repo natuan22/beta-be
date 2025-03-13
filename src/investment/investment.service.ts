@@ -854,7 +854,7 @@ export class InvestmentService {
       const arr = []
 
       stock.map((item: any) => {
-        const price = data.filter(res => res.code == item.code)
+        const price = data?.filter(res => res.code == item.code)
         price[price.length - 1]['closePrice'] = !realtimePrice ? (lastPrice.find(price => price.code == item.code)).closePrice : realtimePrice
         
         const result = !haveMa ? this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo) : this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo, item.ma)
@@ -1432,7 +1432,7 @@ export class InvestmentService {
     const results: any[] = [];
     for (const item of stock) {
       const lastPrice = !realtimePrice ? lastPriceData.find((p: any) => p.code === item.code)?.closePrice : realtimePrice;
-      const priceData = dataSignals.filter((res) => res.code === item.code);
+      const priceData = dataSignals?.filter((res) => res.code === item.code);
 
       let prevSignalZero = null;
       let prevSignalOne = null;
