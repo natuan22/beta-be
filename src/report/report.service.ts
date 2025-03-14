@@ -386,13 +386,12 @@ export class ReportService {
     try {
       const { now, prev } = await this.getLatestAndPreviousDate('tickerTradeVND', 'marketTrade.dbo');
 
-      const buildTopStocksQuery = (orderDirection: 'DESC' | 'ASC') => {
+      const buildTopStocksQuery = (compareType: '>' | '<') => {
         const topStocksCTE = `
           Top5Stock AS (
-            SELECT TOP 5 code, closePrice, totalVol
+            SELECT code, closePrice, totalVol
             FROM marketTrade.dbo.tickerTradeVND
-            WHERE floor = 'HOSE' AND type = 'STOCK' AND date = '${now}' AND totalVol > 200000
-            ORDER BY perChange ${orderDirection}
+            WHERE floor = 'HOSE' AND type = 'STOCK' AND date = '${now}' AND totalVol > 200000 AND perChange ${compareType} 0
           ),
           ranked_trades AS (
             SELECT code, totalVol, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
@@ -406,7 +405,7 @@ export class ReportService {
 
         return `
           ${this.buildCommonPriceComparisonCTE(now, prev, topStocksCTE)}
-          SELECT 
+          SELECT TOP 5
             p.code, 
             p.price_today * 1000  AS price, 
             (p.price_today - p.price_yesterday) / NULLIF(p.price_yesterday, 0) * 100 AS day, 
@@ -422,8 +421,8 @@ export class ReportService {
       };
       
       const [desc, asc] = await Promise.all([
-        this.mssqlService.query(buildTopStocksQuery('DESC')),
-        this.mssqlService.query(buildTopStocksQuery('ASC'))
+        this.mssqlService.query(buildTopStocksQuery('>')),
+        this.mssqlService.query(buildTopStocksQuery('<'))
       ]);
 
       return { desc, asc };
