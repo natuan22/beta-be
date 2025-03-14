@@ -391,7 +391,7 @@ export class ReportService {
           Top5Stock AS (
             SELECT TOP 5 code, closePrice, totalVol
             FROM marketTrade.dbo.tickerTradeVND
-            WHERE floor = 'HOSE' AND type = 'STOCK' AND date = '${now}'
+            WHERE floor = 'HOSE' AND type = 'STOCK' AND date = '${now}' AND totalVol > 200000
             ORDER BY perChange ${orderDirection}
           ),
           ranked_trades AS (

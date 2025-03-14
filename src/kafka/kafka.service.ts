@@ -750,28 +750,38 @@ export class KafkaService {
   }
 
   async backTestTradingTool(payload: ChartNenInterface[]) {
-    if (!payload?.length) return;
+    if (!payload?.length || !payload[0]?.code || !payload[0]?.closePrice) return;
     
     try {
-      const code = payload[0].code;
-      if (!code) return;
+      const { code, closePrice, time } = payload[0];
       
-      const data: any[] = await this.redis.get('beta-watch-list') || [];
-      const item = data.find(item => item.code === code);
+      // Sử dụng cache key để lưu beta watch list
+      const cacheKey = 'beta-watch-list';
+      const cachedData: any[] = await this.redis.get(cacheKey);
       
-      if (!item) return;
-      
-      const startDate = moment('2024-10-01').format('YYYY-MM-DD');
-      const endDate = moment().format('YYYY-MM-DD');
-      const closePrice = payload[0].closePrice;
-      
-      const res = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], startDate, endDate, closePrice);
-      
+      // Kiểm tra cache và item cần thiết
+      if (!cachedData?.length) return;
+      const item = cachedData.find(item => item.code === code);
+      if (!item?.ma) return;
+
+      // Tính toán dates một lần
+      const dates = { startDate: moment('2024-10-01').format('YYYY-MM-DD'), endDate: moment().format('YYYY-MM-DD') };
+
+      // Gọi backtest với params đã được validate
+      const res = await this.investmentService.backtest([{ code: item.code, ma: item.ma }], dates.startDate, dates.endDate, closePrice);
       if (!Array.isArray(res)) return;
-      const filteredRes = res.filter(resItem => resItem.code === code && resItem.status === 0).map(resItem => ({ ...resItem, time: payload[0].time }));
-      
+
+      // Optimize filter và map operation
+      const filteredRes = res.reduce((acc, resItem) => {
+        if (resItem.code === code && resItem.status === 0) {
+          acc.push({ ...resItem, time });
+        }
+        return acc;
+      }, []);
+
+      // Chỉ emit khi có kết quả
       if (filteredRes.length > 0) {
-        this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
+        await this.send(`${SocketEmit.BackTestTradingTool}`, filteredRes);
       }
     } catch (error) {
       console.error(error);
@@ -780,32 +790,48 @@ export class KafkaService {
 
   async handleContributePEPB(payload: ChartNenInterface[]) {
     try {
-      const code = payload[0].code;
-      const closePrice = payload[0].closePrice;
-  
-      let data = await this.redis.get(`eps-bpvs:${code}`);
-  
+      if (!payload?.length) return;
+
+      const { code, closePrice, time } = payload[0];
+      if (!code || !closePrice) return;
+
+      const cacheKey = `eps-bpvs:${code}`;
+      let data = await this.redis.get(cacheKey) as any[];
+
       if (!data) {
-        data = await this.dbServer.query(`
-          SELECT TOP 1 WITH TIES code, EPS, BVPS 
-          FROM VISUALIZED_DATA.dbo.filterResource
-          WHERE code = '${code}'
-          ORDER BY date DESC;
-        `);
+        const query = `
+          WITH LatestDate AS (
+            SELECT MAX(date) as maxDate 
+            FROM VISUALIZED_DATA.dbo.filterResource
+            WHERE code = '${code}'
+          )
+          SELECT f.code, f.EPS, f.BVPS
+          FROM VISUALIZED_DATA.dbo.filterResource f
+          JOIN LatestDate d ON f.date = d.maxDate
+          WHERE f.code = '${code}'`;
+
+        data = await this.dbServer.query(query) as any[];
         
-        await this.redis.set(`eps-bpvs:${code}`, data, TimeToLive.OneDay);
+        if (data?.length) {
+          await this.redis.set(cacheKey, data, { ttl: TimeToLive.OneDay });
+        } else {
+          return;
+        }
       }
-  
+
+      const { EPS, BVPS } = data[0];
+      if (!EPS || !BVPS) return;
+
       const result = {
         code,
-        pe: closePrice / data[0].EPS,
-        pb: closePrice / data[0].BVPS,
-        time: payload[0].time
+        pe: closePrice / EPS,
+        pb: closePrice / BVPS,
+        time
       };
-  
-      this.send(`${SocketEmit.ContributePEPB}-${code}`, result);
+
+      await this.send(`${SocketEmit.ContributePEPB}-${code}`, result);
     } catch (error) {
-      this.logger.error(`handleContributePEPB failed: ${error.message}`, error);
+      console.error(error);
     }
   }
 

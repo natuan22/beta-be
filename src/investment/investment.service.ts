@@ -1374,58 +1374,71 @@ export class InvestmentService {
     return result;
   }
 
-  async backtest(stock: string | any[], from: string, to: string, realtimePrice?: number) {
+  async backtest(stock: any[], from: string, to: string, realtimePrice?: number) {
     const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
     
-    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
-      this.redis.get(`price-back-test:${listStock}`),
-      this.redis.get(`price-back-test:${from}`),
-      this.redis.get(`price-back-test:${to}`),
-    ]);
+    const fromDate = moment(from).format('YYYY-MM-DD');
+    const toDate = moment(to).format('YYYY-MM-DD');
 
+    const cacheKeyData = `price-back-test:${listStock}`;
+    const cacheKeyFrom = `price-back-test:${fromDate}`;
+    const cacheKeyTo = `price-back-test:${toDate}`;
+
+    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+      this.redis.get(cacheKeyData),
+      this.redis.get(cacheKeyFrom),
+      this.redis.get(cacheKeyTo),
+    ]);
+    
+    const historyQuery = `select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`;
+    const signalsQuery = `
+      WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
+      SELECT b.code, b.date, b.signal
+      FROM PHANTICH.dbo.BuySellSignals b
+      JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
+      WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${fromDate}' AND '${toDate}'
+      ORDER BY b.date ASC;
+    `;
+    const latestPriceQuery = `
+      WITH LatestTrade AS (
+        SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
+        FROM tradeIntraday.dbo.tickerTradeVNDIntraday 
+        WHERE code ${listStock}
+      )
+      SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
+    `;
+    const fromDateQuery = `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${fromDate}' ORDER BY date ASC`;
+    const toDateQuery = `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${toDate}' ORDER BY date DESC`;
+    
     let [data, dataSignals, lastPriceData, date, dateTo] = await Promise.all([
-      !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [],
-      this.mssqlService.query(`WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
-                               SELECT b.code, b.date, b.signal
-                               FROM PHANTICH.dbo.BuySellSignals b
-                               JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-                               WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${moment(from).format('YYYY-MM-DD')}' AND '${moment(to).format('YYYY-MM-DD')}'
-                               ORDER BY b.date ASC;`) as any,
-      !realtimePrice ? this.mssqlService.query(`WITH LatestTrade AS (
-                                                  SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
-                                                  FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
-                                                )
-                                                SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : (1 as any),
-      !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
-      !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : [],
+      !dataRedis ? this.mssqlService.query(historyQuery) as any : [],
+      this.mssqlService.query(signalsQuery) as any,
+      !realtimePrice ? this.mssqlService.query(latestPriceQuery) : (1 as any),
+      !dateRedis ? this.mssqlService.query(fromDateQuery) : [],
+      !dateToRedis ? this.mssqlService.query(toDateQuery) : [],
     ]);
 
     if (realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)) {
-      await this.redis.set(`price-back-test:${listStock}`, data, { ttl: 180 });
+      await this.redis.set(cacheKeyData, data, { ttl: 180 });
     }
     if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
-      await this.redis.set(`price-back-test:${from}`, date, { ttl: 180 });
+      await this.redis.set(cacheKeyFrom, date, { ttl: 180 });
     }
     if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
-      await this.redis.set(`price-back-test:${to}`, dateTo, { ttl: 180 });
+      await this.redis.set(cacheKeyTo, dateTo, { ttl: 180 });
     }
 
-    if (dataRedis) {
-      data = dataRedis;
-    }
-    if (dateRedis) {
-      date = dateRedis;
-    }
-    if (dateToRedis) {
-      dateTo = dateToRedis;
-    }
+    if (dataRedis) data = dataRedis
+    if (dateRedis) date = dateRedis
+    if (dateToRedis) dateTo = dateToRedis
 
     const priceMap = new Map();
     data.forEach((d: any) => {
+      const formattedDate = moment(d.date).format('YYYY-MM-DD');
       if (!priceMap.has(d.code)) {
         priceMap.set(d.code, {});
       }
-      priceMap.get(d.code)[moment(d.date).format('YYYY-MM-DD')] = d.closePrice;
+      priceMap.get(d.code)[formattedDate] = d.closePrice;
     });
 
     // Duyệt qua từng stock để tính toán price change
@@ -1443,9 +1456,12 @@ export class InvestmentService {
         } else if (priceItem.signal === 1 && prevSignalZero) {
           prevSignalOne = priceItem;
 
+          const dateZero = moment(prevSignalZero.date).format('YYYY-MM-DD');
+          const dateOne = moment(prevSignalOne.date).format('YYYY-MM-DD');
+
           // Lấy giá từ priceMap theo ngày và code
-          const priceZero = priceMap.get(item.code)?.[moment(prevSignalZero.date).format('YYYY-MM-DD')];
-          const priceOne = priceMap.get(item.code)?.[moment(prevSignalOne.date).format('YYYY-MM-DD')];
+          const priceZero = priceMap.get(item.code)?.[dateZero];
+          const priceOne = priceMap.get(item.code)?.[dateOne];
 
           if (priceZero !== undefined && priceOne !== undefined) {
             // Tính giá thay đổi
@@ -1453,8 +1469,8 @@ export class InvestmentService {
 
             // Lưu kết quả
             results.push({
-              startDate: moment(prevSignalZero.date).format('YYYY-MM-DD'),
-              endDate: moment(prevSignalOne.date).format('YYYY-MM-DD'),
+              startDate: dateZero,
+              endDate: dateOne,
               priceBuy: priceZero,
               priceSell: priceOne,
               priceStar: 0,
@@ -1470,8 +1486,11 @@ export class InvestmentService {
       
       // Nếu không tìm thấy signal = 1 sau signal = 0, dùng giá tại dateTo
       if (prevSignalZero) {
-        const priceZero = priceMap.get(item.code)?.[moment(prevSignalZero.date).format('YYYY-MM-DD')];
-        let priceOne = priceMap.get(item.code)?.[moment(dateTo[0].date).format('YYYY-MM-DD')];
+        const dateZero = moment(prevSignalZero.date).format('YYYY-MM-DD');
+        const dateOne = moment(dateTo[0].date).format('YYYY-MM-DD');
+
+        const priceZero = priceMap.get(item.code)?.[dateZero];
+        let priceOne = priceMap.get(item.code)?.[dateOne];
       
         if (realtimePrice) {
           priceOne = realtimePrice;
@@ -1486,8 +1505,8 @@ export class InvestmentService {
           const priceChange = ((priceOne - priceZero) / priceZero) * 100;
       
           results.push({
-            startDate: moment(prevSignalZero.date).format('YYYY-MM-DD'),
-            endDate: moment(dateTo[0].date).format('YYYY-MM-DD'),
+            startDate: dateZero,
+            endDate: dateOne,
             priceBuy: priceZero,
             priceSell: 0,
             priceStar: priceOne,
