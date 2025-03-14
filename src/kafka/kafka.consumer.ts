@@ -232,7 +232,7 @@ export class KafkaConsumer {
     const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
     
     try {
-      await Promise.allSettled([
+      await Promise.all([
         this.kafkaService.handleBetaWatchListSocket(payload),
         withTimeout(this.kafkaService.backTestTradingTool(payload), 6000, 'backTestTradingTool'),
         withTimeout(this.kafkaService.handleContributePEPB(payload), 6000, 'handleContributePEPB'),
