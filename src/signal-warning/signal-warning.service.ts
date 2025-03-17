@@ -5,6 +5,7 @@ import * as moment from 'moment';
 import * as calTech from 'technicalindicators';
 import { Repository } from 'typeorm';
 import { DB_SERVER } from '../constants';
+import { TimeToLive } from '../enums/common.enum';
 import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
 import { MssqlService } from '../mssql/mssql.service';
 import { UtilCommonTemplate } from '../utils/utils.common';
@@ -12,7 +13,6 @@ import { SaveSignalDto } from './dto/save-signal.dto';
 import { SignalWarningUserEntity } from './entities/signal-warning.entity';
 import { SignalWarningResponse } from './response/signal-warning.response';
 import { SignalWarningUserResponse } from './response/signalUser.response';
-import { TimeToLive } from '../enums/common.enum';
 
 @Injectable()
 export class SignalWarningService {
@@ -156,66 +156,118 @@ export class SignalWarningService {
   }
 
   async getDataSignal(stock: any[], realtimePrice?: number) {
-    const listStock = stock.map(item => `'${item.code}'`).join(',');
+    try {
+      // Validate input
+      if (!Array.isArray(stock) || stock.length === 0) return [];
 
-    const dataRedis = await this.redis.get(`price-signal:${listStock}`);
-    
-    let data = dataRedis ? dataRedis : await this.mssqlService.query(`SELECT TOP 150 closePrice, date, code FROM marketTrade.dbo.historyTicker WHERE code IN (${listStock}) ORDER BY date DESC;`) as any;
+      // Create cache key
+      const listStock = stock.map(item => `'${item.code}'`).join(',');
+      const cacheKey = `price-signal:${listStock}:${realtimePrice || ''}`;
 
-    if (realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)) { await this.redis.set(`price-signal:${listStock}`, data, { ttl: 180 }) }
+      // Check cache first
+      const cachedData: any[] = await this.redis.get(cacheKey);
+      if (cachedData) {
+        return cachedData;
+      }
 
-    const arr = [];
-    stock.forEach((item: any) => {
-        const stockData = data.filter(res => res.code === item.code);
-        if (stockData.length > 0) {
-          stockData[0]['closePrice'] = realtimePrice ? realtimePrice : stockData[0].closePrice;
+      // Get data from database
+      const query = `SELECT TOP 150 closePrice, date, code FROM marketTrade.dbo.historyTicker WHERE code IN (${listStock}) ORDER BY date DESC;`;
+
+      const data: any[] = await this.mssqlService.query(query);
+      if (!data?.length) return [];
+
+      // Process data efficiently using Map
+      const stockMap = new Map();
+      data.forEach(item => {
+        if (!stockMap.has(item.code)) {
+          stockMap.set(item.code, []);
         }
+        stockMap.get(item.code).push(item);
+      });
 
-        const result = this.calculateAllIndicators(stockData);
-        arr.push(result);
-    });
-    
-    return arr;
+      // Calculate indicators for each stock
+      const results = await Promise.all(
+        stock.map(async (item) => {
+          const stockData = stockMap.get(item.code) || [];
+          if (stockData.length === 0) return null;
+
+          // Update closePrice if realtimePrice is provided
+          if (realtimePrice) {
+            stockData[0] = { ...stockData[0], closePrice: realtimePrice };
+          }
+
+          // Calculate indicators
+          const result = this.calculateAllIndicators(stockData);
+          return result;
+        })
+      );
+
+      // Filter out null results and cache valid ones
+      const validResults = results.filter(Boolean);
+      if (validResults.length > 0) {
+        await this.redis.set(cacheKey, validResults, { ttl: 180 });
+      }
+
+      return validResults;
+    } catch (error) {
+      throw new CatchException(error);
+    }
   }
 
-  async getLiquidMarketCap(stock: string | any[]): Promise<any> {
-    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
-    
-    const redisData = await this.redis.get(`data-liquidity-marketCap:${listStock}`);
-    if (redisData) return redisData;
+  async getLiquidMarketCap(stock: any[]): Promise<any> {
+    try {
+      // Validate input
+      if (!Array.isArray(stock) || stock.length === 0) return [];
 
-    const query = `
-      WITH LatestRatio AS (
-        SELECT r.marketCap, r.date, r.code
-        FROM (SELECT code, marketCap, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
-              FROM RATIO.dbo.ratioInday 
-              WHERE type = 'STOCK' AND code ${listStock}
-            ) r
-        WHERE r.rn = 1
-      ),
-      StockInfo AS (SELECT code, floor, indexCode FROM marketInfor.dbo.info WHERE status = 'listed' AND code ${listStock}),
-      RecentTrades AS (
-        SELECT code, totalVal, CASE WHEN rn <= 5 THEN 1 WHEN rn <= 20 THEN 2 ELSE 3 END AS period_type
-        FROM (SELECT code, totalVal, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
-              FROM marketTrade.dbo.tickerTradeVND WITH (NOLOCK)
-              WHERE type = 'STOCK' AND code ${listStock} AND date >= DATEADD(DAY, -30, GETDATE())
-            ) AS t
-        WHERE rn <= 20
-      )
-      SELECT lr.marketCap, lr.date, lr.code, si.floor, si.indexCode,
-             AVG(CASE WHEN rt.period_type = 1 THEN rt.totalVal ELSE NULL END) AS avg_totalVal_5d,
-             AVG(CASE WHEN rt.period_type IN (1, 2) THEN rt.totalVal ELSE NULL END) AS avg_totalVal_20d
-      FROM LatestRatio lr
-      JOIN StockInfo si ON lr.code = si.code
-      LEFT JOIN RecentTrades rt ON lr.code = rt.code
-      GROUP BY lr.marketCap, lr.date, lr.code, si.floor, si.indexCode
-      ORDER BY lr.code;
-    `
+      // Format stock list
+      const listStock = `in (${stock.map(item => `'${item.code}'`).join(',')})`;
+      const cacheKey = `data-liquidity-marketCap:${listStock}`;
 
-    const data = await this.mssqlService.query(query);
-    
-    await this.redis.set(`data-liquidity-marketCap:${listStock}`, data, { ttl: TimeToLive.FiveMinutes });
-    return data;
+      // Check cache
+      const cachedData = await this.redis.get(cacheKey) as any[];
+      if (cachedData?.length) return cachedData;
+
+      // Optimize query with better indexing and filtering
+      const query = `
+        WITH LatestRatio AS (
+          SELECT r.marketCap, r.date, r.code
+          FROM (SELECT code, marketCap, date, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
+            FROM RATIO.dbo.ratioInday WITH (NOLOCK)
+            WHERE type = 'STOCK' AND code ${listStock} AND date >= DATEADD(DAY, -7, GETDATE())
+          ) r
+          WHERE r.rn = 1
+        ),
+        StockInfo AS (SELECT code, floor, indexCode FROM marketInfor.dbo.info WITH (NOLOCK) WHERE status = 'listed' AND code ${listStock}),
+        RecentTrades AS (
+          SELECT code, totalVal, CASE WHEN rn <= 5 THEN 1 WHEN rn <= 20 THEN 2 ELSE 3 END AS period_type
+          FROM (
+            SELECT code, totalVal, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
+            FROM marketTrade.dbo.tickerTradeVND WITH (NOLOCK)
+            WHERE type = 'STOCK' AND code ${listStock} AND date >= DATEADD(DAY, -30, GETDATE())
+          ) AS t
+          WHERE rn <= 20
+        )
+        SELECT lr.marketCap, lr.date, lr.code, si.floor, si.indexCode,
+          ROUND(AVG(CASE WHEN rt.period_type = 1 THEN rt.totalVal ELSE NULL END), 2) AS avg_totalVal_5d,
+          ROUND(AVG(CASE WHEN rt.period_type IN (1, 2) THEN rt.totalVal ELSE NULL END), 2) AS avg_totalVal_20d
+        FROM LatestRatio lr
+        INNER JOIN StockInfo si ON lr.code = si.code
+        LEFT JOIN RecentTrades rt ON lr.code = rt.code
+        GROUP BY lr.marketCap, lr.date, lr.code, si.floor, si.indexCode
+        ORDER BY lr.code;
+      `;
+
+      // Execute query
+      const data = await this.mssqlService.query(query) as any[];
+      if (!data?.length) return [];
+
+      // Cache results
+      await this.redis.set(cacheKey, data, TimeToLive.FiveMinutes);
+
+      return data;
+    } catch (error) {
+      throw new CatchException(error);
+    }
   }
 
   private calculateAllIndicators(data: any) {
@@ -255,11 +307,28 @@ export class SignalWarningService {
       item.BBL = parseFloat((bbl[index] / 1000 || 0).toFixed(2));
     });
 
-    // Lấy dữ liệu hôm nay và hôm qua
+    // Lấy dữ liệu hôm nay và ngày giao dịch trước đó
     const today = UtilCommonTemplate.toDateV2(moment());
-    const yesterday = UtilCommonTemplate.toDateV2(moment().subtract(1, 'day'));
+    
+    // Tìm ngày giao dịch trước đó (bỏ qua thứ 7 và chủ nhật)
+    let prevTradingDay = UtilCommonTemplate.toDateV2(moment().subtract(1, 'day'));
+    let prevTradingDayData = dateFormat.find(item => item.date === prevTradingDay);
+    
+    // Nếu ngày hôm trước là thứ 7 hoặc chủ nhật, tìm ngày giao dịch gần nhất
+    if (!prevTradingDayData) {
+      for (let i = 2; i <= 5; i++) {
+        const checkDate = UtilCommonTemplate.toDateV2(moment().subtract(i, 'day'));
+        const checkData = dateFormat.find(item => item.date === checkDate);
+        if (checkData) {
+          prevTradingDay = checkDate;
+          prevTradingDayData = checkData;
+          break;
+        }
+      }
+    }
+
     const todayData = dateFormat.find(item => item.date === today) || {};
-    const yesterdayData = dateFormat.find(item => item.date === yesterday) || {};
+    const yesterdayData = prevTradingDayData || {};
     
     // Kết hợp kết quả cho tất cả chỉ báo
     const result = {
