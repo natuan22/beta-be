@@ -1,10 +1,11 @@
-import { CACHE_MANAGER, HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
+import { CACHE_MANAGER, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cache } from 'cache-manager';
 import * as moment from 'moment';
 import * as calTech from 'technicalindicators';
 import { Repository } from 'typeorm';
 import { DB_SERVER } from '../constants';
+import { TimeToLive } from '../enums/common.enum';
 import { CatchException, ExceptionResponse } from '../exceptions/common.exception';
 import { MssqlService } from '../mssql/mssql.service';
 import { UtilCommonTemplate } from '../utils/utils.common';
@@ -12,7 +13,6 @@ import { SaveSignalDto } from './dto/save-signal.dto';
 import { SignalWarningUserEntity } from './entities/signal-warning.entity';
 import { SignalWarningResponse } from './response/signal-warning.response';
 import { SignalWarningUserResponse } from './response/signalUser.response';
-import { TimeToLive } from '../enums/common.enum';
 
 @Injectable()
 export class SignalWarningService {
