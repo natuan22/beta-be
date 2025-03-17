@@ -936,7 +936,6 @@ export class KafkaService {
       if (!allClientsEmit?.length || !payload?.length) return;
       
       const { code, closePrice, time } = payload[0];
-      
       if (!code || closePrice === undefined) return;
       
       await this.processClients(allClientsEmit, [{ code }], closePrice, time);
@@ -946,46 +945,40 @@ export class KafkaService {
   }
 
   private async processClients(allClientsEmit: string[], code: any[], closePrice: number, time: string) {
-    if (!allClientsEmit?.length || !code?.length) return;
-    
     try {
+      if (!allClientsEmit?.length || !code?.length) return;
+    
+      // Get socket server instance
+      const sockets = global._server?.sockets;
+      if (!sockets) return;
+
+      // Create socket map efficiently
+      const socketMap = new Map();
+      const socketIterator = Array.isArray(sockets) ? sockets : sockets.values();
+      
+      for (const socket of socketIterator) {
+        if (socket?.id && allClientsEmit.includes(socket.id)) {
+          socketMap.set(socket.id, socket);
+        }
+      }
+
+      // Get valid client IDs
+      const validClientIds = allClientsEmit.filter(id => socketMap.has(id));
+      if (!validClientIds.length) return;
+ 
       const [dataSignal, dataLiquidMarketCap] = await Promise.all([
         this.signalWarningService.getDataSignal(code, closePrice),
         this.signalWarningService.getLiquidMarketCap(code)
       ]);
       
       if (!dataSignal?.length) return;
-  
       const res = SignalWarningResponse.mapToList(dataSignal, dataLiquidMarketCap);
       if (!res?.length) return;
   
       const resSend = res.map(item => ({ ...item, time }));
-      
-      const sockets = global._server?.sockets;
-      if (!sockets) return;
-      
-      const socketMap = new Map();
-      if (Array.isArray(sockets)) {
-        sockets.forEach((socket: any) => {
-          if (socket.id && allClientsEmit.includes(socket.id)) {
-            socketMap.set(socket.id, socket);
-          }
-        });
-      } else {
-        for (const socket of sockets.values()) {
-          if (socket.id && allClientsEmit.includes(socket.id)) {
-            socketMap.set(socket.id, socket);
-          }
-        }
-      }
-      
-      const validClientIds = allClientsEmit.filter(id => socketMap.has(id));
-      
       const payload = { data: resSend };
       
-      validClientIds.forEach(clientId => {
-        socketMap.get(clientId).emit('signal-warning-response', payload);
-      });
+      await Promise.all(validClientIds.map(clientId => socketMap.get(clientId).emit('signal-warning-response', payload)));
     } catch (error) {
       console.error(error);
     }

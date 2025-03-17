@@ -1375,151 +1375,131 @@ export class InvestmentService {
   }
 
   async backtest(stock: any[], from: string, to: string, realtimePrice?: number) {
-    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
-    
-    const fromDate = moment(from).format('YYYY-MM-DD');
-    const toDate = moment(to).format('YYYY-MM-DD');
+    try {
+      const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map((item) => `'${item.code}'`).join(',')})`;
+      const fromDate = moment(from).format('YYYY-MM-DD');
+      const toDate = moment(to).format('YYYY-MM-DD');
 
-    const cacheKeyData = `price-back-test:${listStock}`;
-    const cacheKeyFrom = `price-back-test:${fromDate}`;
-    const cacheKeyTo = `price-back-test:${toDate}`;
+      // Tạo cache key duy nhất cho bộ tham số đầu vào
+      const cacheKey = `backtest:${listStock}:${fromDate}:${toDate}:${realtimePrice || ''}`;
+      const cachedResult = await this.redis.get(cacheKey);
+      if (cachedResult) return cachedResult;
 
-    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
-      this.redis.get(cacheKeyData),
-      this.redis.get(cacheKeyFrom),
-      this.redis.get(cacheKeyTo),
-    ]);
-    
-    const historyQuery = `select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`;
-    const signalsQuery = `
-      WITH FirstZeroSignal AS (SELECT code, MIN(date) AS StartDate FROM PHANTICH.dbo.BuySellSignals WHERE signal = 0 GROUP BY code)
-      SELECT b.code, b.date, b.signal
-      FROM PHANTICH.dbo.BuySellSignals b
-      JOIN FirstZeroSignal fz ON b.code = fz.code AND b.date >= fz.StartDate
-      WHERE ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1) AND b.code ${listStock} AND b.date BETWEEN '${fromDate}' AND '${toDate}'
-      ORDER BY b.date ASC;
-    `;
-    const latestPriceQuery = `
-      WITH LatestTrade AS (
-        SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn 
-        FROM tradeIntraday.dbo.tickerTradeVNDIntraday 
-        WHERE code ${listStock}
-      )
-      SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
-    `;
-    const fromDateQuery = `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${fromDate}' ORDER BY date ASC`;
-    const toDateQuery = `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${toDate}' ORDER BY date DESC`;
-    
-    let [data, dataSignals, lastPriceData, date, dateTo] = await Promise.all([
-      !dataRedis ? this.mssqlService.query(historyQuery) as any : [],
-      this.mssqlService.query(signalsQuery) as any,
-      !realtimePrice ? this.mssqlService.query(latestPriceQuery) : (1 as any),
-      !dateRedis ? this.mssqlService.query(fromDateQuery) : [],
-      !dateToRedis ? this.mssqlService.query(toDateQuery) : [],
-    ]);
+      // Tối ưu query lấy lịch sử giá và tín hiệu trong một lần query
+      const combinedQuery = `
+        WITH HistoricalData AS (
+          SELECT closePrice, date, code 
+          FROM marketTrade.dbo.historyTicker
+          WHERE code ${listStock} AND date BETWEEN '${fromDate}' AND '${toDate}'
+        ),
+        SignalData AS (
+          SELECT b.code, b.date, b.signal
+          FROM PHANTICH.dbo.BuySellSignals b
+          WHERE b.code ${listStock} AND b.date BETWEEN '${fromDate}' AND '${toDate}' AND ((b.signal = 0 AND b.priceIncCY >= 25) OR b.signal = 1)
+        ),
+        LatestPrice AS (
+          SELECT closePrice, date, code
+          FROM (
+            SELECT closePrice, date, code,
+                   ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE code ${listStock}
+          ) t WHERE rn = 1
+        )
+        SELECT h.code, h.date, h.closePrice, s.signal, l.closePrice as lastPrice
+        FROM HistoricalData h
+        LEFT JOIN SignalData s ON h.code = s.code AND h.date = s.date
+        LEFT JOIN LatestPrice l ON h.code = l.code
+        ORDER BY h.code, h.date;
+      `;
 
-    if (realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)) {
-      await this.redis.set(cacheKeyData, data, { ttl: 180 });
-    }
-    if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
-      await this.redis.set(cacheKeyFrom, date, { ttl: 180 });
-    }
-    if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
-      await this.redis.set(cacheKeyTo, dateTo, { ttl: 180 });
-    }
-
-    if (dataRedis) data = dataRedis
-    if (dateRedis) date = dateRedis
-    if (dateToRedis) dateTo = dateToRedis
-
-    const priceMap = new Map();
-    data.forEach((d: any) => {
-      const formattedDate = moment(d.date).format('YYYY-MM-DD');
-      if (!priceMap.has(d.code)) {
-        priceMap.set(d.code, {});
-      }
-      priceMap.get(d.code)[formattedDate] = d.closePrice;
-    });
-
-    // Duyệt qua từng stock để tính toán price change
-    const results: any[] = [];
-    for (const item of stock) {
-      const lastPrice = !realtimePrice ? lastPriceData.find((p: any) => p.code === item.code)?.closePrice : realtimePrice;
-      const priceData = dataSignals?.filter((res) => res.code === item.code);
-
-      let prevSignalZero = null;
-      let prevSignalOne = null;
-
-      priceData.forEach((priceItem) => {
-        if (priceItem.signal === 0) {
-          prevSignalZero = priceItem;
-        } else if (priceItem.signal === 1 && prevSignalZero) {
-          prevSignalOne = priceItem;
-
-          const dateZero = moment(prevSignalZero.date).format('YYYY-MM-DD');
-          const dateOne = moment(prevSignalOne.date).format('YYYY-MM-DD');
-
-          // Lấy giá từ priceMap theo ngày và code
-          const priceZero = priceMap.get(item.code)?.[dateZero];
-          const priceOne = priceMap.get(item.code)?.[dateOne];
-
-          if (priceZero !== undefined && priceOne !== undefined) {
-            // Tính giá thay đổi
-            const priceChange = ((priceOne - priceZero) / priceZero) * 100;
-
-            // Lưu kết quả
-            results.push({
-              startDate: dateZero,
-              endDate: dateOne,
-              priceBuy: priceZero,
-              priceSell: priceOne,
-              priceStar: 0,
-              priceChange: priceChange,
-              priceNow: lastPrice,
-              code: item.code,
-              status: 1,
-            });
-          }
-          prevSignalZero = null;
-        }
-      });
+      const data = await this.mssqlService.query(combinedQuery) as any[];
       
-      // Nếu không tìm thấy signal = 1 sau signal = 0, dùng giá tại dateTo
-      if (prevSignalZero) {
-        const dateZero = moment(prevSignalZero.date).format('YYYY-MM-DD');
-        const dateOne = moment(dateTo[0].date).format('YYYY-MM-DD');
-
-        const priceZero = priceMap.get(item.code)?.[dateZero];
-        let priceOne = priceMap.get(item.code)?.[dateOne];
-      
-        if (realtimePrice) {
-          priceOne = realtimePrice;
-        }
-        
-        // Nếu `dateTo` là ngày hiện tại, dùng giá từ `lastPrice`
-        if (moment(dateTo[0].date).isSame(moment(), 'day') && lastPriceData) {
-          priceOne = lastPrice || priceOne;
-        }
-      
-        if (priceZero !== undefined && priceOne !== undefined) {
-          const priceChange = ((priceOne - priceZero) / priceZero) * 100;
-      
-          results.push({
-            startDate: dateZero,
-            endDate: dateOne,
-            priceBuy: priceZero,
-            priceSell: 0,
-            priceStar: priceOne,
-            priceChange: priceChange,
-            priceNow: lastPrice,
-            code: item.code,
-            status: 0,
+      // Tối ưu xử lý dữ liệu bằng Map
+      const stockMap = new Map();
+      data?.forEach((row) => {
+        if (!stockMap.has(row.code)) {
+          stockMap.set(row.code, {
+            prices: new Map(),
+            signals: [],
+            lastPrice: !realtimePrice ? row.lastPrice : realtimePrice
           });
         }
-      }
-    }
+        const stockData = stockMap.get(row.code);
+        stockData.prices.set(moment(row.date).format('YYYY-MM-DD'), row.closePrice);
+        if (row.signal !== null) {
+          stockData.signals.push({
+            date: row.date,
+            signal: row.signal
+          });
+        }
+      });
 
-    return results
+      // Xử lý kết quả cho từng mã
+      const results: any[] = [];
+      for (const [code, data] of stockMap) {
+        let prevSignalZero = null;
+        const { prices, signals, lastPrice } = data;
+
+        signals.sort((a: any, b: any) => moment(a.date).diff(moment(b.date)));
+        
+        for (const signal of signals) {
+          const currentDate = moment(signal.date).format('YYYY-MM-DD');
+          
+          if (signal.signal === 0) {
+            prevSignalZero = {
+              date: currentDate,
+              price: prices.get(currentDate)
+            };
+          } else if (signal.signal === 1 && prevSignalZero) {
+            const priceZero = prevSignalZero.price;
+            const priceOne = prices.get(currentDate);
+
+            if (priceZero && priceOne) {
+              results.push({
+                code,
+                startDate: prevSignalZero.date,
+                endDate: currentDate,
+                priceBuy: priceZero,
+                priceSell: priceOne,
+                priceStar: 0,
+                priceChange: ((priceOne - priceZero) / priceZero) * 100,
+                priceNow: lastPrice,
+                status: 1
+              });
+            }
+            prevSignalZero = null;
+          }
+        }
+
+        // Xử lý trường hợp còn signal 0 mà chưa có signal 1
+        if (prevSignalZero) {
+          const priceOne = lastPrice;
+          const priceZero = prevSignalZero.price;
+
+          if (priceZero && priceOne) {
+            results.push({
+              code,
+              startDate: prevSignalZero.date,
+              endDate: toDate,
+              priceBuy: priceZero,
+              priceSell: 0,
+              priceStar: priceOne,
+              priceChange: ((priceOne - priceZero) / priceZero) * 100,
+              priceNow: lastPrice,
+              status: 0
+            });
+          }
+        }
+      }
+
+      // Cache kết quả
+      await this.redis.set(cacheKey, results, { ttl: 180 });
+      return results;
+    } catch (error) {
+      console.error('Backtest error:', error);
+      throw error;
+    }
   }
 
   async getBetaWatchListBackup(date: string) {
