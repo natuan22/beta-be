@@ -208,21 +208,20 @@ export class KafkaConsumer {
     }
   }
 
-  // @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
-  // async handleChartNenNew(
-  //   @Payload() payload: ChartNenInterface[], 
-  //   @Ctx() context: KafkaContext
-  // ){
-  //   try {
-  //     const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+  @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
+  async handleChartNenNew(
+    @Payload() payload: ChartNenInterface[], 
+    @Ctx() context: KafkaContext
+  ){
+    try {
+      const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+      if(!allClientsEmit?.length) return;
 
-  //     if(allClientsEmit.length > 0) {
-  //       this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
-  //     }
-  //   } catch (error) {
-  //     this.logger.error(error)
-  //   }
-  // }
+      this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
+    } catch (error) {
+      this.logger.error(error)
+    }
+  }
 
   @MessagePattern(Topics.ChartNenCoPhieuNew)
   async handleChartNenCoPhieuNewSignalMessages(
