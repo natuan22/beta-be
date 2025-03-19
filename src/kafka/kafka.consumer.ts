@@ -208,20 +208,20 @@ export class KafkaConsumer {
     }
   }
 
-  @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
-  async handleChartNenNew(
-    @Payload() payload: ChartNenInterface[], 
-    @Ctx() context: KafkaContext
-  ){
-    try {
-      const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
-      if(!allClientsEmit?.length) return;
+  // @MessagePattern(Topics.ChartNenCoPhieuNewSignal)
+  // async handleChartNenNew(
+  //   @Payload() payload: ChartNenInterface[], 
+  //   @Ctx() context: KafkaContext
+  // ){
+  //   try {
+  //     const allClientsEmit: string[] = (await this.redis.get('clients')) || [];
+  //     if(!allClientsEmit?.length) return;
 
-      this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
-    } catch (error) {
-      this.logger.error(error)
-    }
-  }
+  //     this.kafkaService.handleEventSignalWarning(payload, allClientsEmit);
+  //   } catch (error) {
+  //     this.logger.error(error)
+  //   }
+  // }
 
   @MessagePattern(Topics.ChartNenCoPhieuNew15s)
   async handleChartNenNew15s(
@@ -229,7 +229,7 @@ export class KafkaConsumer {
     @Ctx() context: KafkaContext
   ){
     try {
-      this.kafkaService.handleContributePEPB(payload);
+      this.kafkaService.handleContributePEPB(payload)
     } catch (error) {
       this.logger.error(error)
     }
@@ -240,9 +240,13 @@ export class KafkaConsumer {
     @Payload() payload: ChartNenInterface[],
     @Ctx() context: KafkaContext
   ) {
+    const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
+    
     try {
-      this.kafkaService.handleBetaWatchListSocket(payload);
-      this.kafkaService.backTestTradingTool(payload);
+      await Promise.all([
+        this.kafkaService.handleBetaWatchListSocket(payload),
+        withTimeout(this.kafkaService.backTestTradingTool(payload), 6000, 'backTestTradingTool'),
+      ]);
     } catch (error) {
       this.logger.error(error);
     }
