@@ -15,6 +15,7 @@ export enum Topics {
   CoPhieuAnhHuong = 'kafka-co-phieu-anh-huong-topic',
   ChartNenCoPhieu = 'kafka-chart-nen-tung-co-phieu-topic',
   ChartNenCoPhieuNew = 'kafka-chart-nen-tung-co-phieu-topic-new',
+  ChartNenCoPhieuNew15s = 'kafka-chart-nen-tung-co-phieu-topic-new-15s',
   ChartNenCoPhieuNewSignal = 'kafka-chart-nen-tung-co-phieu-topic-new_signal',
   GiaoDichCoPhieu = 'kafka-giao-dich-tung-co-phieu-topic',
 }

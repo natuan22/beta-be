@@ -223,19 +223,26 @@ export class KafkaConsumer {
     }
   }
 
+  @MessagePattern(Topics.ChartNenCoPhieuNew15s)
+  async handleChartNenNew15s(
+    @Payload() payload: ChartNenInterface[], 
+    @Ctx() context: KafkaContext
+  ){
+    try {
+      this.kafkaService.handleContributePEPB(payload);
+    } catch (error) {
+      this.logger.error(error)
+    }
+  }
+
   @MessagePattern(Topics.ChartNenCoPhieuNew)
   async handleChartNenCoPhieuNewSignalMessages(
     @Payload() payload: ChartNenInterface[],
     @Ctx() context: KafkaContext
   ) {
-    const withTimeout = (promise, ms, text) => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout ${text}`)), ms))]);
-    
     try {
-      await Promise.all([
-        this.kafkaService.handleBetaWatchListSocket(payload),
-        withTimeout(this.kafkaService.backTestTradingTool(payload), 6000, 'backTestTradingTool'),
-        withTimeout(this.kafkaService.handleContributePEPB(payload), 6000, 'handleContributePEPB'),
-      ]);
+      this.kafkaService.handleBetaWatchListSocket(payload);
+      this.kafkaService.backTestTradingTool(payload);
     } catch (error) {
       this.logger.error(error);
     }
