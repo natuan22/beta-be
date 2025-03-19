@@ -809,71 +809,99 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number){
-    const listStock: any = !Array.isArray(stock) ? `= '${stock}'` : `in (${stock.map(item => `'${item.code}'`).join(',')})` 
+  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
+    try {
+      // Format stock list consistently
+      const listStock = Array.isArray(stock) ? `in (${stock.map(item => `'${item.code}'`).join(',')})` : `= '${stock}'`;
 
-    const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
-      this.redis.get(`price:${listStock}`),
-      this.redis.get(`price:${from}`),
-      this.redis.get(`price:${to}`),
-    ])
+      // Prepare cache keys
+      const priceKey = `price:${listStock}`;
+      const fromKey = `price:${from}`;
+      const toKey = `price:${to}`;
 
-    let [data, lastPrice, date, dateTo] = await Promise.all([
-          !dataRedis ? this.mssqlService.query(`select closePrice, date, code from marketTrade.dbo.historyTicker where code ${listStock} order by date asc`) as any : [], 
-          !realtimePrice ? this.mssqlService.query(`
-            WITH LatestTrade AS (
-              SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
-              FROM tradeIntraday.dbo.tickerTradeVNDIntraday WHERE code ${listStock}
-            )
-            SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code;`) : 1 as any, 
-          !dateRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date >= '${moment(from).format('YYYY-MM-DD')}' order by date asc`) : [],
-          !dateToRedis ? this.mssqlService.query(`select top 1 date from marketTrade.dbo.historyTicker where date <= '${moment(to).format('YYYY-MM-DD')}' order by date desc`) : []
-      ])
+      // Get cached data in parallel
+      const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+        this.redis.get(priceKey),
+        this.redis.get(fromKey),
+        this.redis.get(toKey),
+      ]);
 
-    if(realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)){
-      await this.redis.set(`price:${listStock}`, data, {ttl: 180})
-    }
-    if(!dateRedis && UtilCommonTemplate.hasValidData(date)){
-      await this.redis.set(`price:${from}`, date, {ttl: 180})
-    }
-    if(!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)){
-      await this.redis.set(`price:${to}`, dateTo, {ttl: 180})
-    }
+      // Prepare queries
+      const queries = {
+        data: !dataRedis && `SELECT closePrice, date, code FROM marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date ASC`,
+        lastPrice: !realtimePrice && `
+          WITH LatestTrade AS (
+            SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE code ${listStock}
+          )
+          SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
+        `,
+        date: !dateRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${moment(from).format('YYYY-MM-DD')}' ORDER BY date ASC`,
+        dateTo: !dateToRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${moment(to).format('YYYY-MM-DD')}' ORDER BY date DESC`
+      };
 
-    if(dataRedis){
-      data = dataRedis
-    }
-    if(dateRedis){
-      date = dateRedis
-    }
-    if(dateToRedis){
-      dateTo = dateToRedis
-    }
+      // Execute necessary queries in parallel
+      const [data, lastPrice, date, dateTo] = await Promise.all([
+        queries.data ? this.mssqlService.query(queries.data) : [],
+        queries.lastPrice ? this.mssqlService.query(queries.lastPrice) : realtimePrice,
+        queries.date ? this.mssqlService.query(queries.date) : [],
+        queries.dateTo ? this.mssqlService.query(queries.dateTo) : []
+      ]);
 
-    if(Array.isArray(stock)){
-      const arr = []
+      // Cache valid results
+      const cachePromises = [];
+      if (realtimePrice && !dataRedis && UtilCommonTemplate.hasValidData(data)) {
+        cachePromises.push(this.redis.set(priceKey, data, { ttl: 180 }));
+      }
+      if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
+        cachePromises.push(this.redis.set(fromKey, date, { ttl: 180 }));
+      }
+      if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
+        cachePromises.push(this.redis.set(toKey, dateTo, { ttl: 180 }));
+      }
+      if (cachePromises.length > 0) {
+        await Promise.all(cachePromises);
+      }
 
-      stock.map((item: any) => {
-        const price = data?.filter(res => res.code == item.code)
-        price[price.length - 1]['closePrice'] = !realtimePrice ? (lastPrice.find(price => price.code == item.code)).closePrice : realtimePrice
-        
-        const result = !haveMa ? this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo) : this.calculateMAIndex([...data.filter(res => res.code == item.code)], date, dateTo, item.ma)
-        arr.push({
-          code: item.code,
-          name: result.max.name,
-          total: result.max.total,
-          closePrice: result.data[result.data.length - 1].closePrice,
-          signal: result.max.signal,
-          ma: result.max.ma,
-          closePricePrev: result.data[result.data.length - 1].closePricePrev
-        })
-      })
+      // Use cached data if available
+      const finalData = (dataRedis || data) as Array<{ code: string; closePrice: number; date: string }>;
+      const finalDate = dateRedis || date;
+      const finalDateTo = dateToRedis || dateTo;
+      const lastPriceData = lastPrice as Array<{ code: string; closePrice: number }> | number;
 
-      return arr
+      // Process array of stocks
+      if (Array.isArray(stock)) {
+        return stock.map((item: any) => {
+          const stockData = finalData?.filter(res => res.code === item.code);
+          if (!stockData?.length) return null;
+
+          // Update latest price
+          const latestPrice = !realtimePrice && typeof lastPriceData !== 'number' ? lastPriceData.find(price => price.code === item.code)?.closePrice : realtimePrice;
+          if (latestPrice) {
+            stockData[stockData.length - 1].closePrice = latestPrice;
+          }
+
+          // Calculate indicators
+          const result = !haveMa ? this.calculateMAIndex([...stockData], finalDate, finalDateTo) : this.calculateMAIndex([...stockData], finalDate, finalDateTo, item.ma);
+
+          return {
+            code: item.code,
+            name: result.max.name,
+            total: result.max.total,
+            closePrice: result.data[result.data.length - 1].closePrice,
+            signal: result.max.signal,
+            ma: result.max.ma,
+            closePricePrev: result.data[result.data.length - 1].closePricePrev
+          };
+        }).filter(Boolean);
+      }
+      
+      // Process single stock
+      return this.calculateMAIndex(finalData, finalDate, finalDateTo, undefined, role);
+    } catch (error) {
+      throw new CatchException(error);
     }
-    
-    const result = this.calculateMAIndex(data, date, dateTo, undefined, role)
-    return result
   }
 
   private calculateMAIndex(data: any, date: any, dateTo: any, maNumber?: number, role?: number) {
@@ -1103,7 +1131,7 @@ export class InvestmentService {
     const minute = now.minute();
     const isWeekday = !['Saturday', 'Sunday'].includes(now.format('dddd'));
 
-    return (isWeekday && ((hour === 8 && minute >= 59) || (hour > 8 && hour < 15) || (hour === 15 && minute <= 5)));
+    return (isWeekday && ((hour === 8 && minute >= 59) || (hour > 8 && hour < 15) || (hour === 15 && minute <= 30)));
   }
 
   static arrOrSingle(key: string, code: string | string[]) {
