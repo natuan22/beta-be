@@ -997,28 +997,26 @@ export class StockService {
             ORDER BY row_num
         `
         : `
-          WITH temp
-            AS (SELECT
+          WITH temp AS (
+            SELECT
               name,
-              MAX(lastUpdated) AS lastUpdated,
+              MAX(date) AS date,
               ${sortGoods}
             FROM [macroEconomic].[dbo].[HangHoa]
             WHERE unit != ''
-            GROUP BY name)
-            SELECT
-              h.name,
-              h.price,
-              h.unit,
-              h.change1D AS Day,
-              h.changeMTD AS MTD,
-              h.changeYTD AS YTD
-            FROM [macroEconomic].[dbo].[HangHoa] h
-            INNER JOIN temp t
-              ON t.lastUpdated = h.lastUpdated
-              AND t.name = h.name
-            WHERE unit != ''
-            AND id IS NOT NULL
-            ORDER BY row_num
+            GROUP BY name
+          )
+          SELECT
+            h.name,
+            h.price,
+            h.unit,
+            h.change1D AS Day,
+            h.changeMTD AS MTD,
+            h.changeYTD AS YTD
+          FROM [macroEconomic].[dbo].[HangHoa] h
+          INNER JOIN temp t ON t.date = h.date AND t.name = h.name
+          WHERE unit != '' AND id IS NOT NULL
+          ORDER BY row_num
           `;
       const data: MerchandisePriceInterface[] = await this.dbServer.query(
         query,
