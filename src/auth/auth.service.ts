@@ -305,13 +305,8 @@ export class AuthService {
 
       await this.deviceRepo.save(session);
 
-      res.cookie('rt', refreshToken, {
-        path: '/',
-      });
-
-      res.cookie('at', accessToken, {
-        path: '/',
-      });
+      res.cookie('rt', refreshToken, { path: '/', httpOnly: true });
+      res.cookie('at', accessToken, { path: '/', httpOnly: true });
 
       return new UserResponse({
         ...userByPhone,
