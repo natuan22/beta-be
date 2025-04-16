@@ -2430,12 +2430,17 @@ export class InvestmentService {
 
       // Optimize SQL query with index hints and better join strategy
       const data = await this.mssqlService.query(`
-        WITH LatestPrice AS (SELECT TOP 1 closePrice FROM marketTrade.dbo.tickerTradeVND WHERE code = '${stock}' ORDER BY date DESC)
-        SELECT sr.company, sr.targetPrice, (CAST(sr.targetPrice - lp.closePrice AS FLOAT) / lp.closePrice) * 100 AS percentChange
-        FROM PHANTICH.dbo.StockReco sr
-        CROSS JOIN LatestPrice lp
-        WHERE sr.code = '${stock}' AND sr.reportDate BETWEEN '${startDate}' AND '${endDate}'
-        ORDER BY sr.targetPrice DESC;
+        WITH LatestPrice AS (SELECT TOP 1 closePrice FROM marketTrade.dbo.tickerTradeVND WHERE code = '${stock}' ORDER BY date DESC),
+        RankedReco AS (
+          SELECT sr.code, sr.company, sr.targetPrice, sr.reportDate, ROW_NUMBER() OVER (PARTITION BY sr.company ORDER BY sr.reportDate DESC) AS rn
+          FROM PHANTICH.dbo.StockReco sr
+          WHERE sr.code = '${stock}' AND sr.reportDate BETWEEN '${startDate}' AND '${endDate}'
+        )
+        SELECT rr.code, rr.company, rr.targetPrice, (CAST(rr.targetPrice - lp.closePrice AS FLOAT) / lp.closePrice) * 100 AS percentChange, rr.reportDate
+        FROM RankedReco rr
+        JOIN LatestPrice lp ON 1=1
+        WHERE rr.rn = 1
+        ORDER BY rr.targetPrice DESC;
       `);
       
       return data;
