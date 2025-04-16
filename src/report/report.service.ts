@@ -348,7 +348,7 @@ export class ReportService {
         const tableName = tableType == 0 ? '[foreign]' : '[proprietary]';
         const topStocksCTE = `
           Top5Stock AS (
-            SELECT TOP 5 code, netVal
+            SELECT TOP 5 code, netVal, date
             FROM marketTrade.dbo.${tableName}
             WHERE type = 'STOCK' AND date = '${now}' AND floor = '${floor}' AND netVal ${compareType} 0
             ORDER BY netVal ${orderDirection}
@@ -363,7 +363,8 @@ export class ReportService {
             (p.price_today - p.price_yesterday) / NULLIF(p.price_yesterday, 0) * 100 AS day, 
             t.netVal / 1000000000 as point, 
             p.totalVal / 1000000000 AS value, 
-            p.totalVol AS volume
+            p.totalVol AS volume,
+            t.date
           FROM PriceComparison p
           JOIN Top5Stock t ON p.code = t.code
           WHERE p.price_today IS NOT NULL AND p.price_yesterday IS NOT NULL
@@ -489,7 +490,7 @@ export class ReportService {
         LEFT JOIN StockData sd ON ts.code = sd.code
         ORDER BY ts.type, ts.point DESC;
       `;
-
+      
       const data = await this.mssqlService.query<BuySellActiveResponse[]>(query);
 
       return data.reduce<{ MB: BuySellActiveResponse[]; BM: BuySellActiveResponse[] }>(

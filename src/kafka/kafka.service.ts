@@ -739,7 +739,7 @@ export class KafkaService {
       const endDate = moment().format('YYYY-MM-DD');
       const closePrice = payload[0].closePrice;
       
-      const results = await this.investmentService.test([{ code: item.code, ma: item.ma }], startDate, endDate, 1, closePrice);
+      const results = await this.investmentService.tradingStrategiesMa([{ code: item.code, ma: item.ma }], startDate, endDate, 1, closePrice);
       
       const resultsWithTime = Array.isArray(results) ? results.map(res => ({ ...res, time })) : [];
       

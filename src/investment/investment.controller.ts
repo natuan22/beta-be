@@ -35,6 +35,8 @@ import { TickerTransLogResponse } from './response/tickerTransLog.response';
 import { BackTestTradingToolDto } from './dto/back-test-trading-tool';
 import { BackTestTradingToolBackupDto } from './dto/back-test-trading-tool-back-up';
 import { StockByIndustryDto } from './dto/stock-by-industry.dto';
+import { TradingStrategiesDto } from './dto/trading-strategies.dto';
+import { StockValuationDto } from './dto/stock-valuation.dto';
 
 @Controller('investment')
 @ApiTags('Investment - Công cụ đầu tư')
@@ -138,20 +140,41 @@ export class InvestmentController {
     }
   }
 
-  @Get('test')
-  async test(@GetRoleFromTokenV2() role: number, @Query() q: any, @Res() res: Response) {
+  @Get('trading-strategies')
+  async tradingStrategies(@GetRoleFromTokenV2() role: number, @Query() q: TradingStrategiesDto, @Res() res: Response) {
     try {
-      const data = await this.investmentService.test(q.stock.toUpperCase(), q.from, q.to, 0, null, role);
+      const { indicator, stock, from, to, maShort, maLong } = q;
+      const upperStock = stock.toUpperCase();
+  
+      let data;
+      switch (indicator) {
+        case 'ma':
+          data = await this.investmentService.tradingStrategiesMa(upperStock, from, to, 0, null, role);
+          break;
+        case 'sar':
+          data = await this.investmentService.tradingStrategiesSar(upperStock, from, to);
+          break;
+        case 'macdSignal':
+        case 'macdHistogram':
+          data = await this.investmentService.tradingStrategiesMacdSignal(upperStock, from, to, indicator);
+          break;
+        case 'maShortCutLong':
+          data = await this.investmentService.tradingStrategiesMaShortCutLong(upperStock, from, to, maShort, maLong);
+          break;
+        default:
+          return res.status(HttpStatus.BAD_REQUEST).send(new BaseResponse({ message: 'Invalid indicator' }));
+      }
+  
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
     }
   }
 
-  @Post('test-all-stock')
-  async testAllStock(@Body() q: any, @Res() res: Response) {
+  @Post('trading-strategies-ma-all-stock')
+  async tradingStrategiesMaAllStock(@Body() q: any, @Res() res: Response) {
     try {
-      const data = await this.investmentService.testAllStock(q.stock, q.from, q.to);
+      const data = await this.investmentService.tradingStrategiesMaAllStock(q.stock, q.from, q.to);
       return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
     } catch (e) {
       throw new CatchException(e);
@@ -313,5 +336,31 @@ export class InvestmentController {
       throw new CatchException(error);
     }
   }
-  
+
+  /**
+   * Định giá cổ phiếu
+   */
+  @ApiOperation({ summary: 'Định giá cổ phiếu'})
+  @ApiOkResponse({ status: HttpStatus.OK})
+  @Get('stock-valuation')
+  async stockValuation(@Query() q: StockValuationDto, @Res() res: Response){
+    try {
+      const data = await this.investmentService.getStockValuation(q)
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  @ApiOperation({ summary: 'Lấy giá định giá của các cty khác'})
+  @ApiOkResponse({ status: HttpStatus.OK})
+  @Get('stock-valuation-recommendations')
+  async stockValuationRecommendations(@Query() q: StockDto, @Res() res: Response){
+    try {
+      const data = await this.investmentService.stockValuationRecommendations(q.stock)
+      return res.status(HttpStatus.OK).send(new BaseResponse({ data }));
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
 }

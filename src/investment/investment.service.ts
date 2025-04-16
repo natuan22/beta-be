@@ -32,6 +32,7 @@ import {
 import { UtilsRandomUserAgent } from '../tcbs/utils/utils.random-user-agent';
 import axios from 'axios';
 import { BetaSmartResponse } from './response/betaSmart.response';
+import { StockValuationDto } from './dto/stock-valuation.dto';
 
 @Injectable()
 export class InvestmentService {
@@ -809,7 +810,10 @@ export class InvestmentService {
     return this.getMonth(count - 1, previousEndDate, results);
   }
 
-  async test(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
+  /**
+   * Chỉ báo MA
+   */
+  async tradingStrategiesMa(stock: string | any[], from: string, to: string, haveMa?: 0 | 1, realtimePrice?: number, role?: number) {
     try {
       // Format stock list consistently
       const listStock = Array.isArray(stock) ? `in (${stock.map(item => `'${item.code}'`).join(',')})` : `= '${stock}'`;
@@ -986,6 +990,558 @@ export class InvestmentService {
     return { max: max, data: arr };
   }
 
+  /**
+   * Chỉ báo SAR
+   */
+  async tradingStrategiesSar(stock: string | any[], from: string, to: string) {
+    try {
+      const listStock = Array.isArray(stock) ? `in (${stock.map(item => `'${item.code}'`).join(',')})` : `= '${stock}'`;
+
+      const priceKey = `price:${listStock}`;
+      const fromKey = `price:${from}`;
+      const toKey = `price:${to}`;
+
+      const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+        this.redis.get(priceKey),
+        this.redis.get(fromKey),
+        this.redis.get(toKey),
+      ]);
+      
+      const queries = {
+        data: !dataRedis && `SELECT closePrice, highPrice, lowPrice, date, code FROM marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date ASC`,
+        lastPrice: `
+          WITH LatestTrade AS (
+            SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE code ${listStock}
+          )
+          SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
+        `,
+        date: !dateRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${moment(from).format('YYYY-MM-DD')}' ORDER BY date ASC`,
+        dateTo: !dateToRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${moment(to).format('YYYY-MM-DD')}' ORDER BY date DESC`
+      };
+
+      // Execute necessary queries in parallel
+      const [data, lastPrice, date, dateTo] = await Promise.all([
+        queries.data ? this.mssqlService.query(queries.data) : [],
+        this.mssqlService.query(queries.lastPrice),
+        queries.date ? this.mssqlService.query(queries.date) : [],
+        queries.dateTo ? this.mssqlService.query(queries.dateTo) : []
+      ]);
+
+      // Cache valid results
+      const cachePromises = [];
+      if (!dataRedis && UtilCommonTemplate.hasValidData(data)) {
+        cachePromises.push(this.redis.set(priceKey, data, { ttl: 180 }));
+      }
+      if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
+        cachePromises.push(this.redis.set(fromKey, date, { ttl: 180 }));
+      }
+      if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
+        cachePromises.push(this.redis.set(toKey, dateTo, { ttl: 180 }));
+      }
+      if (cachePromises.length > 0) {
+        await Promise.all(cachePromises);
+      }
+
+      // Use cached data if available
+      const finalData = (dataRedis || data) as Array<{ code: string; closePrice: number; highPrice: number; lowPrice: number; date: string }>;
+      const finalDate = dateRedis || date;
+      const finalDateTo = dateToRedis || dateTo;
+      const lastPriceData = lastPrice as Array<{ code: string; closePrice: number }>;
+
+      // Process array of stocks
+      if (Array.isArray(stock)) {
+        return stock.map((item: any) => {
+          const stockData = finalData?.filter(res => res.code === item.code);
+          if (!stockData?.length) return null;
+
+          // Update latest price
+          const latestPrice = lastPriceData.find(price => price.code === item.code)?.closePrice;
+          if (latestPrice) {
+            stockData[stockData.length - 1].closePrice = latestPrice;
+          }
+
+          // Calculate indicators
+          const result = this.calculatePSARIndex([...stockData], finalDate, finalDateTo);
+
+          return {
+            code: item.code,
+            name: result.max.name,
+            total: result.max.total,
+            closePrice: result.data[0].closePrice,
+            signal: result.max.signal,
+            ma: result.max.psar,
+            closePricePrev: result.data[0].closePricePrev
+          };
+        }).filter(Boolean);
+      }
+
+      // Process single stock
+      return this.calculatePSARIndex(finalData, finalDate, finalDateTo);
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  private calculatePSARIndex(data: any, date: any, dateTo: any) {
+    const price = data.map((item) => item.closePrice);
+    const highPrice = data.map((item) => item.highPrice);
+    const lowPrice = data.map((item) => item.lowPrice);
+    const dateFormat = data.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
+    const indexDateFrom = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(date[0].date));
+    const indexDateTo = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date));
+
+    const psar = calTech.psar({ high: highPrice, low: lowPrice, max: 0.2, step: 0.02 });
+    const newData = dateFormat.map((item, index) => ({ ...item, psar: psar[index] || 0 }));
+
+    let isBuy = false;
+    let indexBuy = 0;
+    let count = 0;
+    let total = 1;
+    let min = 0, max = 0;
+    const detail = [];
+    let lastSignal = 0; // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
+
+    const dataWithPSAR = newData.slice(indexDateFrom, indexDateTo + 1);
+    
+    dataWithPSAR.map((item, index) => {
+      if (item.closePrice > item.psar && !isBuy) {
+        isBuy = true;
+        indexBuy = index;
+        count += 1;
+      }
+
+      if (index == dataWithPSAR.length - 1) {
+        lastSignal = item.closePrice > item.psar ? 0 : item.closePrice < item.psar ? 1 : isBuy ? 2 : 3;
+      }
+    
+      if ((item.closePrice < item.psar && isBuy) || (index == dataWithPSAR.length - 1 && isBuy)) {
+        isBuy = false;
+        const percent = ((item.closePrice - dataWithPSAR[indexBuy].closePrice) / dataWithPSAR[indexBuy].closePrice) * 100;
+
+        total = total * (1 + percent / 100);
+        min = Math.min(min, percent / 100);
+        max = Math.max(max, percent / 100);
+
+        detail.push({
+          date_buy: dataWithPSAR[indexBuy].date,
+          date_sell: item.date,
+          price_buy: dataWithPSAR[indexBuy].closePrice,
+          price_sell: item.closePrice,
+          profit: percent,
+        });
+      }
+    });
+
+    const result = {
+      name: 'SAR',
+      total: total - 1,
+      count: count,
+      min,
+      max,
+      detail,
+      closePrice: price[price.length - 1],
+      signal: lastSignal,
+      psar: psar[psar.length - 1],
+      closePricePrev: price[price.length - 2],
+    };
+
+    return { max: result, data: [result] };
+  }
+
+  /**
+   * Chỉ báo MACD
+   */
+  async tradingStrategiesMacdSignal(stock: string | any[], from: string, to: string, indicator: string) {
+    try {
+      const listStock = Array.isArray(stock) ? `in (${stock.map(item => `'${item.code}'`).join(',')})` : `= '${stock}'`;
+
+      const priceKey = `price:${listStock}`;
+      const fromKey = `price:${from}`;
+      const toKey = `price:${to}`;
+
+      const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+        this.redis.get(priceKey),
+        this.redis.get(fromKey),
+        this.redis.get(toKey),
+      ]);
+      
+      const queries = {
+        data: !dataRedis && `SELECT closePrice, highPrice, lowPrice, date, code FROM marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date ASC`,
+        lastPrice: `
+          WITH LatestTrade AS (
+            SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE code ${listStock}
+          )
+          SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
+        `,
+        date: !dateRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${moment(from).format('YYYY-MM-DD')}' ORDER BY date ASC`,
+        dateTo: !dateToRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${moment(to).format('YYYY-MM-DD')}' ORDER BY date DESC`
+      };
+
+      // Execute necessary queries in parallel
+      const [data, lastPrice, date, dateTo] = await Promise.all([
+        queries.data ? this.mssqlService.query(queries.data) : [],
+        this.mssqlService.query(queries.lastPrice),
+        queries.date ? this.mssqlService.query(queries.date) : [],
+        queries.dateTo ? this.mssqlService.query(queries.dateTo) : []
+      ]);
+
+      // Cache valid results
+      const cachePromises = [];
+      if (!dataRedis && UtilCommonTemplate.hasValidData(data)) {
+        cachePromises.push(this.redis.set(priceKey, data, { ttl: 180 }));
+      }
+      if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
+        cachePromises.push(this.redis.set(fromKey, date, { ttl: 180 }));
+      }
+      if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
+        cachePromises.push(this.redis.set(toKey, dateTo, { ttl: 180 }));
+      }
+      if (cachePromises.length > 0) {
+        await Promise.all(cachePromises);
+      }
+
+      // Use cached data if available
+      const finalData = (dataRedis || data) as Array<{ code: string; closePrice: number; highPrice: number; lowPrice: number; date: string }>;
+      const finalDate = dateRedis || date;
+      const finalDateTo = dateToRedis || dateTo;
+      const lastPriceData = lastPrice as Array<{ code: string; closePrice: number }>;
+
+      // Process array of stocks
+      if (Array.isArray(stock)) {
+        return stock.map((item: any) => {
+          const stockData = finalData?.filter(res => res.code === item.code);
+          if (!stockData?.length) return null;
+
+          // Update latest price
+          const latestPrice = lastPriceData.find(price => price.code === item.code)?.closePrice;
+          if (latestPrice) {
+            stockData[stockData.length - 1].closePrice = latestPrice;
+          }
+
+          // Calculate indicators
+          const result = this.calculateMACDIndex([...stockData], finalDate, finalDateTo, indicator);
+
+          return {
+            code: item.code,
+            name: result.max.name,
+            total: result.max.total,
+            closePrice: result.data[result.data.length - 1].closePrice,
+            signal: result.max.signal,
+            ma: result.max.macd,
+            closePricePrev: result.data[result.data.length - 1].closePricePrev
+          };
+        }).filter(Boolean);
+      }
+      
+      // Process single stock
+      return this.calculateMACDIndex(finalData, finalDate, finalDateTo, indicator);
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  private calculateMACDIndex(data: any, date: any, dateTo: any, indicator: string) {
+    const dataReverse = [...data].reverse();
+
+    const price = dataReverse.map((item) => item.closePrice);
+    const dateFormat = dataReverse.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
+    const indexDateFrom = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(date[0].date));
+    const indexDateTo = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date));
+    
+    const macdResults = calTech.macd({ values: [...price].reverse(), fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false }).reverse();
+    const macd = macdResults.map(value => value.MACD);
+    const macdSignal = macdResults.map(value => value.signal);
+    const macdHistogram = macdResults.map(value => value.histogram);
+
+    const dataWithMACD = dateFormat.map((item, index) => ({ 
+      ...item, 
+      macd: macd[index] || 0, 
+      signal: macdSignal[index] || 0, 
+      histogram: macdHistogram[index] || 0 
+    })).slice(indexDateTo +  1, indexDateFrom).reverse();
+
+    let isBuy = false;
+    let indexBuy = 0;
+    let count = 0;
+    let total = 1;
+    let min = 0, max = 0;
+    const detail = [];
+    let lastSignal = 0;
+
+    const processSignal = (item: any, index: number, prevItem?: any) => {
+      const shouldBuy = this.determineBuySignal(item, prevItem, indicator);
+      const shouldSell = this.determineSellSignal(item, prevItem, isBuy, index, dataWithMACD.length - 1, indicator);
+
+      if (shouldBuy && !isBuy) {
+        isBuy = true;
+        indexBuy = index;
+        count += 1;
+      }
+
+      if(index === dataWithMACD.length - 1) {
+        lastSignal = this.determineLastSignal(item, dataWithMACD[index - 1], isBuy, indicator);
+      }
+
+      if(shouldSell && isBuy) {
+        isBuy = false;
+        const percent = ((item.closePrice - dataWithMACD[indexBuy].closePrice) / dataWithMACD[indexBuy].closePrice) * 100;
+
+        total = total * (1 + percent / 100);
+        min = Math.min(min, percent / 100);
+        max = Math.max(max, percent / 100);
+
+        detail.push({
+          date_buy: dataWithMACD[indexBuy].date,
+          date_sell: item.date,
+          price_buy: dataWithMACD[indexBuy].closePrice,
+          price_sell: item.closePrice,
+          profit: percent,
+        })
+      }
+    }
+    
+    dataWithMACD.forEach((item, index) => {
+      processSignal(item, index, dataWithMACD[index - 1]);
+    });
+    
+    const name = indicator == 'macdSignal' ? 'MACD_Signal' : indicator == 'macdHistogram' ? 'MACD_Histogram' : 'MACD'
+    const result = {
+      name,
+      total: total - 1,
+      count: count,
+      min,
+      max,
+      detail,
+      closePrice: price[price.length - 1],
+      signal: lastSignal,
+      macd: macdResults[macdResults.length - 1],
+      closePricePrev: price[price.length - 2],
+    };
+
+    return { max: result, data: [result] };
+  }
+
+  private determineLastSignal(item: any, prevItem: any, isBuy: boolean, indicator: string): number {
+    if (!prevItem) return 3; // Default to hold sell if no previous data
+
+    switch (indicator) {
+      case 'macdSignal':
+        if (item.macd > item.signal) return 0; // Buy signal
+        if (item.macd < item.signal) return 1; // Sell signal
+        return isBuy ? 2 : 3; // Hold buy or hold sell
+      case 'macdHistogram':
+        if (item.macd < item.signal && item.histogram > prevItem.histogram) return 0; // Buy signal
+        if (item.macd > item.signal && item.histogram < prevItem.histogram) return 1; // Sell signal
+        return isBuy ? 2 : 3; // Hold buy or hold sell
+      default:
+        return 3; // Default to hold sell for unknown indicators
+    }
+  }
+
+  private determineBuySignal(item: any, prevItem: any, indicator: string): boolean {
+    if (!prevItem) return false;
+
+    switch (indicator) {
+      case 'macdSignal':
+        return prevItem.macd < prevItem.signal && item.macd > item.signal;
+      case 'macdHistogram':
+        return item.macd < item.signal && item.histogram > prevItem.histogram;
+      default:
+        return false;
+    }
+  }
+
+  private determineSellSignal(item: any, prevItem: any, isBuy: boolean, index: number, lastIndex: number, indicator: string): boolean {
+    if (!isBuy) return false;
+    if (index === lastIndex) return true;
+
+    switch (indicator) {
+      case 'macdSignal':
+        return prevItem.macd > prevItem.signal && item.macd < item.signal;
+      case 'macdHistogram':
+        return item.macd > item.signal && item.histogram < prevItem.histogram;
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Chỉ báo MA ngắn cắt MA dài
+   */
+  async tradingStrategiesMaShortCutLong(stock: string | any[], from: string, to: string, maShort: string, maLong: string) {
+    try {
+      const listStock = Array.isArray(stock) ? `in (${stock.map(item => `'${item.code}'`).join(',')})` : `= '${stock}'`;
+
+      const priceKey = `price:${listStock}`;
+      const fromKey = `price:${from}`;
+      const toKey = `price:${to}`;
+
+      const [dataRedis, dateRedis, dateToRedis] = await Promise.all([
+        this.redis.get(priceKey),
+        this.redis.get(fromKey),
+        this.redis.get(toKey),
+      ]);
+
+      const queries = {
+        data: !dataRedis && `SELECT closePrice, highPrice, lowPrice, date, code FROM marketTrade.dbo.historyTicker WHERE code ${listStock} ORDER BY date ASC`,
+        lastPrice: `
+          WITH LatestTrade AS (
+            SELECT closePrice, date, code, ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC, time DESC) AS rn
+            FROM tradeIntraday.dbo.tickerTradeVNDIntraday
+            WHERE code ${listStock}
+          )
+          SELECT closePrice, date, code FROM LatestTrade WHERE rn = 1 ORDER BY code
+        `,
+        date: !dateRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date >= '${moment(from).format('YYYY-MM-DD')}' ORDER BY date ASC`,
+        dateTo: !dateToRedis && `SELECT TOP 1 date FROM marketTrade.dbo.historyTicker WHERE date <= '${moment(to).format('YYYY-MM-DD')}' ORDER BY date DESC`
+      };
+
+      // Execute necessary queries in parallel
+      const [data, lastPrice, date, dateTo] = await Promise.all([
+        queries.data ? this.mssqlService.query(queries.data) : [],
+        this.mssqlService.query(queries.lastPrice),
+        queries.date ? this.mssqlService.query(queries.date) : [],
+        queries.dateTo ? this.mssqlService.query(queries.dateTo) : []
+      ]);
+
+      // Cache valid results
+      const cachePromises = [];
+      if (!dataRedis && UtilCommonTemplate.hasValidData(data)) {
+        cachePromises.push(this.redis.set(priceKey, data, { ttl: 180 }));
+      }
+      if (!dateRedis && UtilCommonTemplate.hasValidData(date)) {
+        cachePromises.push(this.redis.set(fromKey, date, { ttl: 180 }));
+      }
+      if (!dateToRedis && UtilCommonTemplate.hasValidData(dateTo)) {
+        cachePromises.push(this.redis.set(toKey, dateTo, { ttl: 180 }));
+      }
+      if (cachePromises.length > 0) {
+        await Promise.all(cachePromises);
+      }
+
+      // Use cached data if available
+      const finalData = (dataRedis || data) as Array<{ code: string; closePrice: number; highPrice: number; lowPrice: number; date: string }>;
+      const finalDate = dateRedis || date;
+      const finalDateTo = dateToRedis || dateTo;
+      const lastPriceData = lastPrice as Array<{ code: string; closePrice: number }>;
+
+      // Process array of stocks
+      if (Array.isArray(stock)) {
+        return stock.map((item: any) => {
+          const stockData = finalData?.filter(res => res.code === item.code);
+          if (!stockData?.length) return null;
+
+          // Update latest price
+          const latestPrice = lastPriceData.find(price => price.code === item.code)?.closePrice;
+          if (latestPrice) {
+            stockData[stockData.length - 1].closePrice = latestPrice;
+          }
+
+          // Calculate indicators
+          const result = this.calculateMaShortCutLong([...stockData], finalDate, finalDateTo, maShort, maLong);
+
+          return {
+            code: item.code,
+            // name: result.max.name,
+            // total: result.max.total,
+            // closePrice: result.data[result.data.length - 1].closePrice,
+            // signal: result.max.signal,
+            // ma: result.max.macd,
+            // closePricePrev: result.data[result.data.length - 1].closePricePrev
+          };
+        }).filter(Boolean);
+      }
+      
+      // Process single stock
+      return this.calculateMaShortCutLong(finalData, finalDate, finalDateTo, maShort, maLong);
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  private calculateMaShortCutLong(data: any, date: any, dateTo: any, maShort: string, maLong: string) {
+    const dataReverse = [...data].reverse();
+
+    const price = dataReverse.map((item) => item.closePrice);
+    const dateFormat = dataReverse.map((item) => ({ ...item, date: UtilCommonTemplate.toDateV2(item.date) }));
+    const indexDateFrom = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(date[0].date));
+    const indexDateTo = dateFormat.findIndex((item) => item.date == UtilCommonTemplate.toDateV2(dateTo[0].date));
+    
+    // Calculate short and long MA
+    const maShortResults = calTech.sma({ values: [...price].reverse(), period: parseInt(maShort) }).reverse();
+    const maLongResults = calTech.sma({ values: [...price].reverse(), period: parseInt(maLong) }).reverse();
+
+    // Combine data with MA values
+    const dataWithMA = dateFormat.map((item, index) => ({
+      ...item,
+      maShort: maShortResults[index] || 0,
+      maLong: maLongResults[index] || 0
+    })).slice(indexDateTo +  1, indexDateFrom).reverse();
+    
+    let isBuy = false;
+    let indexBuy = 0;
+    let count = 0;
+    let total = 1;
+    let min = 0, max = 0;
+    const detail = [];
+    let lastSignal = 0; // 0 - Mua, 1 - Bán, 2 - Hold mua, 3 - Hold bán
+    
+    // Process each data point
+    dataWithMA.forEach((item, index) => {
+      const prevItem = dataWithMA[index - 1];
+      if (!prevItem) return;
+
+      // Check for buy signal (MA ngắn cắt lên MA dài)
+      if (prevItem.maShort < prevItem.maLong && item.maShort > item.maLong && !isBuy) {
+        isBuy = true;
+        indexBuy = index;
+        count += 1;
+      }
+
+      // Determine last signal
+      if (index === dataWithMA.length - 1) {
+        lastSignal = prevItem.maShort < prevItem.maLong && item.maShort > item.maLong ? 0 : prevItem.maShort > prevItem.maLong && item.maShort < item.maLong ? 1 : isBuy ? 2 : 3;
+      }
+
+      // Check for sell signal (MA ngắn cắt xuống MA dài)
+      if ((prevItem.maShort > prevItem.maLong && item.maShort < item.maLong && isBuy) || (index === dataWithMA.length - 1 && isBuy)) {
+        isBuy = false;
+        const percent = ((item.closePrice - dataWithMA[indexBuy].closePrice) / dataWithMA[indexBuy].closePrice) * 100;
+
+        total = total * (1 + percent / 100);
+        min = Math.min(min, percent / 100);
+        max = Math.max(max, percent / 100);
+
+        detail.push({
+          date_buy: dataWithMA[indexBuy].date,
+          date_sell: item.date,
+          price_buy: dataWithMA[indexBuy].closePrice,
+          price_sell: item.closePrice,
+          profit: percent,
+        });
+      }
+    });
+
+    const result = {
+      name: `MA${maShort} cắt MA${maLong}`,
+      total: total - 1,
+      count: count,
+      min,
+      max,
+      detail,
+      closePrice: price[price.length - 1],
+      signal: lastSignal,
+      ma: maShortResults[maShortResults.length - 1],
+      closePricePrev: price[price.length - 2],
+    };
+
+    return { max: result, data: [result] };
+  }
+
   async allStock() {
     try {
       const data: any = await this.mssqlService.query(`select code from marketInfor.dbo.info where status = 'listed' and type = 'STOCK'`);
@@ -1027,9 +1583,9 @@ export class InvestmentService {
     let price;
 
     if (!body?.is_beta_page) {
-      price = await this.test(body.code, body.from, body.to);
+      price = await this.tradingStrategiesMa(body.code, body.from, body.to);
     } else {
-      price = await this.test(
+      price = await this.tradingStrategiesMa(
         [{ code: body.code, ma: body.ma }],
         moment().subtract(2, 'year').format('YYYY-MM-DD'),
         moment().format('YYYY-MM-DD'),
@@ -1062,7 +1618,7 @@ export class InvestmentService {
     await this.redis.set('beta-watch-list', data, { ttl: 0 });
 
     if (body?.is_beta_page) {
-      const price = await this.test(
+      const price = await this.tradingStrategiesMa(
         [{ code: body.code, ma: body.ma }],
         moment().subtract(2, 'year').format('YYYY-MM-DD'),
         moment().format('YYYY-MM-DD'),
@@ -1085,8 +1641,8 @@ export class InvestmentService {
     );
   }
 
-  async testAllStock(code: string[], from: string, to: string) {
-    const data = await this.test(
+  async tradingStrategiesMaAllStock(code: string[], from: string, to: string) {
+    const data = await this.tradingStrategiesMa(
       code.map((item) => ({ code: item })),
       from,
       to,
@@ -1097,7 +1653,7 @@ export class InvestmentService {
   async getBetaWatchList(from: string, to: string) {
     const data: any = await this.redis.get('beta-watch-list');
     if (from) {
-      const result: any = await this.testAllStock(
+      const result: any = await this.tradingStrategiesMaAllStock(
         data.map((item) => item.code),
         from,
         to,
@@ -1108,7 +1664,7 @@ export class InvestmentService {
         nextPT: data[index].nextPT || 0,
       }));
     }
-    const result: any = await this.test(
+    const result: any = await this.tradingStrategiesMa(
       data.map((item) => ({ code: item.code, ma: item.ma })),
       moment().subtract(2, 'year').format('YYYY-MM-DD'),
       moment().format('YYYY-MM-DD'),
@@ -1226,7 +1782,7 @@ export class InvestmentService {
   async getDataBetaSmartTrading() {
     try {
       const data: any = await this.redis.get('beta-watch-list');
-      const result: any = await this.test(
+      const result: any = await this.tradingStrategiesMa(
         data.map((item) => ({ code: item.code, ma: item.ma })),
         moment().subtract(2, 'year').format('YYYY-MM-DD'),
         moment().format('YYYY-MM-DD'),
@@ -1698,5 +2254,193 @@ export class InvestmentService {
     const max = arr.reduce((acc, curr) => !acc?.total ? arr[0] : curr.total > acc.total ? curr : acc, arr[0]);
     
     return { max: max, data: arr };
+  }
+
+  /**
+   * Định giá cổ phiếu
+   */
+  async getStockValuation(q: StockValuationDto) {
+    try {
+      const { stock, average, perWelfareFund = 0.05, averageGrowthLNST: inputGrowthRate } = q;
+      const startDate = moment().subtract(average, 'year').format('YYYY-MM-DD');
+      const endDate = moment().format('YYYY-MM-DD');
+
+      // Cache key for both EPS and BVPS
+      const cacheKey = `eps-bpvs:${stock}`;
+      let epsBvpsData = await this.redis.get(cacheKey) as any[];
+
+      if (!epsBvpsData?.length) {
+        const query = `
+          WITH LatestDate AS (
+            SELECT MAX(date) as maxDate 
+            FROM VISUALIZED_DATA.dbo.filterResource
+            WHERE code = '${stock}'
+          )
+          SELECT f.code, f.EPS, f.BVPS
+          FROM VISUALIZED_DATA.dbo.filterResource f
+          JOIN LatestDate d ON f.date = d.maxDate
+          WHERE f.code = '${stock}'`;
+
+        epsBvpsData = await this.mssqlService.query(query) as any[];
+      
+        if (epsBvpsData?.length) {
+          await this.redis.set(cacheKey, epsBvpsData, { ttl: TimeToLive.OneDay });
+        }
+      }
+
+      // Lấy thông tin ngành và dữ liệu tài chính trong một lần query
+      const financialData = await this.mssqlService.query<Array<{code: string; year: number; value: string}>>(`
+        SELECT TOP 6 code, year, value 
+        FROM financialReport.dbo.financialReportV2 
+        WHERE code = '${stock}' AND quarter = 0 AND id = CASE 
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Ngân hàng') THEN '15'
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Bảo hiểm') THEN '37'
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Dịch vụ tài chính') THEN '1101'
+          ELSE '21'
+        END AND type = 'KQKD'
+        ORDER BY year DESC
+      `);
+
+      if (!financialData?.length) return;
+
+      // Lấy dữ liệu vốn chủ sở hữu
+      const ownersEquityData = await this.mssqlService.query<Array<{value: number}>>(`
+        SELECT TOP 1 value 
+        FROM financialReport.dbo.financialReportV2 
+        WHERE code = '${stock}' AND quarter = 0 AND id = CASE 
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Ngân hàng') THEN '308'
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Bảo hiểm') THEN '40101'
+          WHEN EXISTS (SELECT 1 FROM marketInfor.dbo.info WHERE code = '${stock}' AND LV2 = N'Dịch vụ tài chính') THEN '302'
+          ELSE '30201'
+        END AND type = 'CDKT'
+        ORDER BY year DESC
+      `);
+
+      // Tính toán tăng trưởng lợi nhuận sau thuế
+      const growthRates = financialData.reduce((acc, item, index) => {
+        const currentValue = parseFloat(item.value);
+        const previousValue = index < financialData.length - 1 ? parseFloat(financialData[index + 1].value) : 0;
+        const growthRate = previousValue !== 0 ? ((currentValue - previousValue) / Math.abs(previousValue)) * 100 : 0;
+        
+        if (growthRate !== 0) {
+          acc.push(growthRate);
+        }
+        return acc;
+      }, [] as number[]);
+
+      // Tính trung bình tăng trưởng hoặc sử dụng giá trị từ input
+      const averageGrowthLNST = inputGrowthRate !== undefined ? +inputGrowthRate : 
+        (growthRates.length > 0 ? growthRates.reduce((sum, rate) => sum + rate, 0) / growthRates.length : 0);
+      
+      // Tính trích lập quỹ khen thưởng phúc lợi
+      const currentProfit = parseFloat(financialData[0].value);
+      const projectedProfit = currentProfit + (currentProfit * averageGrowthLNST / 100);
+      const welfareFund = projectedProfit * perWelfareFund;
+
+      // Get PE, PB data for stock and industry
+      const [pePbData] = await this.mssqlService.query<Array<{ stockPE: number; stockPB: number; industryPE: number; industryPB: number; }>>(`
+        WITH Industry AS (SELECT nganh FROM RATIO.dbo.phanNganhTcbs WHERE code = '${stock}' ORDER BY date DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY),
+        StockRatios AS (
+          SELECT AVG(CASE WHEN PE >= 0 AND PE < 100 THEN PE ELSE NULL END) as avgPE, AVG(CASE WHEN PB >= 0 AND PB < 100 THEN PB ELSE NULL END) as avgPB
+          FROM RATIO.dbo.ratioIndayTcbs s
+          WHERE s.code = '${stock}' 
+          AND s.date BETWEEN '${startDate}' AND '${endDate}'
+        ),
+        IndustryRatios AS (
+          SELECT 
+            AVG(CASE WHEN i.PE >= 0 AND i.PE < 100 THEN i.PE ELSE NULL END) as avgIndustryPE, 
+            AVG(CASE WHEN i.PB >= 0 AND i.PB < 100 THEN i.PB ELSE NULL END) as avgIndustryPB
+          FROM RATIO.dbo.ratioIndayTcbs s
+          LEFT JOIN Industry ind ON 1=1
+          LEFT JOIN RATIO.dbo.ratioIndayTcbs i ON i.code = ind.nganh AND i.date = s.date AND i.type = 'industry'
+          WHERE s.code = '${stock}' 
+          AND s.date BETWEEN '${startDate}' AND '${endDate}'
+        )
+        SELECT s.avgPE as stockPE, s.avgPB as stockPB, i.avgIndustryPE as industryPE, i.avgIndustryPB as industryPB
+        FROM StockRatios s
+        CROSS JOIN IndustryRatios i
+      `);
+
+      // Get latest shareout data
+      const [shareout] = await this.mssqlService.query<Array<{ shareout:number }>>(`
+        SELECT TOP 1 shareout FROM RATIO.dbo.ratioInday WHERE code = '${stock}' ORDER BY date DESC
+      `);
+
+      // Calculate forward EPS and BVPS
+      const epsFw = shareout?.shareout ? (projectedProfit - welfareFund) / shareout.shareout : 0;
+      const bvpsFw = shareout?.shareout ? (ownersEquityData[0]?.value + (projectedProfit - welfareFund)) / shareout.shareout : 0;
+
+      // Calculate reasonable prices
+      const eps = epsBvpsData[0]?.EPS || 0;
+      const bvps = epsBvpsData[0]?.BVPS || 0;
+      const stockPE = pePbData?.stockPE || 0;
+      const stockPB = pePbData?.stockPB || 0;
+      const industryPE = pePbData?.industryPE || 0;
+      const industryPB = pePbData?.industryPB || 0;
+
+      const [closePrice] = await this.mssqlService.query<Array<{ closePrice: number }>>(`
+        SELECT TOP 1 closePrice FROM marketTrade.dbo.tickerTradeVND WHERE code = '${stock}' ORDER BY date DESC
+      `);
+
+      return {
+        closePrice: closePrice?.closePrice,
+        averageGrowthLNST,
+        reasonablePriceStock: [
+          stockPE,
+          stockPB,
+          eps,
+          bvps,
+          eps * stockPE,
+          bvps * stockPB
+        ],
+        reasonablePriceIndus: [
+          industryPE,
+          industryPB,
+          eps,
+          bvps,
+          eps * industryPE,
+          bvps * industryPB
+        ],
+        estimatedPriceStock: [
+          stockPE,
+          stockPB,
+          epsFw,
+          bvpsFw,
+          epsFw * stockPE,
+          bvpsFw * stockPB
+        ],
+        estimatedPriceIndus: [
+          industryPE,
+          industryPB,
+          epsFw,
+          bvpsFw,
+          epsFw * industryPE,
+          bvpsFw * industryPB
+        ]
+      };
+    } catch (error) {
+      throw new CatchException(error);
+    }
+  }
+
+  async stockValuationRecommendations(stock: string) {
+    try {
+      const startDate = moment().subtract(3, 'month').format('YYYY-MM-DD');
+      const endDate = moment().format('YYYY-MM-DD');
+
+      // Optimize SQL query with index hints and better join strategy
+      const data = await this.mssqlService.query(`
+        WITH LatestPrice AS (SELECT TOP 1 closePrice FROM marketTrade.dbo.tickerTradeVND WHERE code = '${stock}' ORDER BY date DESC)
+        SELECT sr.company, sr.targetPrice, (CAST(sr.targetPrice - lp.closePrice AS FLOAT) / lp.closePrice) * 100 AS percentChange
+        FROM PHANTICH.dbo.StockReco sr
+        CROSS JOIN LatestPrice lp
+        WHERE sr.code = '${stock}' AND sr.reportDate BETWEEN '${startDate}' AND '${endDate}'
+        ORDER BY sr.targetPrice DESC;
+      `);
+      
+      return data;
+    } catch (error) {
+      throw new CatchException(error);
+    }
   }
 }
